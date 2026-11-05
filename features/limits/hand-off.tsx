@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
@@ -144,12 +143,10 @@ export const HandOffView = ({
   plans,
   history,
   now,
-  toggle,
 }: {
   plans: readonly Plan[];
   history: Readonly<Record<string, Points>>;
   now: number;
-  toggle: ReactNode;
 }) => {
   const days = activity(activityPlans(plans, history), now);
   const found = gaps(days);
@@ -168,7 +165,6 @@ export const HandOffView = ({
           ? "Weekly limits only."
           : `Longest stretch ${clock(longest.from)} to ${clock(Math.min(longest.to, now))}, ${duration(Math.min(longest.to, now) - longest.from)}. Weekly limits only.`
       }
-      actions={toggle}
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div>

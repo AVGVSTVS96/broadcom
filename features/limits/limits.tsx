@@ -36,67 +36,33 @@ export const Limits = ({
     (plan) => plan.hasPlan
   );
 
-  const toggle = <Views views={views} current={view} />;
-
   const body = () => {
     if (view === "weeks") {
       return (
-        <WeeksView
-          plans={plans}
-          daily={daily}
-          history={history}
-          now={now}
-          toggle={toggle}
-        />
+        <WeeksView plans={plans} daily={daily} history={history} now={now} />
       );
     }
 
     if (view === "activity") {
-      return (
-        <ActivityView
-          plans={plans}
-          history={history}
-          now={now}
-          toggle={toggle}
-        />
-      );
+      return <ActivityView plans={plans} history={history} now={now} />;
     }
 
     if (view === "hand-off") {
-      return (
-        <HandOffView
-          plans={plans}
-          history={history}
-          now={now}
-          toggle={toggle}
-        />
-      );
+      return <HandOffView plans={plans} history={history} now={now} />;
     }
 
     if (view === "timeline") {
-      return (
-        <TimelineView
-          plans={plans}
-          history={history}
-          now={now}
-          toggle={toggle}
-        />
-      );
+      return <TimelineView plans={plans} history={history} now={now} />;
     }
 
     return (
-      <SpiralView
-        plans={plans}
-        daily={daily}
-        history={history}
-        now={now}
-        toggle={toggle}
-      />
+      <SpiralView plans={plans} daily={daily} history={history} now={now} />
     );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      <Views views={views} current={view} />
       <Problems problems={problems} />
       {body()}
     </div>

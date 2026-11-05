@@ -13,18 +13,18 @@ export const metadata: Metadata = { title: "Usage" };
 const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
   const params = await searchParams;
   const view = viewOf(params.view);
-  const toggle = <Views views={views} current={view} />;
 
   return (
     <>
       <RefreshOnStale tags={["usage"]} />
-      {view === "wallet" ? (
-        <div className="space-y-5">
-          <WalletView wallet={await readWallet()} toggle={toggle} />
-        </div>
-      ) : (
-        <UsageView usage={await readUsage(queryOf(params))} toggle={toggle} />
-      )}
+      <div className="space-y-5">
+        <Views views={views} current={view} />
+        {view === "wallet" ? (
+          <WalletView wallet={await readWallet()} />
+        ) : (
+          <UsageView usage={await readUsage(queryOf(params))} />
+        )}
+      </div>
     </>
   );
 };
