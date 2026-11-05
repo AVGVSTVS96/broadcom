@@ -40,7 +40,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
           <Mark />
           BROADCOM
         </Link>
-        <div className="order-last w-full lg:order-none lg:w-auto">
+        <div className="ml-auto md:order-last md:ml-0 md:w-full lg:order-none lg:w-auto">
           <Suspense>
             <Nav />
           </Suspense>
