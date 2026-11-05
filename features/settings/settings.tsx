@@ -204,7 +204,7 @@ export const Settings = ({
               </Row>
             ))}
             {group.name === "Routing" && policy !== null ? (
-              <Row label="Cutoffs and agents per account">
+              <Row label="Cutoffs and sessions per account">
                 <Link
                   href="/accounts#routing"
                   className="shrink-0 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
