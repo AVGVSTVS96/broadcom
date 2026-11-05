@@ -43,7 +43,7 @@ export const dimensions = [
   "account",
 ] as const;
 
-export const page = 25;
+export const page = 15;
 
 export interface UsageQuery {
   readonly range: Range;
