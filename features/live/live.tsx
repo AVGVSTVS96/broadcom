@@ -9,7 +9,7 @@ import { Section } from "@/components/viz/section";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { clock, duration, plural } from "@/lib/model/format";
+import { duration, plural, when } from "@/lib/model/format";
 import { agentSdk, byState, threadHref, waiting } from "@/lib/model/live";
 import type { Handoff, Handoffs } from "@/lib/model/live";
 import { nameOf, namesOf } from "@/lib/model/names";
@@ -237,7 +237,7 @@ const AccountLane = ({
   const idle = sessions.length - working.length;
 
   return (
-    <div className="space-y-3 rounded-2xl border p-4 sm:p-5">
+    <div className="space-y-3 max-sm:border-t max-sm:pt-4 max-sm:first:border-t-0 max-sm:first:pt-0 sm:rounded-2xl sm:border sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="flex min-w-0 items-baseline gap-2">
           <h3 className="truncate font-medium">{label}</h3>
@@ -358,24 +358,34 @@ const shades = [
 const shadeOf = (count: number, peak: number) =>
   count <= 0 ? 0 : Math.max(1, Math.ceil(Math.sqrt(count / peak) * 4));
 
+const hour = 3_600_000;
+
 const hourClock = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
 });
 
-const Group = ({ group, name }: { group: Handoff; name: Name }) => {
+const Group = ({
+  group,
+  name,
+  now,
+}: {
+  group: Handoff;
+  name: Name;
+  now: number;
+}) => {
   const shown = group.labels.slice(0, 2);
   const more = group.labels.length - shown.length;
 
   return (
     <li className="space-y-0.5 py-2.5">
       <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="min-w-0">
+        <span className="min-w-0 truncate">
           {group.from === null ? "" : `${name(group.from)} → `}
           {name(group.to)}
         </span>
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {clock(group.at)}
+          {when(group.at, now)}
         </span>
       </div>
       <div className="truncate text-xs text-muted-foreground">
@@ -420,10 +430,12 @@ const Moves = ({
   moves,
   name,
   keys,
+  now,
 }: {
   moves: Handoffs;
   name: Name;
   keys: ReadonlySet<string>;
+  now: number;
 }) => {
   const accounts = useLive((live) => live.accounts);
   const pool = useLive((live) => live.pool);
@@ -453,25 +465,30 @@ const Moves = ({
     })
     .join(", ");
 
-  const counts = [
-    bounce === null ? null : `Last at ${clock(bounce.at)}.`,
-    `${plural(moves.started, "session")} started${moved === "" ? "" : `; ${moved}`} in 24 hours.`,
-  ]
-    .filter((part) => part !== null)
-    .join(" ");
+  const counts = `${plural(moves.started, "session")} started${moved === "" ? "" : `; ${moved}`} in 24 hours.`;
+  const over = bounce !== null && now - bounce.at > hour;
+
+  const title = () => {
+    if (bounce === null) {
+      return limitTitle(limit);
+    }
+
+    const who = `${bounce.label ?? "One session"} moved ${bounce.count} times`;
+
+    return over
+      ? `${who} in an hour, until ${when(bounce.at, now)}`
+      : `${who} in an hour, between ${between(bounce.between, name, keys)}`;
+  };
+
+  const detail = over
+    ? `Between ${between(bounce.between, name, keys)}. ${counts}`
+    : counts;
 
   const marks = [0, 6, 12, 18].map((offset) => moves.from + offset * 3_600_000);
 
   return (
-    <Section
-      title={
-        bounce === null
-          ? limitTitle(limit)
-          : `${bounce.label ?? "One session"} moved ${bounce.count} times in an hour, between ${between(bounce.between, name, keys)}`
-      }
-      detail={counts}
-    >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-8">
+    <Section title={title()} detail={detail}>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
         <div className="min-w-0 space-y-4">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-y-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-4">
             <span className="hidden sm:block" />
@@ -540,6 +557,7 @@ const Moves = ({
                   key={`${group.at} ${group.from} ${group.to}`}
                   group={group}
                   name={name}
+                  now={now}
                 />
               ))}
             </ul>
@@ -568,7 +586,7 @@ export const LiveView = ({ data }: { data: LiveData }) => {
           </p>
         </Section>
       ) : (
-        <Moves moves={data.handoffs} name={name} keys={keys} />
+        <Moves moves={data.handoffs} name={name} keys={keys} now={now} />
       )}
     </div>
   );
