@@ -13,6 +13,7 @@ const pages = [
   { href: "/accounts", name: "Accounts" },
   { href: "/files", name: "Files" },
   { href: "/plugins", name: "Plugins" },
+  { href: "/executor", name: "Executor" },
   { href: "/settings", name: "Settings" },
 ] as const;
 
