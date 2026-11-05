@@ -160,7 +160,7 @@ export const walletOf = (input: WalletInput): Wallet => {
       : [
           {
             credit: granted,
-            detail: `${plural(input.grants.length, "grant")}, ${input.grants.length === 1 ? "ends" : "end"} ${utcDate(Math.min(...input.grants.map((grant) => grant.expiresAt)))}`,
+            detail: plural(input.grants.length, "API key"),
             key: "credit",
             name: "API credit",
             parts: creditParts,

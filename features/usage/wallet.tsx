@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
-import { dollars, plural, times } from "@/lib/model/format";
+import { dollars, plural, times, utcDate } from "@/lib/model/format";
 import type { Part, Source, Wallet } from "@/lib/model/wallet";
 import { cn } from "@/lib/utils";
 
@@ -22,11 +22,10 @@ const percent = (share: number) =>
 
 const priceOf = (source: Source) => source.plan ?? source.credit;
 
-const multiple = (source: Source) => {
-  const price = priceOf(source);
-
-  return price === null || price <= 0 ? null : times(source.ran / price);
-};
+const multiple = (source: Source) =>
+  source.plan === null || source.plan <= 0
+    ? null
+    : times(source.ran / source.plan);
 
 const Tile = ({
   className,
@@ -34,7 +33,7 @@ const Tile = ({
   ...stat
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   unit?: string;
   className?: string;
   children: ReactNode;
@@ -44,24 +43,45 @@ const Tile = ({
   </Stat>
 );
 
-const Tiles = ({ wallet }: { wallet: Wallet }) => (
-  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-3">
-    <Tile
-      label="Plans"
-      value={dollars(wallet.monthly)}
-      unit="/ month"
-      className="col-span-2 sm:col-span-1"
+const Tiles = ({ wallet }: { wallet: Wallet }) => {
+  const { credit } = wallet;
+
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border",
+        credit === null ? "sm:grid-cols-2" : "sm:grid-cols-3"
+      )}
     >
-      {wallet.plans.join(", ")}
-    </Tile>
-    <Tile label="At API prices" value={dollars(wallet.ran)}>
-      Last 30 days
-    </Tile>
-    <Tile label="Per year" value={dollars(wallet.monthly * 12)}>
-      In plans at this rate
-    </Tile>
-  </div>
-);
+      <Tile
+        label="Plans"
+        value={dollars(wallet.monthly)}
+        unit="/ month"
+        className={cn(credit !== null && "col-span-2 sm:col-span-1")}
+      >
+        {wallet.plans.join(", ")}
+      </Tile>
+      <Tile label="At API prices" value={dollars(wallet.ran)}>
+        Last 30 days
+      </Tile>
+      {credit === null ? null : (
+        <Tile
+          label="API credit"
+          value={
+            <span
+              className={cn(credit.left < credit.granted * 0.05 && "text-bad")}
+            >
+              {dollars(credit.left)}
+            </span>
+          }
+          unit="left"
+        >
+          Of {dollars(credit.granted)}, ends {utcDate(credit.ends)}
+        </Tile>
+      )}
+    </div>
+  );
+};
 
 const size = 200;
 
