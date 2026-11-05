@@ -6,6 +6,7 @@ export default defineConfig({
   ignorePatterns: [
     ...(ultracite.ignorePatterns ?? []),
     "tools/oxlint/anti-slop/**",
+    "tsconfig.json",
   ],
   sortTailwindcss: {
     functions: ["clsx", "cn", "cva"],
