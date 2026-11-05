@@ -315,6 +315,9 @@ const Curve = ({
   );
 };
 
+const points = (value: number) =>
+  value < 10 ? value.toFixed(1) : String(Math.round(value));
+
 const barHeight = (value: number, top: number) =>
   `${Math.max(2, (value / top) * 100)}%`;
 
@@ -345,8 +348,8 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
           over ? "text-foreground" : "text-muted-foreground"
         )}
       >
-        {ahead ? `~${day.forecast.toFixed(1)}` : null}
-        {day.used === null ? null : used.toFixed(1)}
+        {ahead ? `~${points(day.forecast)}` : null}
+        {day.used === null ? null : points(used)}
       </span>
       {ahead ? (
         <span
@@ -411,7 +414,9 @@ const PerDay = ({ turn }: { turn: Turn }) => {
   );
 };
 
-const outNote = (shift: number | null, projected: boolean, out: boolean) => {
+const outNote = (turn: Turn, shift: number | null, projected: boolean) => {
+  const [, again] = turn.runOuts;
+
   if (shift !== null) {
     return `${shiftText(shift)} than the week before`;
   }
@@ -420,7 +425,11 @@ const outNote = (shift: number | null, projected: boolean, out: boolean) => {
     return "if the pace holds";
   }
 
-  return out ? "first one read" : "not this week";
+  if (again !== undefined) {
+    return `again ${clock(toMinute(again))}`;
+  }
+
+  return turn.ranOut === null ? "not this week" : "";
 };
 
 const lockEnd = (locks: readonly Span[], turn: Turn, pace: Pace | null) => {
@@ -474,7 +483,7 @@ const Stats = ({
         }
       >
         <div className="text-sm text-muted-foreground">
-          {outNote(shift, projected, out !== null)}
+          {outNote(turn, shift, projected)}
         </div>
       </Stat>
       <Stat
