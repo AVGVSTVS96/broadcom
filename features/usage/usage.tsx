@@ -26,7 +26,7 @@ import {
 } from "@/features/usage/words";
 import { useLive } from "@/lib/live/client";
 import { dollars, when } from "@/lib/model/format";
-import { format } from "@/lib/model/usage";
+import { format, isLimit } from "@/lib/model/usage";
 import type { Unit } from "@/lib/model/usage";
 import type { SessionState } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
@@ -220,6 +220,20 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
   );
 };
 
+const amountOf = (unit: Unit, value: number | null) => {
+  const text = format(unit, value);
+
+  if (value === null || !isLimit(unit)) {
+    return text;
+  }
+
+  const kind = unit === "week" ? "weekly" : "5-hour";
+
+  return value >= 100
+    ? text.replace("limits", `${kind} limits`)
+    : `${text} of a ${kind} limit`;
+};
+
 const readingWords = (unit: Unit) =>
   unit === "fiveHour" ? "5-hour readings" : "Weekly readings";
 
@@ -230,7 +244,7 @@ const verdictOf = (usage: Usage) => {
   const { coverage } = usage;
 
   if (q !== "") {
-    return `“${q}” used ${format(unit, total)} ${rangeWords[range]}`;
+    return `“${q}” used ${amountOf(unit, total)} ${rangeWords[range]}`;
   }
 
   if (top === undefined) {
@@ -245,7 +259,7 @@ const verdictOf = (usage: Usage) => {
     return `${readingWords(unit)} cover ${coverage.read.length} of ${coverage.active} ${slotWords[usage.size]}s`;
   }
 
-  return `${top.label} led with ${percent(top.values[unit] ?? 0, total)} of ${format(unit, total)} ${rangeWords[range]}`;
+  return `${top.label} led with ${percent(top.values[unit] ?? 0, total)} of ${amountOf(unit, total)} ${rangeWords[range]}`;
 };
 
 const evidenceOf = (usage: Usage) => {
@@ -305,7 +319,20 @@ const tileNote = (usage: Usage, unit: Unit) => {
 
   return unit === query.unit && coverage !== null
     ? `Readings on ${coverage.read.length} of ${coverage.active} ${slotWords[usage.size]}s`
-    : "Summed over plans";
+    : "Across all plans";
+};
+
+const TileValue = ({ unit, value }: { unit: Unit; value: number | null }) => {
+  const [number, ...rest] = format(unit, value).split(" ");
+
+  return (
+    <div className="flex items-baseline gap-1 truncate">
+      <span className="text-3xl tracking-tight tabular-nums sm:text-4xl">
+        {number}
+      </span>
+      <span className="text-sm text-muted-foreground">{rest.join(" ")}</span>
+    </div>
+  );
 };
 
 const Tiles = ({ usage }: { usage: Usage }) => {
@@ -335,9 +362,7 @@ const Tiles = ({ usage }: { usage: Usage }) => {
             />
             {name}
           </div>
-          <div className="truncate text-3xl tracking-tight sm:text-4xl">
-            {format(unit, usage.total.values[unit])}
-          </div>
+          <TileValue unit={unit} value={usage.total.values[unit]} />
           <div className="min-h-4 text-xs text-muted-foreground">
             {tileNote(usage, unit)}
           </div>
@@ -716,10 +741,14 @@ const Ranking = ({ usage }: { usage: Usage }) => {
   );
 };
 
-const Body = ({ usage }: { usage: Usage }) => (
+const Body = ({ usage, toggle }: { usage: Usage; toggle: ReactNode }) => (
   <>
     <Toolbar usage={usage} />
-    <Section title={verdictOf(usage)} detail={evidenceOf(usage)}>
+    <Section
+      title={verdictOf(usage)}
+      detail={evidenceOf(usage)}
+      actions={toggle}
+    >
       <div className="space-y-6">
         <Tiles usage={usage} />
         {usage.rows.length === 0 && usage.selected === null ? (
@@ -742,8 +771,14 @@ const Body = ({ usage }: { usage: Usage }) => (
   </>
 );
 
-export const UsageView = ({ usage }: { usage: Usage }) => (
+export const UsageView = ({
+  usage,
+  toggle,
+}: {
+  usage: Usage;
+  toggle: ReactNode;
+}) => (
   <UsageNav>
-    <Body usage={usage} />
+    <Body usage={usage} toggle={toggle} />
   </UsageNav>
 );
