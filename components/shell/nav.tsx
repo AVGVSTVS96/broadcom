@@ -9,7 +9,7 @@ const pages = [
   { href: "/", name: "Overview" },
   { href: "/limits", name: "Limits" },
   { href: "/usage", name: "Usage" },
-  { href: "/sessions", name: "Sessions" },
+  { href: "/live", name: "Live" },
   { href: "/accounts", name: "Accounts" },
 ] as const;
 
