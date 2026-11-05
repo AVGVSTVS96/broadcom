@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 
-import { handoffs, threadHref } from "@/lib/model/live";
+import { handoffs, threadHref, waiting } from "@/lib/model/live";
 import type { Move } from "@/lib/model/live";
+import type { LiveSession } from "@/lib/proxy/schema";
 
 const hour = 3_600_000;
 
@@ -48,4 +49,62 @@ test("thread rows link to their conversation where the app has links", () => {
   expect(threadHref("t:t3:abc")).toBe("t3-thread://v1/abc");
   expect(threadHref("t:buzz:abc")).toBeNull();
   expect(threadHref("p:local:/home")).toBeNull();
+});
+
+test("the worst hour of one session's moves in the day reads as a bounce", () => {
+  const burst = now - 5 * hour;
+
+  const digest = handoffs(
+    [
+      ...Array.from({ length: 7 }, (_, index) =>
+        move(
+          burst + index * 5 * 60_000,
+          "limit",
+          index % 2 === 0 ? "a" : "b",
+          index % 2 === 0 ? "b" : "a",
+          "busy"
+        )
+      ),
+      move(now - 20 * 60_000, "limit", "a", "c", "busy"),
+      move(now - 2 * hour, "limit", "a", "b", "calm"),
+    ].map((one) => ({ ...one, session: one.label ?? "" })),
+    now
+  );
+
+  expect(digest.bounce).toEqual({
+    at: burst + 30 * 60_000,
+    between: ["a", "b"],
+    count: 7,
+    label: "busy",
+  });
+});
+
+const session = (
+  id: string,
+  since: number,
+  state: LiveSession["state"],
+  account: string | null,
+  label = id
+): LiveSession => ({
+  account,
+  app: null,
+  cwd: "/",
+  entrypoint: "cli",
+  host: "server",
+  id,
+  label,
+  row: "p:local:/",
+  since,
+  state,
+});
+
+test("only blocked sessions the proxy still seats, on a thread nothing newer took over, wait", () => {
+  expect(
+    waiting([
+      session("old", now - 30 * 24 * hour, "blocked", null),
+      session("asks", now - hour, "blocked", "a"),
+      session("dm", now - 3 * hour, "blocked", "a", "DM"),
+      session("dm2", now - hour, "working", "a", "DM"),
+    ]).map((one) => one.id)
+  ).toEqual(["asks"]);
 });

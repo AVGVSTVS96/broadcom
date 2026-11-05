@@ -1,5 +1,6 @@
 import "server-only";
 import { Effect, Schema } from "effect";
+import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
 
 import { handoffs } from "@/lib/model/live";
@@ -16,35 +17,41 @@ export interface LiveData {
   readonly grants: readonly Pick<Grant, "account" | "credentialId">[];
 }
 
-export const readLiveData = async (): Promise<LiveData> => {
-  await connection();
+const readHandoffs = async () => {
+  "use cache";
+  cacheLife({ expire: 300, revalidate: 30, stale: 30 });
+  cacheTag("accounts");
+
+  const now = Date.now();
 
   return await runtime.runPromise(
     Effect.gen(function* () {
-      const proxy = yield* Proxy;
-      const now = Date.now();
+      const { moves } = yield* (yield* Proxy).get("/deck/accounts", Moves);
 
-      const { moves, credits } = yield* Effect.all(
-        {
-          credits: proxy
-            .get("/deck/credits", Credits)
-            .pipe(Effect.orElseSucceed(() => ({ api: [] }))),
-          moves: proxy.get("/deck/accounts", Moves).pipe(
-            Effect.map((view) => handoffs(view.moves, now)),
-            Effect.orElseSucceed(() => null)
-          ),
-        },
-        { concurrency: "unbounded" }
-      );
-
-      return {
-        grants: credits.api.map((grant) => ({
-          account: grant.account,
-          credentialId: grant.credentialId,
-        })),
-        handoffs: moves,
-        now,
-      };
+      return handoffs(moves, now);
     })
   );
+};
+
+const readGrants = async () =>
+  await runtime.runPromise(
+    Effect.gen(function* () {
+      const credits = yield* (yield* Proxy).get("/deck/credits", Credits);
+
+      return credits.api.map((grant) => ({
+        account: grant.account,
+        credentialId: grant.credentialId,
+      }));
+    }).pipe(Effect.orElseSucceed(() => []))
+  );
+
+export const readLiveData = async (): Promise<LiveData> => {
+  await connection();
+
+  const [moves, grants] = await Promise.all([
+    readHandoffs().catch(() => null),
+    readGrants(),
+  ]);
+
+  return { grants, handoffs: moves, now: Date.now() };
 };
