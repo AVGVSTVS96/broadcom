@@ -18,7 +18,12 @@ export const Legend = ({
   items,
   className,
 }: {
-  items: readonly { key: Key; label: string; className?: string }[];
+  items: readonly {
+    key: Key;
+    label: string;
+    className?: string;
+    fill?: string;
+  }[];
   className?: string;
 }) => (
   <ul
@@ -33,7 +38,11 @@ export const Legend = ({
           aria-hidden
           className={cn("flex items-center text-foreground", item.className)}
         >
-          {keys[item.key]}
+          {item.fill === undefined ? (
+            keys[item.key]
+          ) : (
+            <span className={cn("size-2.5 rounded-[3px]", item.fill)} />
+          )}
         </span>
         {item.label}
       </li>

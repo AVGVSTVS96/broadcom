@@ -14,7 +14,7 @@ import type { Points } from "@/lib/model/history";
 import { windowPace } from "@/lib/model/pace";
 import { logins, names } from "@/lib/model/pool";
 import { windows } from "@/lib/model/timeline";
-import { weeksOf } from "@/lib/model/weeks";
+import { weeksOf, withHistory } from "@/lib/model/weeks";
 import type { Account, Grant } from "@/lib/proxy/schema";
 
 const resetsAt = Date.UTC(2026, 10, 8, 2);
@@ -267,24 +267,68 @@ describe("windows", () => {
   });
 });
 
-describe("weeks", () => {
-  test("weeks split Monday to Sunday, the first one partial", () => {
-    const since = new Date(2026, 9, 17).getTime();
-    const now = new Date(2026, 10, 5, 12).getTime();
+const novemberDay = (date: number, hour = 0) =>
+  new Date(2026, 10, date, hour).getTime();
 
-    const days = [
+describe("weeks", () => {
+  const since = new Date(2026, 9, 17).getTime();
+  const now = new Date(2026, 10, 5, 12).getTime();
+
+  const daily = {
+    days: [
       [new Date(2026, 9, 17).getTime(), 10],
       [new Date(2026, 9, 20).getTime(), 30],
       [new Date(2026, 10, 3).getTime(), 20],
-    ] as const;
+    ] as const,
+    id: "a",
+  };
 
-    const result = weeksOf({ days, id: "a" }, since, now);
+  test("weeks split Monday to Sunday, the first one partial", () => {
+    const result = weeksOf(daily, since, now, { left: 5, locks: [] });
 
     expect(result.weeks).toHaveLength(4);
     expect(result.weeks[0]?.part).toBe(true);
-    expect(result.weeks[0]?.days.slice(0, 4)).toEqual([null, null, null, null]);
+    expect(result.weeks[0]?.days[3]?.used).toBeNull();
     expect(result.base).toBe(30);
     expect(result.weeks[3]?.current).toBe(true);
-    expect(result.weeks[3]?.forecast).toBeCloseTo((20 / 4) * 7);
+    expect(result.weeks[3]?.expected).toBeCloseTo(25);
+  });
+
+  test("a locked plan expects nothing more until its reset", () => {
+    const result = weeksOf(daily, since, now, {
+      left: 0,
+      locks: [
+        [new Date(2026, 10, 3, 10).getTime(), new Date(2026, 10, 9).getTime()],
+      ],
+    });
+
+    const week = result.weeks.at(-1);
+
+    expect(week?.expected).toBe(20);
+    expect(week?.days[1]?.ranOut).toBe(true);
+    expect(week?.days[6]?.locked).toBe(true);
+  });
+
+  test("limit history replaces the usage estimate for the days it covers", () => {
+    const merged = withHistory(
+      {
+        days: [
+          [novemberDay(1), 4],
+          [novemberDay(3), 1],
+        ],
+        id: "a",
+      },
+      [
+        [novemberDay(2, 12), 0],
+        [novemberDay(3, 9), 60],
+        [novemberDay(3, 20), 99],
+      ],
+      novemberDay(3, 21)
+    );
+
+    expect(merged.days).toEqual([
+      [novemberDay(1), 4],
+      [novemberDay(3), 99],
+    ]);
   });
 });

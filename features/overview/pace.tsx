@@ -20,10 +20,9 @@ import { clock, duration, percent, times } from "@/lib/model/format";
 import { WEEK, valueAt } from "@/lib/model/history";
 import { lockedFor } from "@/lib/model/pace";
 import type { Pace } from "@/lib/model/pace";
+import { byPace } from "@/lib/model/pool";
+import type { Plan } from "@/lib/model/pool";
 import { cn } from "@/lib/utils";
-
-import { byPace } from "./plans";
-import type { Plan } from "./plans";
 
 type Paced = Plan & { readonly pace: Pace };
 

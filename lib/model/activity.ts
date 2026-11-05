@@ -8,8 +8,17 @@ export interface Plan {
   readonly points: Points;
 }
 
+export interface PlanHour {
+  readonly id: string;
+  readonly used: number;
+  readonly present: boolean;
+  readonly locked: boolean;
+  readonly ranOut: boolean;
+}
+
 export interface Hour {
   readonly from: number;
+  readonly plans: readonly PlanHour[];
   readonly used: number;
   readonly runOuts: readonly string[];
   readonly free: number;
@@ -39,22 +48,24 @@ export const activity = (plans: readonly Plan[], now: number, days = 7) => {
       const to = addHours(dayStart, index + 1);
       const middle = Math.min(now, (from + to) / 2);
 
-      const present = locks.filter(
-        ({ plan }) => (plan.points[0]?.[0] ?? Infinity) <= middle
-      );
+      const byPlan = locks.map(({ plan, spans }): PlanHour => ({
+        id: plan.id,
+        locked: isLocked(spans, middle),
+        present: (plan.points[0]?.[0] ?? Infinity) <= middle,
+        ranOut: spans.some(([start]) => start >= from && start < to),
+        used: usedBetween(plan.points, from, to),
+      }));
+
+      const present = byPlan.filter((plan) => plan.present);
 
       return {
-        free: present.filter(({ spans }) => !isLocked(spans, middle)).length,
+        free: present.filter((plan) => !plan.locked).length,
         from,
         future: from > now,
+        plans: byPlan,
         present: present.length,
-        runOuts: locks.flatMap(({ plan, spans }) =>
-          spans.some(([start]) => start >= from && start < to) ? [plan.id] : []
-        ),
-        used: plans.reduce(
-          (sum, plan) => sum + usedBetween(plan.points, from, to),
-          0
-        ),
+        runOuts: byPlan.flatMap((plan) => (plan.ranOut ? [plan.id] : [])),
+        used: byPlan.reduce((sum, plan) => sum + plan.used, 0),
       };
     });
 

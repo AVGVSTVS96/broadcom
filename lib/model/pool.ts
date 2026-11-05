@@ -1,3 +1,6 @@
+import type { Points } from "@/lib/model/history";
+import { windowPace } from "@/lib/model/pace";
+import type { Pace } from "@/lib/model/pace";
 import type { Account, Grant } from "@/lib/proxy/schema";
 
 export interface Login {
@@ -62,3 +65,25 @@ export const creditLeft = (grants: readonly Grant[]) =>
 
 export const creditTotal = (grants: readonly Grant[]) =>
   grants.reduce((sum, grant) => sum + grant.allowance, 0);
+
+export interface Plan extends Login {
+  readonly pace: Pace | null;
+}
+
+export const plansOf = (
+  accounts: Readonly<Record<string, Account>>,
+  grants: readonly Grant[],
+  history: Readonly<Record<string, Points>>,
+  now: number
+): readonly Plan[] =>
+  logins(Object.values(accounts), grants).map((login) => ({
+    ...login,
+    pace: login.hasPlan
+      ? windowPace(login.account.week, history[login.id] ?? [], now)
+      : null,
+  }));
+
+export const byPace = (plans: readonly Plan[]) =>
+  plans
+    .filter((plan) => plan.pace !== null)
+    .toSorted((a, b) => (b.pace?.pace ?? 0) - (a.pace?.pace ?? 0));

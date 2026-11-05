@@ -10,11 +10,11 @@ import {
   hasRoom,
   left,
 } from "@/lib/model/pool";
+import type { Plan } from "@/lib/model/pool";
 import type { Pool } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
-import { sessionTone, weekTone } from "./plans";
-import type { Plan } from "./plans";
+import { sessionTone, weekTone } from "./tones";
 
 const Column = ({
   label,
