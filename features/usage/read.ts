@@ -9,6 +9,7 @@ import {
   coverageOf,
   groupings,
   isLimit,
+  labelsOf,
   oneOf,
   ranges,
   readingsOf,
@@ -250,6 +251,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
   );
 
   const names = namesOf(view.facets.account ?? [], credits.api);
+  const labels = labelsOf(view.rows);
 
   const rowOf = (row: UsageRow): Row => ({
     agentSdk: row.agentSdk,
@@ -259,7 +261,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     label:
       query.by === "account"
         ? (names[row.key.slice(2)] ?? row.label)
-        : row.label,
+        : (labels.get(row.key) ?? row.label),
     lastActiveAt: row.lastActiveAt,
     sessions: row.sessions,
     values: valuesOf(row.amount, row.points),

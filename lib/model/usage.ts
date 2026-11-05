@@ -68,6 +68,10 @@ const points = (value: number) => {
     return "<0.1%";
   }
 
+  if (value >= 100) {
+    return `${(Math.round(value / 10) / 10).toFixed(1)} limits`;
+  }
+
   return `${value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString("en")}%`;
 };
 
@@ -391,6 +395,36 @@ export const bucketLabel = (at: number, size: BucketSize, zone: string) => {
     timeZone: zone,
     weekday: "short",
   }).format(at);
+};
+
+const placeOf = (project: string) =>
+  project
+    .replace(/^local:/u, "")
+    .replace(/^github\.com\//u, "")
+    .replace(/^\/(?:home|Users)\/[^/]+/u, "~");
+
+export const labelsOf = (
+  rows: readonly { readonly key: string; readonly label: string }[]
+): ReadonlyMap<string, string> => {
+  const named = rows.map((row) => ({
+    key: row.key,
+    label: /^t:telegram:-\d+$/u.test(row.key) ? "General" : row.label,
+  }));
+
+  const counts = new Map<string, number>();
+
+  for (const row of named) {
+    counts.set(row.label, (counts.get(row.label) ?? 0) + 1);
+  }
+
+  return new Map(
+    named.map((row) => [
+      row.key,
+      (counts.get(row.label) ?? 0) > 1 && row.key.startsWith("p:")
+        ? placeOf(row.key.slice(2))
+        : row.label,
+    ])
+  );
 };
 
 export const totalOf = (
