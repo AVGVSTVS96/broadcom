@@ -19,9 +19,10 @@ const ChangesPage = async ({ params }: PageProps<"/files/[ws]/changes">) => {
   const [changes, diff] = await Promise.all([readChanges(ws), readDiff(ws)]);
   const shown = new Set(splitPatch(diff.patch).map(patchPath));
 
-  const left = changes.files.flatMap((file) =>
-    shown.has(file.path) ? [] : [file.path]
-  );
+  const left = [
+    ...changes.files.map((file) => file.path),
+    ...changes.fresh,
+  ].filter((file) => !shown.has(file));
 
   return (
     <ChangesView
@@ -32,6 +33,7 @@ const ChangesPage = async ({ params }: PageProps<"/files/[ws]/changes">) => {
           : `${ws.name} → ${ws.base ?? "detached"}`
       }
       files={changes.files}
+      fresh={changes.fresh}
       patch={diff.patch}
       left={left}
       ahead={changes.ahead}

@@ -36,11 +36,9 @@ const FilesLayout = async ({
     })
   );
 
-  const changed = changes.files.filter((file) => file.status !== "untracked");
-
   return (
     <Bench>
-      <FilesBar repos={repos} changed={changed.length} />
+      <FilesBar repos={repos} changed={changes.files.length} />
       <div className="flex min-h-0 flex-1">{children}</div>
       <Watch ws={ws.id} />
     </Bench>

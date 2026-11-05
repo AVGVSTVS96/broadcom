@@ -18,6 +18,7 @@ export const ChangesView = ({
   ws,
   where,
   files,
+  fresh,
   patch,
   left,
   ahead,
@@ -26,6 +27,7 @@ export const ChangesView = ({
   ws: string;
   where: string;
   files: readonly Change[];
+  fresh: readonly string[];
   patch: string;
   left: readonly string[];
   ahead: number;
@@ -34,12 +36,15 @@ export const ChangesView = ({
   const router = useRouter();
   const closeSide = usePickedInSide();
   const [focus, setFocus] = useState("");
-  const edited = files.filter((file) => file.status !== "untracked");
-  const fresh = files.length - edited.length;
-  const added = edited.reduce((sum, file) => sum + file.added, 0);
-  const removed = edited.reduce((sum, file) => sum + file.removed, 0);
+  const added = files.reduce((sum, file) => sum + file.added, 0);
+  const removed = files.reduce((sum, file) => sum + file.removed, 0);
   const outside = new Set(left);
-  const open = edited.length > 0 || files.length > 300 ? edited : files;
+  const paths = [...files.map((file) => file.path), ...fresh].toSorted();
+
+  const open =
+    files.length > 0 || fresh.length > 300
+      ? files.map((file) => file.path)
+      : fresh;
 
   return (
     <>
@@ -47,8 +52,9 @@ export const ChangesView = ({
         <Tree
           paths={files.map((file) => file.path)}
           changes={files}
+          fresh={fresh}
           selected={focus}
-          open={open.map((file) => file.path)}
+          open={open}
           showCounts
           onPick={(picked) => {
             if (outside.has(picked)) {
@@ -63,8 +69,8 @@ export const ChangesView = ({
       <div className="flex min-w-0 flex-1 flex-col">
         <FileBar>
           <span className="flex min-w-0 items-center gap-2 tabular-nums">
-            {edited.length > 0 && (
-              <span className="shrink-0">{many(edited.length, "file")}</span>
+            {files.length > 0 && (
+              <span className="shrink-0">{many(files.length, "file")}</span>
             )}
             {added > 0 && (
               <span className="text-ok">+{added.toLocaleString("en-US")}</span>
@@ -74,9 +80,9 @@ export const ChangesView = ({
                 −{removed.toLocaleString("en-US")}
               </span>
             )}
-            {fresh > 0 && (
+            {fresh.length > 0 && (
               <span className="shrink-0 text-muted-foreground">
-                {many(fresh, "new file")}
+                {many(fresh.length, "new file")}
               </span>
             )}
           </span>
@@ -85,13 +91,13 @@ export const ChangesView = ({
             {ahead > 0 && ` · ${ahead} ahead`}
             {behind > 0 && ` · ${behind} behind`}
           </span>
-          {files.length > 0 && (
+          {paths.length > 0 && (
             <Tools>
               <StylePills />
             </Tools>
           )}
         </FileBar>
-        {files.length === 0 ? (
+        {paths.length === 0 ? (
           <p className="m-auto p-6 text-sm text-muted-foreground">
             No changes.
           </p>

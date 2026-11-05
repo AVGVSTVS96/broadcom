@@ -120,6 +120,7 @@ export const Side = ({
       <Sheet open={sideOpen} onOpenChange={setSideOpen}>
         <SheetContent
           side="left"
+          initialFocus={false}
           className="w-[85vw] gap-0 p-0 pt-[env(safe-area-inset-top)]"
         >
           <SheetTitle className="px-4 pt-4 pb-2 text-sm">{title}</SheetTitle>

@@ -35,9 +35,9 @@ export const watchWorkspace = async (ws: Workspace, changed: () => void) => {
     wanted: (name: string) => boolean,
     recursive = false
   ) => {
-    if (existsSync(dir)) {
+    if (existsSync(/*turbopackIgnore: true*/ dir)) {
       watchers.push(
-        watch(dir, { recursive }, (_, name) => {
+        watch(/*turbopackIgnore: true*/ dir, { recursive }, (_, name) => {
           if (name !== null && !name.endsWith(".lock") && wanted(name)) {
             changed();
           }
