@@ -13,10 +13,13 @@ import type { ReactNode } from "react";
 import { applyChange } from "@/lib/live/event";
 import type { Live, LiveEvent } from "@/lib/live/event";
 
+const refreshEvery = 30_000;
+
 interface Store {
   readonly read: () => Live;
   readonly subscribe: (listener: () => void) => () => void;
   readonly apply: (event: LiveEvent) => void;
+  readonly wanted: Map<string, number>;
 }
 
 const createStore = (initial: Live): Store => {
@@ -46,10 +49,21 @@ const createStore = (initial: Live): Store => {
         listeners.delete(listener);
       };
     },
+    wanted: new Map(),
   };
 };
 
 const LiveContext = createContext<Store | null>(null);
+
+const useStore = () => {
+  const store = use(LiveContext);
+
+  if (store === null) {
+    throw new Error("useLive needs a LiveProvider above it");
+  }
+
+  return store;
+};
 
 export const LiveProvider = ({
   initial,
@@ -63,25 +77,36 @@ export const LiveProvider = ({
 
   useEffect(() => {
     const source = new EventSource("/api/live");
-    let refresh: ReturnType<typeof setTimeout> | undefined;
+    let last = 0;
+    let pending: ReturnType<typeof setTimeout> | undefined;
+
+    const refresh = () => {
+      pending = undefined;
+      last = Date.now();
+      router.refresh();
+    };
 
     source.addEventListener("message", (message: MessageEvent<string>) => {
-      // SAFETY: /api/live only sends events lib/live/event.ts decoded and serialized.
+      // SAFETY: /api/live only sends events lib/live/decode.ts decoded and serialized.
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
       const event = JSON.parse(message.data) as LiveEvent;
 
       store.apply(event);
 
-      if (event.type === "stale") {
-        clearTimeout(refresh);
-        refresh = setTimeout(() => {
-          router.refresh();
-        }, 500);
+      if (
+        event.type === "stale" &&
+        pending === undefined &&
+        event.tags.some((tag) => store.wanted.has(tag))
+      ) {
+        pending = setTimeout(
+          refresh,
+          Math.max(0, last + refreshEvery - Date.now())
+        );
       }
     });
 
     return () => {
-      clearTimeout(refresh);
+      clearTimeout(pending);
       source.close();
     };
   }, [store, router]);
@@ -90,15 +115,38 @@ export const LiveProvider = ({
 };
 
 export const useLive = <A,>(select: (live: Live) => A): A => {
-  const store = use(LiveContext);
-
-  if (store === null) {
-    throw new Error("useLive needs a LiveProvider above it");
-  }
+  const store = useStore();
 
   return useSyncExternalStore(
     store.subscribe,
     () => select(store.read()),
     () => select(store.read())
   );
+};
+
+export const RefreshOnStale = ({ tags }: { tags: readonly string[] }) => {
+  const { wanted } = useStore();
+  const key = tags.join(" ");
+
+  useEffect(() => {
+    const names = key.split(" ");
+
+    for (const name of names) {
+      wanted.set(name, (wanted.get(name) ?? 0) + 1);
+    }
+
+    return () => {
+      for (const name of names) {
+        const count = (wanted.get(name) ?? 1) - 1;
+
+        if (count === 0) {
+          wanted.delete(name);
+        } else {
+          wanted.set(name, count);
+        }
+      }
+    };
+  }, [wanted, key]);
+
+  return null;
 };

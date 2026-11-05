@@ -21,7 +21,7 @@ export const Nav = () => {
   const path = usePathname();
 
   return (
-    <nav className="-mx-1 flex [scrollbar-width:none] overflow-x-auto rounded-full bg-muted p-1">
+    <nav className="-mx-1 flex flex-wrap gap-y-0.5 rounded-2xl bg-muted p-1 lg:flex-nowrap lg:rounded-full">
       {pages.map((page) => {
         const current =
           page.href === "/" ? path === "/" : path.startsWith(page.href);

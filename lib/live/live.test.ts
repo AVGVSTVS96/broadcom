@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { applyChange, decodeLiveEvent } from "@/lib/live/event";
+import { decodeLiveEvent } from "@/lib/live/decode";
+import { applyChange } from "@/lib/live/event";
 import type { Account } from "@/lib/proxy/schema";
 
 const window = {

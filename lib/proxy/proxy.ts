@@ -18,10 +18,7 @@ import {
 import { Sse } from "effect/encoding";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
-import { decodeLiveEvent } from "@/lib/live/event";
-import type { LiveEvent } from "@/lib/live/event";
-
-const base = process.env.BROADCOM_PROXY ?? "http://100.113.223.113:8317";
+const base = process.env.BROADCOM_PROXY ?? "http://127.0.0.1:8317";
 
 const keyFile =
   process.env.BROADCOM_KEY_FILE ??
@@ -47,7 +44,7 @@ export class Proxy extends Context.Service<
       body: Schema.Json,
       schema: S
     ) => Effect.Effect<S["Type"], ProxyUnreachable>;
-    readonly live: Stream.Stream<LiveEvent, ProxyUnreachable>;
+    readonly events: Stream.Stream<string, ProxyUnreachable>;
   }
 >()("Proxy") {}
 
@@ -107,21 +104,18 @@ export const ProxyLive = Layer.effect(
       );
 
     return {
-      get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
-      live: HttpClient.filterStatusOk(client)
+      events: HttpClient.filterStatusOk(client)
         .execute(HttpClientRequest.get("/deck/events"))
         .pipe(
           Effect.map((response) => response.stream),
           Stream.unwrap,
           Stream.decodeText,
           Stream.pipeThroughChannel(Sse.decode()),
-          Stream.filterMap((event) => {
-            const decoded = Predicate.isTagged(event, "Event")
-              ? decodeLiveEvent(event.data)
-              : null;
-
-            return decoded === null ? Result.failVoid : Result.succeed(decoded);
-          }),
+          Stream.filterMap((event) =>
+            Predicate.isTagged(event, "Event")
+              ? Result.succeed(event.data)
+              : Result.failVoid
+          ),
           Stream.mapError(
             (cause) =>
               new ProxyUnreachable({
@@ -132,6 +126,7 @@ export const ProxyLive = Layer.effect(
               })
           )
         ),
+      get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
       send: (method, at, body, schema) =>
         decode(
           at,

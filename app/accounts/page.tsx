@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { Accounts } from "@/features/accounts/accounts";
+import { RefreshOnStale } from "@/lib/live/client";
 import { creditOf, loginOf } from "@/lib/model/accounts";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
 import { Credentials, Credits } from "@/lib/proxy/schema";
@@ -61,6 +62,11 @@ const read = async () => {
   );
 };
 
-const AccountsPage = async () => <Accounts {...await read()} at={Date.now()} />;
+const AccountsPage = async () => (
+  <>
+    <RefreshOnStale tags={["credits"]} />
+    <Accounts {...await read()} at={Date.now()} />
+  </>
+);
 
 export default AccountsPage;
