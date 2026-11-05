@@ -148,3 +148,55 @@ export const Dot = ({
     )}
   />
 );
+
+export interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+const traced = (lines: readonly (readonly XY[])[]) =>
+  lines.flatMap((points) =>
+    points.flatMap((point, index): XY[] => {
+      const before = points[index - 1];
+
+      if (before === undefined) {
+        return [point];
+      }
+
+      const steps = Math.ceil(
+        Math.hypot(point[0] - before[0], point[1] - before[1])
+      );
+
+      return Array.from({ length: steps }, (_, step): XY => {
+        const t = (step + 1) / steps;
+
+        return [
+          before[0] + (point[0] - before[0]) * t,
+          before[1] + (point[1] - before[1]) * t,
+        ];
+      });
+    })
+  );
+
+const pad = 1.5;
+
+export const freeSpot = (
+  spots: readonly Box[],
+  lines: readonly (readonly XY[])[]
+) => {
+  const marks = traced(lines);
+
+  return (
+    spots.find((spot) =>
+      marks.every(
+        ([x, y]) =>
+          x < spot.left - pad ||
+          x > spot.left + spot.width + pad ||
+          y < spot.top - pad ||
+          y > spot.top + spot.height + pad
+      )
+    ) ?? spots[0]
+  );
+};
