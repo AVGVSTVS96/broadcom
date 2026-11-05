@@ -36,6 +36,7 @@ export interface Turn {
 export interface Spiral {
   readonly turns: readonly Turn[];
   readonly exactFrom: number | null;
+  readonly locks: readonly Span[];
   readonly ahead: Span | null;
   readonly usual: readonly boolean[];
 }
@@ -210,6 +211,7 @@ export const spiralOf = ({
   return {
     ahead,
     exactFrom,
+    locks: locks.filter(([from]) => runOuts.includes(from)),
     turns,
     usual: usualOf(
       turns.flatMap((turn) => turn.cells),
@@ -245,6 +247,12 @@ export const locksIn = (turn: Turn, ahead: Span | null): Span[] => [
   ...turn.locks,
   ...clip(ahead === null ? [] : [ahead], turn.from, turn.to),
 ];
+
+export const locksFrom = (spiral: Spiral, turn: Turn): Span[] =>
+  [
+    ...spiral.locks,
+    ...(turn.current && spiral.ahead !== null ? [spiral.ahead] : []),
+  ].filter(([from]) => from >= turn.from && from < turn.to);
 
 export const shiftOf = (turns: readonly Turn[], index: number) => {
   const turn = turns[index];

@@ -21,6 +21,7 @@ import type { Pace } from "@/lib/model/pace";
 import type { Plan } from "@/lib/model/pool";
 import {
   lockedHours,
+  locksFrom,
   locksIn,
   shiftOf,
   spiralOf,
@@ -81,7 +82,9 @@ const runOutsText = (spiral: Spiral) => {
   );
 
   if (outs.length === 0) {
-    return spiral.exactFrom === null
+    const thisWeek = spiral.turns.at(-1)?.from ?? 0;
+
+    return spiral.exactFrom === null || spiral.exactFrom >= thisWeek
       ? null
       : `No run-out since ${date(spiral.exactFrom)}.`;
   }
@@ -114,7 +117,15 @@ const detailOf = (spiral: Spiral, plan: Plan, now: number) => {
 const lockedTime = (spans: readonly Span[]) =>
   spans.reduce((sum, [from, to]) => sum + (to - from), 0);
 
-const Center = ({ spiral, selected }: { spiral: Spiral; selected: number }) => {
+const Center = ({
+  spiral,
+  selected,
+  now,
+}: {
+  spiral: Spiral;
+  selected: number;
+  now: number;
+}) => {
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -122,16 +133,25 @@ const Center = ({ spiral, selected }: { spiral: Spiral; selected: number }) => {
   }
 
   const shift = shiftOf(spiral.turns, selected);
-  const locked = lockedTime(locksIn(turn, turn.current ? spiral.ahead : null));
+  const locks = locksFrom(spiral, turn);
+  const locked = lockedTime(locks);
+  const end = locks.at(-1)?.[1];
+
+  const lockCaption = () => {
+    if (end === undefined) {
+      return turn.current
+        ? "locked this week"
+        : `locked, week of ${date(turn.from)}`;
+    }
+
+    return turn.ranOut === null
+      ? "locked if the pace holds"
+      : `locked until ${when(end, now)}`;
+  };
 
   const [value, caption] =
     shift === null
-      ? [
-          locked === 0 ? "0 h" : span(locked),
-          turn.current
-            ? "locked this week"
-            : `locked, week of ${date(turn.from)}`,
-        ]
+      ? [locked === 0 ? "0 h" : span(locked), lockCaption()]
       : [
           span(Math.abs(shift.earlier)),
           `${shift.earlier >= 0 ? "earlier" : "later"} run-out than ${date(shift.than)}`,
@@ -139,7 +159,7 @@ const Center = ({ spiral, selected }: { spiral: Spiral; selected: number }) => {
 
   return (
     <div className="pointer-events-none absolute inset-0 grid place-items-center">
-      <div className="max-w-[30%] text-center">
+      <div className="max-w-[40%] text-center">
         <div className="text-base font-normal tracking-tight tabular-nums sm:text-2xl">
           {value}
         </div>
@@ -432,25 +452,15 @@ const outNote = (turn: Turn, shift: number | null, projected: boolean) => {
   return turn.ranOut === null ? "not this week" : "";
 };
 
-const lockEnd = (locks: readonly Span[], turn: Turn, pace: Pace | null) => {
-  const last = locks.at(-1)?.[1] ?? null;
-
-  return last !== null && last === turn.to && pace !== null
-    ? Math.max(last, pace.resetsAt)
-    : last;
-};
-
 const muted = (text: string) => (
   <span className="text-muted-foreground">{text}</span>
 );
 
 const Stats = ({
-  plan,
   spiral,
   selected,
   now,
 }: {
-  plan: Plan;
   spiral: Spiral;
   selected: number;
   now: number;
@@ -462,8 +472,8 @@ const Stats = ({
   }
 
   const ahead = turn.current ? spiral.ahead : null;
-  const locks = locksIn(turn, ahead);
-  const end = lockEnd(locks, turn, plan.pace);
+  const locks = locksFrom(spiral, turn);
+  const end = locks.at(-1)?.[1] ?? null;
   const held = lockedHours(locks, spiral.usual);
   const usualWeek = usualPerWeek(spiral.usual);
   const projected = turn.ranOut === null && ahead !== null;
@@ -551,13 +561,19 @@ const Panel = ({
           },
         ]}
       />
-      <Stats plan={plan} spiral={spiral} selected={selected} now={now} />
+      <Stats spiral={spiral} selected={selected} now={now} />
       <div className="border-t pt-5">
         <PerDay turn={turn} />
       </div>
     </div>
   );
 };
+
+const hasUse = (turn: Turn) => turn.cells.some((cell) => (cell.used ?? 0) > 0);
+
+const depth = (spiral: Spiral) =>
+  spiral.turns.filter(hasUse).length * 100 +
+  spiral.turns.reduce((sum, turn) => sum + turn.runOuts.length, 0);
 
 const Picker = ({
   plans,
@@ -616,14 +632,9 @@ export const SpiralView = ({
   const [picked, setPicked] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
 
-  const plan =
-    plans.find((one) => one.id === chosen) ??
-    plans.find((one) => one.id === next) ??
-    plans[0];
-
   const since = daily?.since ?? null;
 
-  if (plan === undefined || since === null) {
+  if (since === null) {
     return (
       <Section title="No weekly history yet" actions={toggle}>
         {null}
@@ -631,17 +642,34 @@ export const SpiralView = ({
     );
   }
 
-  const spiral = spiralOf({
-    accountSince: plan.account.since,
-    daily: daily?.accounts.find((account) => account.id === plan.id) ?? {
-      days: [],
-      id: plan.id,
-    },
-    now,
-    pace: plan.pace,
-    points: history[plan.id] ?? [],
-    since,
-  });
+  const drawn = plans.map((one) => ({
+    plan: one,
+    spiral: spiralOf({
+      accountSince: one.account.since,
+      daily: daily?.accounts.find((account) => account.id === one.id) ?? {
+        days: [],
+        id: one.id,
+      },
+      now,
+      pace: one.pace,
+      points: history[one.id] ?? [],
+      since,
+    }),
+  }));
+
+  const shown =
+    drawn.find((one) => one.plan.id === chosen) ??
+    drawn.toSorted((a, b) => depth(b.spiral) - depth(a.spiral))[0];
+
+  if (shown === undefined) {
+    return (
+      <Section title="No weekly history yet" actions={toggle}>
+        {null}
+      </Section>
+    );
+  }
+
+  const { plan, spiral } = shown;
 
   const found = spiral.turns.findIndex((turn) => turn.from === picked);
   const selected = found === -1 ? spiral.turns.length - 1 : found;
@@ -674,7 +702,7 @@ export const SpiralView = ({
                 setPicked(spiral.turns[index]?.from ?? null);
               }}
             >
-              <Center spiral={spiral} selected={selected} />
+              <Center spiral={spiral} selected={selected} now={now} />
             </Coil>
           </div>
           <p className="min-h-5 text-center text-sm text-muted-foreground tabular-nums">

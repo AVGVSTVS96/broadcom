@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { DAY, HOUR } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
-import { lockedHours, shiftOf, spiralOf } from "@/lib/model/spiral";
+import { lockedHours, locksFrom, shiftOf, spiralOf } from "@/lib/model/spiral";
 import type { Turn } from "@/lib/model/spiral";
 
 const day = (month: number, date: number, hour = 0, minute = 0) =>
@@ -82,6 +82,32 @@ describe("spiral", () => {
     expect(latest?.runOuts).toEqual([day(10, 2, 21, 29), day(10, 3, 19, 33)]);
     expect(latest?.ranOut).toBe(day(10, 2, 21, 29));
     expect(shiftOf(spiral.turns, 3)).toBeNull();
+  });
+
+  test("a week's lock runs whole to its reset, even past the week", () => {
+    const week = spiral.turns.at(-1);
+
+    const longer = spiralOf({
+      accountSince: null,
+      daily: { days: [], id: "a" },
+      now: day(10, 12, 12),
+      pace: null,
+      points: [
+        [day(10, 2, 10), 50],
+        [day(10, 7, 20), 100],
+        [day(10, 11, 18), 0],
+      ],
+      since: day(10, 2),
+    });
+
+    expect(week === undefined ? [] : locksFrom(spiral, week)).toEqual([
+      [day(10, 2, 21, 29), day(10, 3, 1)],
+      [day(10, 3, 19, 33), day(10, 5, 12)],
+    ]);
+    expect(longer.turns.map((turn) => locksFrom(longer, turn))).toEqual([
+      [[day(10, 7, 20), day(10, 11, 18)]],
+      [],
+    ]);
   });
 
   test("the shift compares where in the week each run-out came", () => {
