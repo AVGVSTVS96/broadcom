@@ -150,7 +150,7 @@ const Focus = ({ plan, now }: { plan: Paced; now: number }) => {
         <div className="text-lg">{plan.name}</div>
         <div className="text-sm text-muted-foreground">
           {plan.account.plan} · resets {when(pace.resetsAt, now)}
-          {pace.restarted ? ` · counted from ${when(pace.start, now)}` : null}
+          {pace.restarted ? ` · restarted ${when(pace.start, now)}` : null}
         </div>
       </div>
       {pace.locked ? (
@@ -476,7 +476,10 @@ export const PaceSection = ({
               {xTicks.map((tick) => (
                 <span
                   key={tick.at}
-                  className="absolute top-1.5 -translate-x-1/2"
+                  className={cn(
+                    "absolute top-1.5 -translate-x-1/2",
+                    tick.at !== 50 && "max-sm:hidden"
+                  )}
                   style={{ left: `${tick.at}%` }}
                 >
                   {tick.label}

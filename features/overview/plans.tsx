@@ -79,7 +79,7 @@ const Session = ({ plan, now }: { plan: Plan; now: number }) => {
       note={
         window.resetsAt === null
           ? "No reading"
-          : `Resets in ${duration(window.resetsAt - now)}`
+          : `in ${duration(window.resetsAt - now)}`
       }
     >
       <Bar value={window.used ?? 0} tone={tone} />
@@ -133,7 +133,14 @@ const Credit = ({ plan }: { plan: Plan }) => {
       label="API credit"
       value={dollars(left)}
       tone={tone}
-      note={`of ${dollars(total)}${ends === undefined ? "" : ` · ends ${utcDate(ends)}`}`}
+      note={
+        <>
+          of {dollars(total)}
+          {ends === undefined ? null : (
+            <span className="max-sm:hidden"> · ends {utcDate(ends)}</span>
+          )}
+        </>
+      }
     >
       <Bar value={(left / total) * 100} tone={tone} />
     </Cell>
