@@ -23,10 +23,10 @@ export const attempt = async <A>(
 export const attemptCached = async <A>(path: string, read: () => Promise<A>) =>
   await attempt(
     Effect.tryPromise({
-      catch: (cause) =>
+      catch: () =>
         new ProxyUnreachable({
           path,
-          reason: cause instanceof Error ? cause.message : String(cause),
+          reason: "no usable answer from the proxy",
         }),
       try: read,
     })
