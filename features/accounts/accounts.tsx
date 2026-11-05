@@ -121,7 +121,11 @@ export const Accounts = ({
         );
       })}
 
-      {pool === null ? null : <Policy pool={pool} name={name} />}
+      {pool === null ? null : (
+        <div id="routing" className="scroll-mt-6">
+          <Policy pool={pool} name={name} />
+        </div>
+      )}
     </div>
   );
 };

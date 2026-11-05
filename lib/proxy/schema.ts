@@ -317,3 +317,48 @@ export const UsageView = Schema.Struct({
 });
 
 export type UsageView = typeof UsageView.Type;
+
+const Maybe = <S extends Schema.Top>(schema: S) => Schema.optionalKey(schema);
+
+export const Config = Schema.Struct({
+  management: Maybe(
+    Schema.Struct({
+      "allow-remote": Maybe(Schema.Boolean),
+      "disable-auto-update-panel": Maybe(Schema.Boolean),
+    })
+  ),
+  oauth: Maybe(Schema.Struct({ "auth-dir": Maybe(Schema.String) })),
+  requests: Maybe(
+    Schema.Struct({ "passthrough-headers": Maybe(Schema.Boolean) })
+  ),
+  routing: Maybe(
+    Schema.Struct({
+      "force-model-prefix": Maybe(Schema.Boolean),
+      pool: Maybe(Schema.Struct({ "reset-command": Maybe(Schema.String) })),
+      "session-affinity": Maybe(Schema.Boolean),
+      strategy: Maybe(Schema.String),
+    })
+  ),
+  server: Maybe(
+    Schema.Struct({ host: Maybe(Schema.String), port: Maybe(Schema.Number) })
+  ),
+  usage: Maybe(
+    Schema.Struct({
+      "device-label": Maybe(Schema.String),
+      "github-actions": Maybe(Schema.Boolean),
+      plans: Maybe(
+        Schema.Array(
+          Schema.Struct({
+            "monthly-usd": Schema.Number,
+            name: Schema.String,
+            since: Maybe(Schema.String),
+          })
+        )
+      ),
+      "state-dir": Maybe(Schema.String),
+      timezone: Maybe(Schema.String),
+    })
+  ),
+});
+
+export type Config = typeof Config.Type;
