@@ -20,7 +20,7 @@ export const Pills = ({
 
 const pill = (current: boolean) =>
   cn(
-    "flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] text-muted-foreground transition-colors hover:text-foreground",
+    "flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] text-muted-foreground transition-colors hover:text-foreground pointer-coarse:h-9",
     current && "bg-card text-foreground shadow-xs"
   );
 
