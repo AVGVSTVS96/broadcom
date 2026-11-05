@@ -11,6 +11,7 @@ const pages = [
   { href: "/usage", name: "Usage" },
   { href: "/live", name: "Live" },
   { href: "/accounts", name: "Accounts" },
+  { href: "/files", name: "Files" },
   { href: "/settings", name: "Settings" },
 ] as const;
 
