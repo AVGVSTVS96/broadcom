@@ -13,8 +13,9 @@ import {
   Path,
   Plot,
   Strokes,
+  freeSpot,
 } from "@/components/viz/plot";
-import type { XY } from "@/components/viz/plot";
+import type { Box, XY } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { duration, percent, times, when } from "@/lib/model/format";
 import { valueAt } from "@/lib/model/history";
@@ -189,6 +190,72 @@ const dotTone = (locked: boolean, focused: boolean) => {
   return focused ? "ink" : "faint";
 };
 
+const useSize = () => {
+  const [size, setSize] = useState({ height: 0, width: 0 });
+
+  const ref = (node: HTMLDivElement | null) => {
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry !== undefined) {
+        setSize({
+          height: entry.contentRect.height,
+          width: entry.contentRect.width,
+        });
+      }
+    });
+
+    if (node !== null) {
+      observer.observe(node);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  };
+
+  return [ref, size] as const;
+};
+
+const steps = [2, 12, 22, 32, 42] as const;
+
+const grid = (at: (across: number, down: number) => Box) =>
+  steps.flatMap((down) => steps.map((across) => at(across, down)));
+
+const zoneSpots = (size: { height: number; width: number }) => {
+  const box = (text: string) => ({
+    height: (16 / size.height) * 100,
+    width: ((text.length * 6.5) / size.width) * 100,
+  });
+
+  const ahead = box("Ahead of even pace");
+  const behind = box("Behind");
+  const even = box("Even pace");
+
+  return {
+    ahead: grid((left, top) => ({ ...ahead, left, top })).filter(
+      (spot) => spot.top + spot.height < 99 - spot.left - spot.width
+    ),
+    behind: grid((right, bottom) => ({
+      ...behind,
+      left: 100 - right - behind.width,
+      top: 100 - bottom - behind.height,
+    })).filter((spot) => spot.top > 101 - spot.left),
+    even: [94, 84, 74, 64, 54].map((right): Box => ({
+      ...even,
+      left: right - even.width,
+      top: 101 - right + even.width,
+    })),
+  };
+};
+
+const ZoneLabel = ({ spot, children }: { spot: Box; children: string }) => (
+  <span
+    className="absolute text-xs whitespace-nowrap text-muted-foreground"
+    style={{ left: `${spot.left}%`, top: `${spot.top}%` }}
+  >
+    {children}
+  </span>
+);
+
 const xTicks = [
   { at: 25, label: "¼" },
   { at: 50, label: "½" },
@@ -208,6 +275,7 @@ export const PaceSection = ({
 
   const [focusId, setFocusId] = useState<string | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const [plotRef, size] = useSize();
   const { title, detail, subject } = verdict(ranked, now);
   const focus = ranked.find((plan) => plan.id === focusId) ?? subject;
 
@@ -216,6 +284,20 @@ export const PaceSection = ({
   }
 
   const ordered = [...ranked.filter((plan) => plan !== focus), focus];
+
+  const drawn = ranked.flatMap((plan) => {
+    const projection = projectionOf(plan.pace, now);
+
+    return projection === null
+      ? [lineOf(plan.pace, now)]
+      : [lineOf(plan.pace, now), projection];
+  });
+
+  const spots = zoneSpots(size);
+
+  const place = (candidates: readonly Box[], fallback: Box) =>
+    size.width === 0 ? fallback : (freeSpot(candidates, drawn) ?? fallback);
+
   const lockFrom = focus.pace.ranOut ?? focus.pace.runsOut;
 
   const track = (event: PointerEvent<HTMLDivElement>) => {
@@ -243,6 +325,7 @@ export const PaceSection = ({
               ))}
             </div>
             <div
+              ref={plotRef}
               className="relative h-64 sm:h-80 lg:h-96"
               onPointerMove={track}
               onPointerLeave={() => {
@@ -326,15 +409,36 @@ export const PaceSection = ({
                     />
                   )}
                 </Strokes>
-                <span className="absolute top-2 left-3 text-xs text-muted-foreground">
+                <ZoneLabel
+                  spot={place(spots.ahead, {
+                    height: 0,
+                    left: 2,
+                    top: 2,
+                    width: 0,
+                  })}
+                >
                   Ahead of even pace
-                </span>
-                <span className="absolute right-3 bottom-2 text-xs text-muted-foreground">
+                </ZoneLabel>
+                <ZoneLabel
+                  spot={place(spots.behind, {
+                    height: 0,
+                    left: 90,
+                    top: 93,
+                    width: 0,
+                  })}
+                >
                   Behind
-                </span>
-                <span className="absolute top-[14%] right-[6%] text-xs text-muted-foreground">
+                </ZoneLabel>
+                <ZoneLabel
+                  spot={place(spots.even, {
+                    height: 0,
+                    left: 84,
+                    top: 14,
+                    width: 0,
+                  })}
+                >
                   Even pace
-                </span>
+                </ZoneLabel>
                 {ranked.map((plan) => {
                   const from = plan.pace.ranOut ?? plan.pace.runsOut;
 
