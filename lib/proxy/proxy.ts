@@ -24,7 +24,7 @@ const keyFile =
   process.env.BROADCOM_KEY_FILE ??
   path.join(homedir(), ".config/cliproxyapi/key");
 
-export class ProxyUnreachable extends Data.TaggedError("ProxyUnreachable")<{
+export class ProxyError extends Data.TaggedError("ProxyError")<{
   readonly path: string;
   readonly reason: string;
 }> {}
@@ -37,14 +37,14 @@ export class Proxy extends Context.Service<
     readonly get: <S extends Decodable>(
       path: string,
       schema: S
-    ) => Effect.Effect<S["Type"], ProxyUnreachable>;
+    ) => Effect.Effect<S["Type"], ProxyError>;
     readonly send: <S extends Decodable>(
       method: "POST" | "PUT" | "PATCH" | "DELETE",
       path: string,
       body: Schema.Json,
       schema: S
-    ) => Effect.Effect<S["Type"], ProxyUnreachable>;
-    readonly events: Stream.Stream<string, ProxyUnreachable>;
+    ) => Effect.Effect<S["Type"], ProxyError>;
+    readonly events: Stream.Stream<string, ProxyError>;
   }
 >()("Proxy") {}
 
@@ -55,7 +55,7 @@ const decodeRefusal = Schema.decodeUnknownOption(
 );
 
 const refusal = (at: string, status: number, body: Schema.Json) =>
-  new ProxyUnreachable({
+  new ProxyError({
     path: at,
     reason: Option.match(decodeRefusal(body), {
       onNone: () => `HTTP ${status}`,
@@ -82,7 +82,7 @@ export const ProxyLive = Layer.effect(
     ) =>
       client.execute(request).pipe(
         Effect.mapError(
-          (cause) => new ProxyUnreachable({ path: at, reason: cause.message })
+          (cause) => new ProxyError({ path: at, reason: cause.message })
         ),
         Effect.flatMap((response) =>
           response.json.pipe(
@@ -96,8 +96,7 @@ export const ProxyLive = Layer.effect(
         Effect.flatMap((body) =>
           Schema.decodeUnknownEffect(schema)(body).pipe(
             Effect.mapError(
-              (cause) =>
-                new ProxyUnreachable({ path: at, reason: cause.message })
+              (cause) => new ProxyError({ path: at, reason: cause.message })
             )
           )
         )
@@ -118,7 +117,7 @@ export const ProxyLive = Layer.effect(
           ),
           Stream.mapError(
             (cause) =>
-              new ProxyUnreachable({
+              new ProxyError({
                 path: "/deck/events",
                 reason: Predicate.isTagged(cause, "Retry")
                   ? "retry"

@@ -330,7 +330,7 @@ const Running = ({
           .join(" ") || undefined
       }
     >
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className={cn("grid gap-3", lanes.length > 1 && "xl:grid-cols-2")}>
         {lanes.map((lane) => (
           <AccountLane
             key={lane.id ?? "none"}
