@@ -15,7 +15,7 @@ export const Crumbs = ({ ws, file }: { ws: string; file: string }) => {
   return (
     <nav
       aria-label="Path"
-      className="flex min-w-0 shrink items-center gap-1 overflow-hidden whitespace-nowrap"
+      className="flex max-w-[60%] min-w-0 shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap"
     >
       {parts.map((part, index) => {
         const at = parts.slice(0, index + 1).join("/");
@@ -26,7 +26,7 @@ export const Crumbs = ({ ws, file }: { ws: string; file: string }) => {
             key={at}
             className={
               last
-                ? "flex max-w-[60%] min-w-0 shrink-0 items-center gap-1"
+                ? "flex min-w-0 items-center gap-1"
                 : "flex shrink-0 items-center gap-1 max-sm:hidden"
             }
           >

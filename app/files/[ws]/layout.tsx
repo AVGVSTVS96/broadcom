@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 
 import { Bench } from "@/features/files/bench";
 import { FilesBar } from "@/features/files/files-bar";
-import { Watch } from "@/features/files/watch";
 import { readChanges } from "@/lib/git/read";
 import { findWorkspace, listDrafts, listPlaces } from "@/lib/git/repos";
+import { RefreshOn } from "@/lib/watch/refresh-on";
 
 const FilesLayout = async ({
   params,
@@ -31,7 +31,7 @@ const FilesLayout = async ({
         drafts={drafts.length}
       />
       <div className="flex min-h-0 flex-1">{children}</div>
-      <Watch ws={ws.id} />
+      <RefreshOn src={`/api/files/watch?ws=${encodeURIComponent(ws.id)}`} />
     </Bench>
   );
 };
