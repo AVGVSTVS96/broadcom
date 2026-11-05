@@ -1,0 +1,57 @@
+{
+  "name": "broadcom",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start",
+    "check": "next typegen && oxlint && oxfmt --check && tsc --noEmit && bun test",
+    "fix": "oxlint --fix; oxfmt",
+    "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "class-variance-authority": "^0.7.1",
+    "cn": "^0.5.2",
+    "d3-array": "^3.2.5",
+    "d3-scale": "^4.0.3",
+    "d3-shape": "^3.2.1",
+    "d3-time": "^3.1.1",
+    "effect": "4.1.2",
+    "lucide-react": "^1.69.0",
+    "next": "16.4.5",
+    "next-themes": "^0.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "shadcn": "^4.23.0",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.91.0",
+    "@tailwindcss/turbopack": "^4.3.4",
+    "@types/bun": "^1.4.4",
+    "@types/d3-array": "^3.2.2",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.2.0",
+    "@types/d3-time": "^3.0.4",
+    "@types/node": "26",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "lefthook": "^2.2.2",
+    "oxfmt": "0.76.0",
+    "oxlint": "1.91.0",
+    "oxlint-tsgolint": "^7.0.2005",
+    "server-only": "^0.0.1",
+    "tailwindcss": "^4",
+    "typescript": "7.0.2",
+    "ultracite": "8.1.1"
+  },
+  "packageManager": "bun@1.4.3",
+  "trustedDependencies": [
+    "sharp",
+    "unrs-resolver"
+  ]
+}
