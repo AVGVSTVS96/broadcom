@@ -41,11 +41,14 @@ const sideLabels: Record<View, string> = {
 export const FilesBar = ({
   repos,
   changed,
+  drafts,
 }: {
   repos: readonly RepoPlaces[];
   changed: number;
+  drafts: number;
 }) => {
   const { ws, view, file } = parseFilesPath(usePathname());
+  const drafting = ws === "drafts";
   const [repoId] = ws.split("~");
   const repo = repos.find((each) => each.id === repoId);
   const place = repo?.places.find((each) => each.id === ws);
@@ -66,10 +69,12 @@ export const FilesBar = ({
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1.5 border-b px-2 sm:gap-2">
-      <SideToggle label={sideLabels[view]} />
+      <SideToggle label={drafting ? "drafts" : sideLabels[view]} />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm hover:bg-muted aria-expanded:bg-muted">
-          <span className="shrink-0 font-medium">{repo?.name}</span>
+          <span className="shrink-0 font-medium">
+            {drafting ? "Drafts" : repo?.name}
+          </span>
           <span className="truncate text-muted-foreground">{place?.name}</span>
           <ChevronsUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
@@ -93,20 +98,37 @@ export const FilesBar = ({
               ))}
             </DropdownMenuGroup>
           ))}
+          {drafts > 0 && (
+            <DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLinkItem
+                render={<Link href={filesHref.drafts()} />}
+                aria-current={drafting ? "page" : undefined}
+                className="aria-[current=page]:bg-accent"
+              >
+                Drafts
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                  {drafts}
+                </span>
+              </DropdownMenuLinkItem>
+            </DropdownMenuGroup>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Pills label="View">
-        <PillLink href={filesHref.code(ws)} current={view === "code"}>
-          Code
-        </PillLink>
-        <PillLink href={filesHref.changes(ws)} current={view === "changes"}>
-          Changes
-          {changed > 0 && <Count>{changed}</Count>}
-        </PillLink>
-        <PillLink href={filesHref.history(ws)} current={view === "history"}>
-          History
-        </PillLink>
-      </Pills>
+      {!drafting && (
+        <Pills label="View">
+          <PillLink href={filesHref.code(ws)} current={view === "code"}>
+            Code
+          </PillLink>
+          <PillLink href={filesHref.changes(ws)} current={view === "changes"}>
+            Changes
+            {changed > 0 && <Count>{changed}</Count>}
+          </PillLink>
+          <PillLink href={filesHref.history(ws)} current={view === "history"}>
+            History
+          </PillLink>
+        </Pills>
+      )}
       <ToolSlot />
     </header>
   );
