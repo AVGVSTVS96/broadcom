@@ -124,10 +124,14 @@ const Row = ({
               style={forecastHatchStyle}
             />
           )}
-          <span className="relative block truncate px-2 pt-1.5 text-xs">
-            <span className="max-sm:hidden">{percent(pace.used)} used · </span>
-            {pace.locked ? "Back " : ""}
-            {when(pace.resetsAt, now)}
+          <span className="relative z-10 block px-1 pt-1 text-xs">
+            <span className="inline-block max-w-full truncate rounded-[4px] bg-card/85 px-1 align-top">
+              <span className="max-sm:hidden">
+                {percent(pace.used)} used ·{" "}
+              </span>
+              {pace.locked ? "Back " : ""}
+              {when(pace.resetsAt, now)}
+            </span>
           </span>
           <span className="absolute inset-x-2 bottom-1.5 h-1 overflow-hidden rounded-full bg-foreground/10">
             <span
@@ -144,16 +148,13 @@ const Row = ({
             "@container border border-dashed px-2 text-xs leading-10 text-muted-foreground"
           )}
         >
-          <span className="block truncate max-sm:hidden">
-            <span className="@max-[5rem]:hidden">Next </span>
-            {date(next.from)}
-          </span>
+          <span className="block truncate max-sm:hidden">Next</span>
         </Band>
         {locks.map(([from]) =>
           x(from) <= 0 ? null : (
             <span
               key={from}
-              className="absolute top-0.5 -translate-x-1/2"
+              className="absolute -top-1 z-10 -translate-x-1/2"
               style={{ left: `${x(from)}%` }}
             >
               <Dot tone="bad" className="size-2" />
