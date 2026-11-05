@@ -3,13 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export const Watch = ({ ws }: { ws: string }) => {
+export const RefreshOn = ({ src }: { src: string }) => {
   const router = useRouter();
 
   useEffect(() => {
-    const source = new EventSource(
-      `/api/files/watch?ws=${encodeURIComponent(ws)}`
-    );
+    const source = new EventSource(src);
 
     source.addEventListener("message", () => {
       router.refresh();
@@ -18,7 +16,7 @@ export const Watch = ({ ws }: { ws: string }) => {
     return () => {
       source.close();
     };
-  }, [ws, router]);
+  }, [src, router]);
 
   return null;
 };
