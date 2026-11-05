@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
 
 import {
   Select,
@@ -619,13 +618,11 @@ export const SpiralView = ({
   daily,
   history,
   now,
-  toggle,
 }: {
   plans: readonly Plan[];
   daily: { since: number | null; accounts: readonly Daily[] } | null;
   history: Readonly<Record<string, Points>>;
   now: number;
-  toggle: ReactNode;
 }) => {
   const next = useLive((live) => live.pool?.next ?? null);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -635,11 +632,7 @@ export const SpiralView = ({
   const since = daily?.since ?? null;
 
   if (since === null) {
-    return (
-      <Section title="No weekly history yet" actions={toggle}>
-        {null}
-      </Section>
-    );
+    return <Section title="No weekly history yet">{null}</Section>;
   }
 
   const drawn = plans.map((one) => ({
@@ -662,11 +655,7 @@ export const SpiralView = ({
     drawn.toSorted((a, b) => depth(b.spiral) - depth(a.spiral))[0];
 
   if (shown === undefined) {
-    return (
-      <Section title="No weekly history yet" actions={toggle}>
-        {null}
-      </Section>
-    );
+    return <Section title="No weekly history yet">{null}</Section>;
   }
 
   const { plan, spiral } = shown;
@@ -679,15 +668,12 @@ export const SpiralView = ({
       title={titleOf(plan, now)}
       detail={detailOf(spiral, plan, now)}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
-          <Picker
-            plans={plans}
-            value={plan.id}
-            next={next}
-            onChange={setChosen}
-          />
-          {toggle}
-        </div>
+        <Picker
+          plans={plans}
+          value={plan.id}
+          next={next}
+          onChange={setChosen}
+        />
       }
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">

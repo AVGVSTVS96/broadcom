@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot } from "@/components/viz/plot";
@@ -132,22 +130,16 @@ export const WeeksView = ({
   daily,
   history,
   now,
-  toggle,
 }: {
   plans: readonly Plan[];
   daily: { since: number | null; accounts: readonly Daily[] } | null;
   history: Readonly<Record<string, Points>>;
   now: number;
-  toggle: ReactNode;
 }) => {
   const since = daily?.since ?? null;
 
   if (daily === null || since === null) {
-    return (
-      <Section title="No weekly history yet" actions={toggle}>
-        {null}
-      </Section>
-    );
+    return <Section title="No weekly history yet">{null}</Section>;
   }
 
   const rows = plans.map((plan) => {
@@ -199,7 +191,6 @@ export const WeeksView = ({
       ]
         .filter((part) => part !== null)
         .join(" ")}
-      actions={toggle}
     >
       <div className="space-y-1">
         <div className="grid gap-3 pb-1 text-xs text-muted-foreground sm:grid-cols-[9rem_minmax(0,1fr)_10rem]">

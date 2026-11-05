@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { fills } from "@/components/viz/meter";
@@ -177,12 +175,10 @@ export const TimelineView = ({
   plans,
   history,
   now,
-  toggle,
 }: {
   plans: readonly Plan[];
   history: Readonly<Record<string, Points>>;
   now: number;
-  toggle: ReactNode;
 }) => {
   const from = addDays(startOfDay(now), -pastDays);
   const to = addDays(from, spanDays);
@@ -210,7 +206,6 @@ export const TimelineView = ({
           : `${first.name} is back first, ${when(first.pace.resetsAt, now)}`
       }
       detail={`${locked.length} of ${plans.length} plans locked`}
-      actions={toggle}
     >
       <div className="grid sm:grid-cols-[13rem_minmax(0,1fr)] sm:gap-4">
         <div className="max-sm:hidden" />

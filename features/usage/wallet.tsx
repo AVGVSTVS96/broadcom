@@ -285,13 +285,7 @@ const footnote = (wallet: Wallet) =>
     .filter((part) => part !== null)
     .join(" · ");
 
-export const WalletView = ({
-  wallet,
-  toggle,
-}: {
-  wallet: Wallet;
-  toggle: ReactNode;
-}) => {
+export const WalletView = ({ wallet }: { wallet: Wallet }) => {
   const [top] = wallet.sources;
 
   return (
@@ -303,7 +297,6 @@ export const WalletView = ({
             : `Each plan dollar ran ${dollars(wallet.perDollar)} of work at API prices`
         }
         detail="Last 30 days, against what the plans cost a month."
-        actions={toggle}
       >
         <Tiles wallet={wallet} />
       </Section>

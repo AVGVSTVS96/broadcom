@@ -743,14 +743,10 @@ const Ranking = ({ usage }: { usage: Usage }) => {
   );
 };
 
-const Body = ({ usage, toggle }: { usage: Usage; toggle: ReactNode }) => (
+const Body = ({ usage }: { usage: Usage }) => (
   <>
     <Toolbar usage={usage} />
-    <Section
-      title={verdictOf(usage)}
-      detail={evidenceOf(usage)}
-      actions={toggle}
-    >
+    <Section title={verdictOf(usage)} detail={evidenceOf(usage)}>
       <div className="space-y-6">
         <Tiles usage={usage} />
         {usage.rows.length === 0 && usage.selected === null ? (
@@ -773,14 +769,8 @@ const Body = ({ usage, toggle }: { usage: Usage; toggle: ReactNode }) => (
   </>
 );
 
-export const UsageView = ({
-  usage,
-  toggle,
-}: {
-  usage: Usage;
-  toggle: ReactNode;
-}) => (
+export const UsageView = ({ usage }: { usage: Usage }) => (
   <UsageNav>
-    <Body usage={usage} toggle={toggle} />
+    <Body usage={usage} />
   </UsageNav>
 );

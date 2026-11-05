@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
@@ -145,12 +144,10 @@ export const ActivityView = ({
   plans,
   history,
   now,
-  toggle,
 }: {
   plans: readonly Plan[];
   history: Readonly<Record<string, Points>>;
   now: number;
-  toggle: ReactNode;
 }) => {
   const days = activity(activityPlans(plans, history), now);
   const { byHour, start, end } = busiest(days);
@@ -165,7 +162,6 @@ export const ActivityView = ({
     <Section
       title={`Busiest ${hourOf(new Date(2026, 0, 1, start).getTime())} to ${hourOf(new Date(2026, 0, 1, end).getTime())}`}
       detail={`${plural(runOuts, "run-out")} in 7 days.`}
-      actions={toggle}
     >
       <Matrix days={days} names={names} peak={byHour} />
     </Section>
