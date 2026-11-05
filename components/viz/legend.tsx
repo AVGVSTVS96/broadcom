@@ -1,14 +1,24 @@
 import type { ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
+import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { cn } from "@/lib/utils";
 
-export type Key = "line" | "dash" | "dot" | "hatch" | "box" | "hollow";
+export type Key =
+  | "line"
+  | "dash"
+  | "dot"
+  | "hatch"
+  | "forecast"
+  | "box"
+  | "hollow";
 
 const keys = {
   box: <span className="size-2.5 rounded-[3px] bg-current" />,
   dash: <span className="w-4 border-t-2 border-dashed border-current" />,
   dot: <span className="size-2.5 rounded-full bg-bad" />,
+  forecast: (
+    <span className="h-2.5 w-4 rounded-[2px]" style={forecastHatchStyle} />
+  ),
   hatch: <span className="h-2.5 w-4 rounded-[2px]" style={hatchStyle} />,
   hollow: <span className="size-2.5 rounded-full border-2 border-current" />,
   line: <span className="w-4 border-t-2 border-current" />,

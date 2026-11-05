@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  accountRows,
-  creditTotals,
-  creditOf,
-  loginOf,
-  resets,
-} from "@/lib/model/accounts";
+import { accountRows, creditOf, loginOf, resets } from "@/lib/model/accounts";
 import type { Account, Credential, Grant } from "@/lib/proxy/schema";
 
 const window = (used: number | null, resetsAt: number | null = null) => ({
@@ -102,7 +96,7 @@ describe("accountRows", () => {
 
     const key = rows.find((row) => row.kind === "api");
 
-    expect(key?.name).toBe("one@example.com API");
+    expect(key?.name).toBe("one API");
     expect(key?.state.is).toBe("empty");
   });
 
@@ -114,7 +108,7 @@ describe("accountRows", () => {
       order: [],
     });
 
-    expect(rows.map((row) => row.name)).toEqual(["new@example.com"]);
+    expect(rows.map((row) => row.name)).toEqual(["new"]);
   });
 
   test("disabled and sign-in states win over the pool's standing", () => {
@@ -165,12 +159,7 @@ describe("accountRows", () => {
       order: ["a2", "a1"],
     });
 
-    expect(rows.map((row) => row.name)).toEqual([
-      "b@example.com",
-      "a@example.com",
-      "a@example.com API",
-      "gpt@example.com",
-    ]);
+    expect(rows.map((row) => row.name)).toEqual(["b", "a", "a API", "gpt"]);
   });
 
   test("a failed sign-in carries the proxy's message", () => {
@@ -196,23 +185,15 @@ describe("accountRows", () => {
 });
 
 describe("totals", () => {
-  test("credit adds up what's left, never below zero", () => {
+  test("a key under a tenth of its credit runs low", () => {
     const rows = accountRows({
       accounts: {},
-      credits: [
-        creditOf(grant("k1", "a1", 120)),
-        creditOf(grant("k2", "a1", -3)),
-      ],
+      credits: [creditOf(grant("k1", "a1", 1.44))],
       logins: [],
       order: [],
     });
 
-    expect(creditTotals(rows)).toEqual({
-      allowance: 400,
-      count: 2,
-      empty: 1,
-      remaining: 120,
-    });
+    expect(rows[0]?.state.is).toBe("low");
   });
 
   test("resets count what's held and list recent spends", () => {
@@ -236,7 +217,7 @@ describe("totals", () => {
       firstExpiry: 400,
       held: 3,
       plans: ["Spends one Sat 6 PM"],
-      spent: [{ at: 500, name: "a@example.com" }],
+      spent: [{ at: 500, name: "a" }],
     });
   });
 });

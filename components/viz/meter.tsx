@@ -1,13 +1,19 @@
+import type { Tone } from "@/lib/model/tone";
 import { cn } from "@/lib/utils";
 
-export type Tone = "ok" | "over" | "bad" | "ink";
-
-const fills = {
+export const fills = {
   bad: "bg-bad",
-  ink: "bg-foreground",
+  none: "bg-faint",
   ok: "bg-ok",
   over: "bg-over",
-} as const;
+} as const satisfies Record<Tone, string>;
+
+export const texts = {
+  bad: "text-bad",
+  none: "text-muted-foreground",
+  ok: "text-ok",
+  over: "text-over",
+} as const satisfies Record<Tone, string>;
 
 export const Meter = ({
   value,

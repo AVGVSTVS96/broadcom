@@ -8,7 +8,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -165,9 +164,7 @@ const Steps = ({
             autoCapitalize="off"
             spellCheck={false}
             className="h-9 font-mono"
-            placeholder={
-              link.flow === "code" ? "code#state" : "http://localhost…"
-            }
+            placeholder={link.flow === "code" ? "Code" : "http://localhost…"}
             onChange={(event) => {
               setInput(event.currentTarget.value);
             }}
@@ -312,13 +309,6 @@ export const SignIn = ({
               ? `Add a ${brand} account`
               : `Sign in to ${target}`}
           </DialogTitle>
-          {phase.at === "done" ? null : (
-            <DialogDescription>
-              {target === null
-                ? `Sign in with the ${brand} account you want in the pool.`
-                : "Sign in with this account to put it back in the pool."}
-            </DialogDescription>
-          )}
         </DialogHeader>
         {phase.at === "starting" || phase.at === "idle" ? (
           <Waiting label="Getting a sign-in link" />

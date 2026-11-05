@@ -1,6 +1,7 @@
 import { addDays, startOfDay, startOfWeek } from "@/lib/model/calendar";
-import { usedBetween } from "@/lib/model/history";
+import { lockedSpans, usedBetween } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
+import type { Pace } from "@/lib/model/pace";
 
 export interface Daily {
   readonly id: string;
@@ -8,17 +9,22 @@ export interface Daily {
 }
 
 export interface Outlook {
-  readonly perDay: number;
-  readonly left: number;
+  readonly since: number | null;
+  readonly rate: number;
+  readonly room: number;
+  readonly cutoff: number;
+  readonly resetsAt: number | null;
   readonly locks: readonly (readonly [from: number, to: number])[];
 }
+
+export type Mark = "real" | "forecast" | null;
 
 export interface WeekDay {
   readonly from: number;
   readonly used: number | null;
   readonly forecast: number;
-  readonly locked: boolean;
-  readonly ranOut: boolean;
+  readonly lock: Mark;
+  readonly out: Mark;
 }
 
 export interface Week {
@@ -55,37 +61,116 @@ export const weekStarts = (since: number, now: number) => {
 const overlaps = (spans: Outlook["locks"], from: number, to: number) =>
   spans.some(([start, end]) => start < to && end > from);
 
+export const outlookOf = (
+  pace: Pace | null,
+  points: Points,
+  since: number | null,
+  now: number
+): Outlook => ({
+  cutoff: pace?.cutoff ?? 100,
+  locks:
+    pace === null
+      ? []
+      : lockedSpans(points, pace.cutoff, pace.locked ? pace.resetsAt : now),
+  rate: pace?.rate ?? 0,
+  resetsAt: pace?.resetsAt ?? null,
+  room: pace === null || pace.locked ? 0 : Math.max(0, pace.cutoff - pace.used),
+  since,
+});
+
+const markOf = (real: boolean, forecast: boolean): Mark => {
+  if (real) {
+    return "real";
+  }
+
+  return forecast ? "forecast" : null;
+};
+
+const forecaster = (outlook: Outlook) => {
+  let { room } = outlook;
+  let ranOut: number | null = null;
+
+  const spend = (from: number, to: number) => {
+    const spent = Math.min(room, outlook.rate * Math.max(0, to - from));
+
+    room -= spent;
+
+    if (room <= 0 && ranOut === null && spent > 0) {
+      ranOut = from + spent / outlook.rate;
+    }
+
+    return spent;
+  };
+
+  return (from: number, to: number) => {
+    const { resetsAt: reset } = outlook;
+
+    if (reset === null || reset <= from || reset >= to) {
+      const spent = spend(from, to);
+
+      return { lockedUntil: reset, ranOut, spent };
+    }
+
+    const before = spend(from, reset);
+    const lockedFrom = ranOut;
+
+    room = outlook.cutoff;
+    ranOut = null;
+
+    return {
+      lockedUntil: reset,
+      ranOut: lockedFrom,
+      spent: before + spend(reset, to),
+    };
+  };
+};
+
 export const weeksOf = (
   daily: Daily,
   since: number,
   now: number,
   outlook: Outlook
 ): AccountWeeks => {
-  const first = startOfDay(since);
+  const first = startOfDay(Math.max(since, outlook.since ?? since));
   const today = startOfDay(now);
+  const forecast = forecaster(outlook);
 
   const used = new Map(
     daily.days.map(([at, value]) => [startOfDay(at), value])
   );
 
-  let room = outlook.left;
-
   const weeks = weekStarts(since, now).map((from): Week => {
     const days = Array.from({ length: daysInWeek }, (_, index): WeekDay => {
       const day = addDays(from, index);
       const next = addDays(day, 1);
-      const locked = overlaps(outlook.locks, day, next);
-      const ahead = day > today;
-      const forecast = ahead && !locked ? Math.min(outlook.perDay, room) : 0;
+      const ahead = next > now;
 
-      room -= forecast;
+      const outlookDay = ahead
+        ? forecast(Math.max(day, now), next)
+        : { lockedUntil: null, ranOut: null, spent: 0 };
+
+      const forecastOut =
+        outlookDay.ranOut !== null &&
+        outlookDay.ranOut >= day &&
+        outlookDay.ranOut < next;
+
+      const forecastLock =
+        outlookDay.ranOut !== null &&
+        outlookDay.ranOut < next &&
+        (outlookDay.lockedUntil === null || outlookDay.lockedUntil > day);
+
+      const realLock = overlaps(outlook.locks, day, next);
+
+      const realOut = outlook.locks.some(
+        ([start]) => start >= day && start < next
+      );
 
       return {
-        forecast,
+        forecast: outlookDay.spent,
         from: day,
-        locked,
-        ranOut: outlook.locks.some(([start]) => start >= day && start < next),
-        used: day < first || ahead ? null : (used.get(day) ?? 0),
+        lock: markOf(realLock, forecastLock),
+        out: markOf(realOut, forecastOut),
+        used: day < first || day > today ? null : (used.get(day) ?? 0),
       };
     });
 
@@ -96,7 +181,7 @@ export const weeksOf = (
       days,
       expected: total + days.reduce((sum, day) => sum + day.forecast, 0),
       from,
-      part: from < first,
+      part: from < startOfDay(since),
       total,
     };
   });

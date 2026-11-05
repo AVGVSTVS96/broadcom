@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
+import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
+import { fills } from "@/components/viz/meter";
 import { Band, Dot } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { addDays, startOfDay } from "@/lib/model/calendar";
-import { clock, date, percent, weekday } from "@/lib/model/format";
+import { date, percent, weekday, when } from "@/lib/model/format";
 import { lockedSpans } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
 import type { Plan } from "@/lib/model/pool";
 import { windows } from "@/lib/model/timeline";
+import { windowTone } from "@/lib/model/tone";
+import type { LimitWindow } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
 const pastDays = 6;
@@ -18,30 +21,16 @@ const spanDays = 14;
 
 const tones = {
   bad: "border-bad/50 bg-bad/10",
+  none: "border-border bg-muted",
   ok: "border-ok/40 bg-ok/10",
   over: "border-over/50 bg-over/10",
 } as const;
 
-const fills = { bad: "bg-bad", ok: "bg-ok", over: "bg-over" } as const;
-
-const toneOf = (plan: Plan) => {
-  if (plan.pace?.locked === true) {
-    return "bad";
-  }
-
-  return plan.pace !== null && plan.pace.used > plan.pace.even ? "over" : "ok";
-};
-
-const Chip = ({ label, value }: { label: string; value: number | null }) => (
+const Chip = ({ window }: { window: LimitWindow }) => (
   <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
-    <span
-      className={cn(
-        "size-1.5 rounded-full",
-        value !== null && value >= 98 ? "bg-bad" : "bg-ok"
-      )}
-    />
-    <span className="text-muted-foreground">{label}</span>
-    {value === null ? "–" : percent(value)}
+    <span className={cn("size-1.5 rounded-full", fills[windowTone(window)])} />
+    <span className="text-muted-foreground">Session</span>
+    {window.used === null ? "–" : percent(window.used)}
   </span>
 );
 
@@ -63,7 +52,7 @@ const Row = ({
   }
 
   const { ended, current, next } = windows(pace.resetsAt, points);
-  const tone = toneOf(plan);
+  const tone = windowTone(account.week, pace);
 
   const locks = lockedSpans(
     points,
@@ -86,8 +75,7 @@ const Row = ({
           <span className="text-muted-foreground"> · {account.plan}</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Chip label="Session" value={account.fiveHour.used} />
-          <Chip label="Weekly" value={account.week.used} />
+          <Chip window={account.fiveHour} />
         </div>
       </div>
       <div className="relative h-10">
@@ -130,16 +118,14 @@ const Row = ({
                 ((ahead[0] - current.from) / (current.to - current.from)) * 100
               }
               x1={100}
-              className="top-0 opacity-30"
-              style={hatchStyle}
+              className="top-0 rounded-r-lg"
+              style={forecastHatchStyle}
             />
           )}
           <span className="relative block truncate px-2 pt-1.5 text-xs">
-            {percent(pace.used)}
-            <span className="max-sm:hidden">
-              {" "}
-              used · {clock(pace.resetsAt)}
-            </span>
+            <span className="max-sm:hidden">{percent(pace.used)} used · </span>
+            {pace.locked ? "Back " : ""}
+            {when(pace.resetsAt, now)}
           </span>
           <span className="absolute inset-x-2 bottom-1.5 h-1 overflow-hidden rounded-full bg-foreground/10">
             <span
@@ -216,14 +202,14 @@ export const TimelineView = ({
     <Section
       title={
         first?.pace === null || first?.pace === undefined
-          ? "Every plan has room"
-          : `${first.name} is back first, ${clock(first.pace.resetsAt)}`
+          ? `All ${plans.length} plans have room`
+          : `${first.name} is back first, ${when(first.pace.resetsAt, now)}`
       }
-      detail={`${locked.length} of ${plans.length} plans locked · ${date(from)} – ${date(addDays(to, -1))}`}
+      detail={`${locked.length} of ${plans.length} plans locked`}
       actions={toggle}
     >
       <div className="grid sm:grid-cols-[13rem_minmax(0,1fr)] sm:gap-4">
-        <div className="text-sm text-muted-foreground max-sm:hidden">Plan</div>
+        <div className="max-sm:hidden" />
         <div className="relative grid grid-cols-14 pb-2 text-center text-xs">
           {days.map((day) => (
             <div
@@ -274,6 +260,7 @@ export const TimelineView = ({
           { fill: "bg-muted", key: "box", label: "Ended" },
           { key: "dot", label: "Ran out" },
           { key: "hatch", label: "Locked" },
+          { key: "forecast", label: "Locked if the pace holds" },
           { key: "line", label: "Reset spent" },
         ]}
       />

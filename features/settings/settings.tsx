@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Section } from "@/components/viz/section";
 import { saveSettings } from "@/features/settings/actions";
 import { useLive } from "@/lib/live/client";
-import { dollars, utcDate } from "@/lib/model/format";
+import { dollars, plural, utcDate } from "@/lib/model/format";
 import { changesOf, groups } from "@/lib/model/settings";
 import type { Field, Values } from "@/lib/model/settings";
 
@@ -167,19 +167,21 @@ export const Settings = ({
     startTransition(async () => {
       const result = await saveSettings(changes);
 
-      if (result.ok) {
+      if (!result.ok) {
+        setNotice(result.reason);
+      } else if (result.value.length > 0) {
+        setNotice(
+          `${result.value.join(", ")} changed somewhere else. Nothing was saved; reload to see it.`
+        );
+      } else {
         setDraft(null);
         setNotice("Saved");
-      } else {
-        setNotice(result.reason);
       }
     });
   };
 
   return (
     <div className="space-y-6 pb-24">
-      <h1 className="text-2xl font-medium tracking-tight">Settings</h1>
-
       {groups.map((group) => (
         <Section key={group.name} title={group.name}>
           <div className="-mt-4 divide-y">
@@ -257,8 +259,7 @@ export const Settings = ({
       {changes.length === 0 && notice === null ? null : (
         <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 pl-4 shadow-lg">
           <output className="text-sm">
-            {notice ??
-              `${changes.length} unsaved ${changes.length === 1 ? "change" : "changes"} · applies to every request right away`}
+            {notice ?? plural(changes.length, "unsaved change")}
           </output>
           {changes.length === 0 ? null : (
             <div className="flex gap-2">

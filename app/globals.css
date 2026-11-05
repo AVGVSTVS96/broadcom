@@ -81,7 +81,7 @@
   --track: light-dark(oklch(0.92 0 0), oklch(0.27 0 0));
   --brand: light-dark(oklch(0.64 0.18 50), oklch(0.74 0.16 55));
   --ok: light-dark(oklch(0.55 0.14 150), oklch(0.72 0.17 150));
-  --over: light-dark(oklch(0.66 0.15 75), oklch(0.8 0.15 80));
+  --over: light-dark(oklch(0.74 0.17 72), oklch(0.8 0.15 80));
   --bad: light-dark(oklch(0.6 0.19 28), oklch(0.72 0.16 28));
   --chart-1: light-dark(oklch(0.2 0 0), oklch(0.96 0 0));
   --chart-2: light-dark(oklch(0.45 0 0), oklch(0.75 0 0));

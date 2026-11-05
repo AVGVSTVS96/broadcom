@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  accountNames,
-  cellsOf,
-  format,
-  formatShort,
-  sumCells,
-} from "@/lib/model/usage";
+import { namesOf } from "@/lib/model/names";
+import { cellsOf, format, formatShort, sumCells } from "@/lib/model/usage";
 
 const zone = "America/Los_Angeles";
 
@@ -98,7 +93,7 @@ test("format keeps one unit per measure", () => {
 
 test("accounts are named by login, API keys by the login they bill", () => {
   expect(
-    accountNames(
+    namesOf(
       [
         { id: "a1", label: "ada101@gmail.com" },
         { id: "key1", label: "" },

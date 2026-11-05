@@ -1,32 +1,64 @@
 import type { ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
+import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { date, weekday } from "@/lib/model/format";
-import { lockedSpans } from "@/lib/model/history";
+import { addDays, startOfDay } from "@/lib/model/calendar";
+import { date, times, weekday } from "@/lib/model/format";
 import type { Points } from "@/lib/model/history";
+import { outcome } from "@/lib/model/pace";
 import type { Plan } from "@/lib/model/pool";
-import { evenPerDay, weeksOf, withHistory } from "@/lib/model/weeks";
-import type { Daily, Week } from "@/lib/model/weeks";
+import { evenPerDay, outlookOf, weeksOf, withHistory } from "@/lib/model/weeks";
+import type { Daily, Mark, Week, WeekDay } from "@/lib/model/weeks";
 import { cn } from "@/lib/utils";
 
-import { outcome } from "./outcome";
-
 const ratioLabel = (week: Week, base: number | null) => {
-  if (week.part) {
-    return "Part";
-  }
-
-  if (base === null || base === 0) {
+  if (week.part || base === null || base === 0) {
     return "–";
   }
 
   const ratio = (week.current ? week.expected : week.total) / base;
 
-  return `${week.current ? "~" : ""}${ratio.toFixed(2)}×`;
+  return `${week.current ? "~" : ""}${times(ratio)}`;
 };
+
+const lockStyle = (mark: Mark) => {
+  if (mark === "real") {
+    return hatchStyle;
+  }
+
+  return mark === "forecast" ? forecastHatchStyle : undefined;
+};
+
+const height = (value: number, top: number) =>
+  `${Math.max(3, (value / top) * 100)}%`;
+
+const Bar = ({ day, top }: { day: WeekDay; top: number }) => (
+  <span
+    title={`${weekday(day.from)} ${date(day.from)}: ${Math.round((day.used ?? 0) + day.forecast)} points`}
+    className="flex h-full flex-1 flex-col justify-end"
+  >
+    {day.forecast > 0 ? (
+      <span
+        className={cn(
+          "rounded-t-[3px] border border-dashed border-muted-foreground/60",
+          day.used !== null && day.used > 0 && "border-b-0"
+        )}
+        style={{ height: height(day.forecast, top) }}
+      />
+    ) : null}
+    {day.used === null || (day.used === 0 && day.forecast > 0) ? null : (
+      <span
+        className={cn(
+          "bg-foreground/40",
+          day.forecast > 0 ? "" : "rounded-t-[3px]"
+        )}
+        style={{ height: height(day.used, top) }}
+      />
+    )}
+  </span>
+);
 
 const Cell = ({
   week,
@@ -53,20 +85,7 @@ const Cell = ({
         style={{ bottom: `${(evenPerDay / top) * 100}%` }}
       />
       {week.days.map((day) => (
-        <span
-          key={day.from}
-          title={`${weekday(day.from)} ${date(day.from)}: ${Math.round(day.used ?? day.forecast)} points`}
-          className={cn(
-            "relative flex-1 rounded-t-[3px]",
-            day.used === null
-              ? "border border-b-0 border-dashed border-muted-foreground/60"
-              : "bg-foreground/40",
-            day.used === null && day.forecast === 0 && "border-0"
-          )}
-          style={{
-            height: `${Math.max(day.used === null && day.forecast === 0 ? 0 : 3, ((day.used ?? day.forecast) / top) * 100)}%`,
-          }}
-        />
+        <Bar key={day.from} day={day} top={top} />
       ))}
     </div>
     <div className="flex h-2 gap-0.5">
@@ -75,11 +94,17 @@ const Cell = ({
           key={day.from}
           className={cn(
             "relative grid flex-1 place-items-center rounded-[2px]",
-            !day.locked && "bg-track"
+            day.lock === null && "bg-track"
           )}
-          style={day.locked ? hatchStyle : undefined}
+          style={lockStyle(day.lock)}
         >
-          {day.ranOut ? <Dot tone="bad" className="absolute size-2" /> : null}
+          {day.out === null ? null : (
+            <Dot
+              tone="bad"
+              hollow={day.out === "forecast"}
+              className="absolute size-2 text-bad"
+            />
+          )}
         </span>
       ))}
     </div>
@@ -120,15 +145,12 @@ export const WeeksView = ({
   if (daily === null || since === null) {
     return (
       <Section title="No weekly history yet" actions={toggle}>
-        <p className="text-sm text-muted-foreground">
-          The proxy has no limit readings to compare weeks with.
-        </p>
+        {null}
       </Section>
     );
   }
 
   const rows = plans.map((plan) => {
-    const { pace } = plan;
     const points = history[plan.id] ?? [];
 
     const own = daily.accounts.find((account) => account.id === plan.id) ?? {
@@ -138,21 +160,12 @@ export const WeeksView = ({
 
     return {
       plan,
-      weeks: weeksOf(withHistory(own, points, now), since, now, {
-        left:
-          pace === null || pace.locked
-            ? 0
-            : Math.max(0, pace.cutoff - pace.used),
-        locks:
-          pace === null
-            ? []
-            : lockedSpans(
-                points,
-                pace.cutoff,
-                pace.locked ? pace.resetsAt : now
-              ),
-        perDay: (pace?.pace ?? 0) * evenPerDay,
-      }),
+      weeks: weeksOf(
+        withHistory(own, points, now),
+        since,
+        now,
+        outlookOf(plan.pace, points, plan.account.since, now)
+      ),
     };
   });
 
@@ -160,22 +173,37 @@ export const WeeksView = ({
 
   const ranOut = rows.filter(
     ({ weeks }) =>
-      weeks.weeks.at(-1)?.days.some((day) => day.ranOut || day.locked) === true
+      weeks.weeks
+        .at(-1)
+        ?.days.some((day) => day.out === "real" || day.lock === "real") === true
   ).length;
 
   const baseWeek = header?.weeks.weeks.find(
     (week) => !week.part && !week.current
   );
 
+  const [exact] = plans
+    .flatMap((plan) => history[plan.id]?.[0]?.[0] ?? [])
+    .toSorted((a, b) => a - b);
+
   return (
     <Section
       title={`${ranOut} of ${plans.length} plans ran out this week`}
-      detail={`Weekly limit points per day, Monday to Sunday, against the week of ${baseWeek === undefined ? "–" : date(baseWeek.from)}. Readings start ${date(since)}; days before the last week are estimates from requests.`}
+      detail={[
+        baseWeek === undefined
+          ? null
+          : `Against the week of ${date(baseWeek.from)}.`,
+        exact === undefined
+          ? null
+          : `Days before ${date(addDays(startOfDay(exact), 1))} are estimates.`,
+      ]
+        .filter((part) => part !== null)
+        .join(" ")}
       actions={toggle}
     >
       <div className="space-y-1">
         <div className="grid gap-3 pb-1 text-xs text-muted-foreground sm:grid-cols-[9rem_minmax(0,1fr)_10rem]">
-          <span className="max-sm:hidden">Plan</span>
+          <span className="max-sm:hidden" />
           <div
             className="grid gap-3"
             style={columns(header?.weeks.weeks.length ?? 1)}
@@ -187,17 +215,17 @@ export const WeeksView = ({
               </span>
             ))}
           </div>
-          <span className="max-sm:hidden">This window</span>
+          <span className="max-sm:hidden" />
         </div>
         {rows.map(({ plan, weeks }) => {
           const top = Math.max(
             evenPerDay * 2,
             ...weeks.weeks.flatMap((week) =>
-              week.days.map((day) => day.used ?? day.forecast)
+              week.days.map((day) => (day.used ?? 0) + day.forecast)
             )
           );
 
-          const result = plan.pace === null ? null : outcome(plan.pace);
+          const result = plan.pace === null ? null : outcome(plan.pace, now);
 
           return (
             <div
@@ -243,8 +271,14 @@ export const WeeksView = ({
             key: "dash",
             label: `Even pace, ${evenPerDay.toFixed(1)} a day`,
           },
+          {
+            className: "text-muted-foreground",
+            key: "hollow",
+            label: "Forecast",
+          },
           { key: "dot", label: "Ran out" },
           { key: "hatch", label: "Locked" },
+          { key: "forecast", label: "Locked if the pace holds" },
         ]}
       />
     </Section>

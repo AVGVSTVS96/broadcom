@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PointerEvent, ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
+import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import {
   Area,
@@ -16,18 +16,19 @@ import {
 } from "@/components/viz/plot";
 import type { XY } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { clock, duration, percent, times } from "@/lib/model/format";
-import { WEEK, valueAt } from "@/lib/model/history";
-import { lockedFor } from "@/lib/model/pace";
+import { duration, percent, times, when } from "@/lib/model/format";
+import { valueAt } from "@/lib/model/history";
+import { lockedFor, outcome } from "@/lib/model/pace";
 import type { Pace } from "@/lib/model/pace";
 import { byPace } from "@/lib/model/pool";
-import type { Plan } from "@/lib/model/pool";
+import type { Paced, Plan } from "@/lib/model/pool";
 import { cn } from "@/lib/utils";
 
-type Paced = Plan & { readonly pace: Pace };
-
 const fraction = (pace: Pace, at: number) =>
-  Math.min(100, Math.max(0, ((at - pace.start) / WEEK) * 100));
+  Math.min(
+    100,
+    Math.max(0, ((at - pace.start) / (pace.resetsAt - pace.start)) * 100)
+  );
 
 const lineOf = (pace: Pace, now: number): XY[] => {
   const end = pace.ranOut ?? now;
@@ -53,54 +54,45 @@ const projectionOf = (pace: Pace, now: number): XY[] | null => {
     : [from, [fraction(pace, pace.runsOut), 100 - pace.cutoff]];
 };
 
-const outcome = (pace: Pace) => {
-  if (pace.locked) {
-    return { bad: true, text: `Back ${clock(pace.resetsAt)}` };
-  }
+const verdict = (ranked: readonly Paced[], now: number) => {
+  const open = ranked.filter((plan) => !plan.pace.locked);
+  const locked = ranked.length - open.length;
 
-  if (pace.runsOut !== null) {
-    return { bad: true, text: clock(pace.runsOut) };
-  }
+  const [runningOut] = open
+    .filter((plan) => plan.pace.runsOut !== null)
+    .toSorted((a, b) => (a.pace.runsOut ?? 0) - (b.pace.runsOut ?? 0));
 
-  return { bad: false, text: `~${percent(pace.atReset)} at reset` };
-};
+  const [lead] = open;
+  const ranOut = locked > 0 ? ` ${locked} already ran out.` : "";
 
-const verdict = (ranked: readonly Paced[]) => {
-  const runningOut = ranked.find((plan) => plan.pace.runsOut !== null);
-  const locked = ranked.filter((plan) => plan.pace.locked);
-  const others = ranked.length - 1;
+  const runsOut = runningOut?.pace.runsOut ?? null;
 
-  if (runningOut !== undefined && runningOut.pace.runsOut !== null) {
+  if (runningOut !== undefined && runsOut !== null) {
     return {
-      detail: `Runs out ${clock(runningOut.pace.runsOut)} if the pace holds.${locked.length > 0 ? ` ${locked.length} already ran out.` : ` The other ${others} are behind.`}`,
+      detail: `Runs out ${when(runsOut, now)}, ${duration(lockedFor(runningOut.pace))} before reset.${ranOut}`,
       subject: runningOut,
-      title: `${runningOut.name} is ${times(runningOut.pace.pace ?? 0)} ahead of even pace`,
+      title: `${runningOut.name} runs at ${times(runningOut.pace.pace ?? 0)} even pace`,
     };
   }
 
-  if (locked.length > 0) {
-    const lead = ranked.find((plan) => !plan.pace.locked);
-    const [fastest] = locked;
-
+  if (locked > 0) {
     return {
       detail:
         lead === undefined
-          ? `${fastest?.name} ran out fastest, at ${times(fastest?.pace.pace ?? 0)} even pace.`
-          : `${lead.name} is at ${times(lead.pace.pace ?? 0)} and ends near ${percent(lead.pace.atReset)}.`,
-      subject: lead ?? fastest,
-      title: `${locked.length} of ${ranked.length} plans ran out this window`,
+          ? undefined
+          : `${lead.name} is at ${times(lead.pace.pace ?? 0)} even pace, ~${percent(lead.pace.atReset)} at reset.`,
+      subject: lead ?? ranked[0],
+      title: `${locked} of ${ranked.length} plans ran out this week`,
     };
   }
-
-  const [lead] = ranked;
 
   return {
     detail:
       lead === undefined
         ? undefined
-        : `${lead.name} leads at ${times(lead.pace.pace ?? 0)}, ~${percent(lead.pace.atReset)} at reset.`,
+        : `${lead.name} leads at ${times(lead.pace.pace ?? 0)} even pace, ~${percent(lead.pace.atReset)} at reset.`,
     subject: lead,
-    title: "Every plan is on pace",
+    title: `All ${ranked.length} plans last to reset`,
   };
 };
 
@@ -123,41 +115,33 @@ const Readout = ({
   </div>
 );
 
-const Outlook = ({ pace }: { pace: Pace }) => {
+const Outlook = ({ pace, now }: { pace: Pace; now: number }) => {
   if (pace.locked) {
     return (
       <>
         <Readout
           label="Ran out"
-          value={pace.ranOut === null ? "–" : clock(pace.ranOut)}
+          value={pace.ranOut === null ? "–" : when(pace.ranOut, now)}
           bad
         />
-        <Readout label="Locked until reset" value={duration(lockedFor(pace))} />
+        <Readout label="Back" value={when(pace.resetsAt, now)} />
       </>
     );
   }
 
   if (pace.runsOut === null) {
-    return (
-      <>
-        <Readout label="At reset" value={`~${percent(pace.atReset)}`} />
-        <Readout
-          label="Room at reset"
-          value={`~${percent(100 - pace.atReset)}`}
-        />
-      </>
-    );
+    return <Readout label="At reset" value={`~${percent(pace.atReset)}`} />;
   }
 
   return (
     <>
-      <Readout label="Runs out" value={clock(pace.runsOut)} bad />
+      <Readout label="Runs out" value={when(pace.runsOut, now)} bad />
       <Readout label="Locked before reset" value={duration(lockedFor(pace))} />
     </>
   );
 };
 
-const Focus = ({ plan }: { plan: Paced }) => {
+const Focus = ({ plan, now }: { plan: Paced; now: number }) => {
   const { pace } = plan;
 
   return (
@@ -165,25 +149,33 @@ const Focus = ({ plan }: { plan: Paced }) => {
       <div>
         <div className="text-lg">{plan.name}</div>
         <div className="text-sm text-muted-foreground">
-          {plan.account.plan} · 7-day window · resets {clock(pace.resetsAt)}
+          {plan.account.plan} · resets {when(pace.resetsAt, now)}
+          {pace.restarted ? ` · counted from ${when(pace.start, now)}` : null}
         </div>
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-5xl font-light tracking-tight">
-          {pace.pace === null ? "–" : times(pace.pace)}
-        </span>
-        <span className="text-muted-foreground">even pace</span>
-      </div>
+      {pace.locked ? (
+        <div
+          className="inline-flex rounded-lg px-3 py-1.5 text-2xl font-light tracking-tight"
+          style={hatchStyle}
+        >
+          <span className="rounded bg-card px-2">Locked</span>
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-2">
+          <span className="text-5xl font-light tracking-tight">
+            {pace.pace === null ? "–" : times(pace.pace)}
+          </span>
+          <span className="text-muted-foreground">even pace</span>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
-        <Readout
-          label={pace.locked ? "Used at run-out" : "Used now"}
-          value={percent(pace.reached)}
-        />
-        <Readout
-          label={pace.locked ? "Even pace by then" : "Even pace by now"}
-          value={percent(pace.even)}
-        />
-        <Outlook pace={pace} />
+        {pace.locked ? null : (
+          <>
+            <Readout label="Used now" value={percent(pace.used)} />
+            <Readout label="Even pace by now" value={percent(pace.even)} />
+          </>
+        )}
+        <Outlook pace={pace} now={now} />
       </div>
     </div>
   );
@@ -198,11 +190,9 @@ const dotTone = (locked: boolean, focused: boolean) => {
 };
 
 const xTicks = [
-  { at: 0, label: "Window start" },
   { at: 25, label: "¼" },
   { at: 50, label: "½" },
   { at: 75, label: "¾" },
-  { at: 100, label: "Reset" },
 ] as const;
 
 const yTicks = [0, 25, 50, 75, 100] as const;
@@ -214,13 +204,11 @@ export const PaceSection = ({
   plans: readonly Plan[];
   now: number;
 }) => {
-  const ranked = byPace(plans).filter(
-    (plan): plan is Paced => plan.pace !== null
-  );
+  const ranked = byPace(plans);
 
   const [focusId, setFocusId] = useState<string | null>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const { title, detail, subject } = verdict(ranked);
+  const { title, detail, subject } = verdict(ranked, now);
   const focus = ranked.find((plan) => plan.id === focusId) ?? subject;
 
   if (focus === undefined) {
@@ -282,7 +270,7 @@ export const PaceSection = ({
                       className="text-border"
                     />
                   ))}
-                  {xTicks.slice(1, -1).map((tick) => (
+                  {xTicks.map((tick) => (
                     <Path
                       key={tick.at}
                       points={[
@@ -359,7 +347,11 @@ export const PaceSection = ({
                         "rounded-[2px]",
                         plan !== focus && "opacity-35"
                       )}
-                      style={{ ...hatchStyle, height: "8px", top: "-10px" }}
+                      style={{
+                        ...(plan.pace.locked ? hatchStyle : forecastHatchStyle),
+                        height: "8px",
+                        top: "-10px",
+                      }}
                     />
                   );
                 })}
@@ -430,7 +422,7 @@ export const PaceSection = ({
                       }}
                     >
                       {focus.pace.locked ? "Ran out" : "Runs out"}{" "}
-                      {clock(lockFrom)}
+                      {when(lockFrom, now)}
                     </span>
                     <span className="absolute -top-8 right-0 text-xs text-bad max-sm:hidden">
                       Locked {duration(lockedFor(focus.pace))}
@@ -450,7 +442,9 @@ export const PaceSection = ({
                       {percent(hover)} into the window
                     </div>
                     {ranked.map((plan) => {
-                      const at = plan.pace.start + (hover / 100) * WEEK;
+                      const at =
+                        plan.pace.start +
+                        (hover / 100) * (plan.pace.resetsAt - plan.pace.start);
 
                       const used =
                         at > now ? null : valueAt(plan.pace.line, at);
@@ -476,10 +470,10 @@ export const PaceSection = ({
             <div />
             <div className="relative text-xs text-muted-foreground">
               <span className="absolute top-1.5 left-0">
-                <span className="sm:hidden">Start</span>
-                <span className="max-sm:hidden">Window start</span>
+                {focus.pace.restarted ? "Restarted " : ""}
+                {when(focus.pace.start, now)}
               </span>
-              {xTicks.slice(1, -1).map((tick) => (
+              {xTicks.map((tick) => (
                 <span
                   key={tick.at}
                   className="absolute top-1.5 -translate-x-1/2"
@@ -488,7 +482,9 @@ export const PaceSection = ({
                   {tick.label}
                 </span>
               ))}
-              <span className="absolute top-1.5 right-0">Reset</span>
+              <span className="absolute top-1.5 right-0">
+                Resets {when(focus.pace.resetsAt, now)}
+              </span>
             </div>
           </div>
           <Legend
@@ -496,19 +492,16 @@ export const PaceSection = ({
               { key: "line", label: "Used so far" },
               { key: "dash", label: "If the pace holds" },
               { key: "dot", label: "Runs out" },
-              { key: "hatch", label: "Locked until reset" },
+              { key: "hatch", label: "Locked" },
+              { key: "forecast", label: "Locked if the pace holds" },
             ]}
           />
         </div>
         <aside className="space-y-6 lg:border-l lg:pl-8">
-          <Focus plan={focus} />
+          <Focus plan={focus} now={now} />
           <div className="space-y-1 border-t pt-5">
-            <div className="mb-2 text-sm">
-              All plans{" "}
-              <span className="text-muted-foreground">· fastest first</span>
-            </div>
             {ranked.map((plan) => {
-              const result = outcome(plan.pace);
+              const result = outcome(plan.pace, now);
 
               return (
                 <button
@@ -519,14 +512,11 @@ export const PaceSection = ({
                     setFocusId(plan.id);
                   }}
                   className={cn(
-                    "grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                    "grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
                     plan === focus && "bg-muted"
                   )}
                 >
                   <span className="truncate">{plan.name}</span>
-                  <span className="tabular-nums">
-                    {plan.pace.pace === null ? "–" : times(plan.pace.pace)}
-                  </span>
                   <span
                     className={cn(
                       "text-right tabular-nums",
@@ -534,6 +524,9 @@ export const PaceSection = ({
                     )}
                   >
                     {result.text}
+                  </span>
+                  <span className="col-span-2 text-xs text-muted-foreground">
+                    {result.note}
                   </span>
                 </button>
               );

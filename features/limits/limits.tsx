@@ -1,5 +1,6 @@
 "use client";
 
+import { Problems } from "@/components/viz/problems";
 import { Views } from "@/components/viz/views";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
@@ -18,11 +19,13 @@ export const Limits = ({
   view,
   history,
   daily,
+  problems,
   rendered,
 }: {
   view: View;
   history: Readonly<Record<string, Points>>;
   daily: { since: number | null; accounts: readonly Daily[] } | null;
+  problems: readonly string[];
   rendered: number;
 }) => {
   const accounts = useLive((live) => live.accounts);
@@ -34,31 +37,50 @@ export const Limits = ({
 
   const toggle = <Views views={views} current={view} />;
 
-  if (view === "weeks") {
-    return (
-      <WeeksView
-        plans={plans}
-        daily={daily}
-        history={history}
-        now={now}
-        toggle={toggle}
-      />
-    );
-  }
+  const body = () => {
+    if (view === "weeks") {
+      return (
+        <WeeksView
+          plans={plans}
+          daily={daily}
+          history={history}
+          now={now}
+          toggle={toggle}
+        />
+      );
+    }
 
-  if (view === "activity") {
-    return (
-      <ActivityView plans={plans} history={history} now={now} toggle={toggle} />
-    );
-  }
+    if (view === "activity") {
+      return (
+        <ActivityView
+          plans={plans}
+          history={history}
+          now={now}
+          toggle={toggle}
+        />
+      );
+    }
 
-  if (view === "hand-off") {
+    if (view === "hand-off") {
+      return (
+        <HandOffView
+          plans={plans}
+          history={history}
+          now={now}
+          toggle={toggle}
+        />
+      );
+    }
+
     return (
-      <HandOffView plans={plans} history={history} now={now} toggle={toggle} />
+      <TimelineView plans={plans} history={history} now={now} toggle={toggle} />
     );
-  }
+  };
 
   return (
-    <TimelineView plans={plans} history={history} now={now} toggle={toggle} />
+    <div className="space-y-6">
+      <Problems problems={problems} />
+      {body()}
+    </div>
   );
 };

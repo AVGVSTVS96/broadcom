@@ -6,13 +6,13 @@ import type { ReactNode } from "react";
 
 import { Legend } from "@/components/viz/legend";
 import { Section } from "@/components/viz/section";
-import { useNow } from "@/features/accounts/use-now";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
+import { useNow } from "@/lib/live/now";
 import { clock, duration } from "@/lib/model/format";
 import { agentSdk, byState, threadHref } from "@/lib/model/live";
 import type { Handoff, Handoffs } from "@/lib/model/live";
-import { accountNames } from "@/lib/model/usage";
+import { nameOf, namesOf } from "@/lib/model/names";
 import type {
   Account,
   LiveSession,
@@ -62,7 +62,7 @@ const plural = (count: number, one: string, many = `${one}s`) =>
 const useNames = (data: LiveData) => {
   const accounts = useLive((live) => live.accounts);
 
-  const named = accountNames(
+  const named = namesOf(
     Object.values(accounts).map((account) => ({
       id: account.id,
       label: account.label,
@@ -70,8 +70,7 @@ const useNames = (data: LiveData) => {
     data.grants
   );
 
-  return (id: string | null) =>
-    id === null ? "No account" : (named[id] ?? `API key ${id.slice(-6)}`);
+  return (id: string | null) => nameOf(named, id);
 };
 
 type Name = ReturnType<typeof useNames>;

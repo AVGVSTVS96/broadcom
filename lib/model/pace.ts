@@ -1,4 +1,6 @@
+import { percent, times, when } from "@/lib/model/format";
 import {
+  DAY,
   HOUR,
   WEEK,
   firstReaching,
@@ -6,44 +8,86 @@ import {
   since,
   valueAt,
 } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
+import type { Point, Points } from "@/lib/model/history";
 import type { LimitWindow } from "@/lib/proxy/schema";
 
 export interface Pace {
   readonly start: number;
+  readonly restarted: boolean;
   readonly resetsAt: number;
   readonly used: number;
   readonly cutoff: number;
   readonly even: number;
   readonly pace: number | null;
+  readonly rate: number;
   readonly locked: boolean;
   readonly ranOut: number | null;
-  readonly reached: number;
   readonly runsOut: number | null;
   readonly atReset: number;
   readonly line: Points;
 }
 
+const trailing = DAY;
+
 const minimumSpan = HOUR;
 
-const measure = (
-  reached: number,
-  base: number,
-  span: readonly [from: number, end: number],
-  start: number,
-  length: number
-) => {
-  const [from, end] = span;
+const fit = (points: Points) => {
+  let meanX = 0;
+  let meanY = 0;
 
-  const [gained, taken, offset] =
-    end - from >= minimumSpan
-      ? [reached - base, end - from, base]
-      : [reached, end - start, 0];
+  for (const [x, y] of points) {
+    meanX += x / points.length;
+    meanY += y / points.length;
+  }
+
+  let cross = 0;
+  let spread = 0;
+
+  for (const [x, y] of points) {
+    cross += (x - meanX) * (y - meanY);
+    spread += (x - meanX) ** 2;
+  }
+
+  const rate = spread === 0 ? 0 : Math.max(0, cross / spread);
 
   return {
-    even: Math.min(100, offset + (taken * 100) / length),
-    rate: taken > 0 ? Math.max(0, gained) / taken : null,
+    at: (time: number) => meanY + rate * (time - meanX),
+    rate,
+    reach: (level: number) => meanX + (level - meanY) / rate,
   };
+};
+
+const between = (line: Points, at: number) => {
+  const after = line.findIndex(([time]) => time > at);
+  const right = line[after];
+  const left = line[after - 1];
+
+  if (left === undefined || right === undefined) {
+    return valueAt(line, at) ?? 0;
+  }
+
+  return (
+    left[1] + ((right[1] - left[1]) * (at - left[0])) / (right[0] - left[0])
+  );
+};
+
+const rises = (line: Points, from: number, latest: Point): Points => {
+  let high = between(line, from);
+  const found: Point[] = [[from, high]];
+
+  for (const [at, used] of line) {
+    if (at > from && used > high) {
+      high = used;
+      found.push([at, used]);
+    }
+  }
+
+  const last = found.at(-1)?.[0] ?? from;
+  const gap = (latest[0] - from) / found.length;
+
+  return latest[0] - last > 2 * gap
+    ? [...found, [latest[0], Math.max(high, latest[1])]]
+    : found;
 };
 
 export const windowPace = (
@@ -58,35 +102,43 @@ export const windowPace = (
     return null;
   }
 
-  const start = resetsAt - length;
-  const counted = Math.max(start, lastDrop(since(points, start)) ?? start);
-  const line = since(points, counted);
+  const nominal = resetsAt - length;
+  const start = Math.max(nominal, lastDrop(since(points, nominal)) ?? nominal);
+  const line = since(points, start);
+  const span = resetsAt - start;
   const locked = used >= cutoff;
   const ranOut = locked ? firstReaching(line, start, cutoff) : null;
-  const end = ranOut ?? window.sampledAt ?? now;
-  const from = Math.max(counted, line[0]?.[0] ?? counted);
-  const base = valueAt(points, from) ?? 0;
-  const reached = ranOut === null ? used : cutoff;
-  const { rate, even } = measure(reached, base, [from, end], start, length);
-  const left = Math.max(0, resetsAt - now);
-  const projected = locked || rate === null ? used : used + rate * left;
+  const latest = window.sampledAt ?? now;
+  const end = ranOut ?? latest;
+  const even = Math.min(100, ((end - start) * 100) / span);
+  const from = Math.max(start, latest - trailing);
+
+  const trend =
+    latest - from >= minimumSpan
+      ? fit(rises(line, from, [latest, used]))
+      : fit([
+          [start, 0],
+          [Math.max(start + minimumSpan, latest), used],
+        ]);
 
   const runsOut =
-    !locked && rate !== null && rate > 0 && projected >= cutoff
-      ? now + (cutoff - used) / rate
-      : null;
+    locked || trend.rate === 0 ? null : Math.max(latest, trend.reach(cutoff));
 
   return {
-    atReset: Math.min(100, projected),
+    atReset: locked ? used : Math.min(100, Math.max(used, trend.at(resetsAt))),
     cutoff,
     even,
     line,
     locked,
-    pace: rate === null ? null : rate / (100 / length),
+    pace: locked || even === 0 ? null : used / even,
     ranOut,
-    reached,
+    rate:
+      ranOut === null
+        ? trend.rate
+        : cutoff / Math.max(minimumSpan, ranOut - start),
     resetsAt,
-    runsOut,
+    restarted: start > nominal,
+    runsOut: runsOut === null || runsOut >= resetsAt ? null : runsOut,
     start,
     used,
   };
@@ -96,4 +148,20 @@ export const lockedFor = (pace: Pace) => {
   const from = pace.ranOut ?? pace.runsOut;
 
   return from === null ? 0 : Math.max(0, pace.resetsAt - from);
+};
+
+export const outcome = (pace: Pace, now: number) => {
+  if (pace.locked) {
+    return {
+      bad: true,
+      note: pace.ranOut === null ? null : `Ran out ${when(pace.ranOut, now)}`,
+      text: `Back ${when(pace.resetsAt, now)}`,
+    };
+  }
+
+  const note = `${times(pace.pace ?? 0)} even pace · ${percent(pace.used)} used`;
+
+  return pace.runsOut === null
+    ? { bad: false, note, text: `~${percent(pace.atReset)} at reset` }
+    : { bad: true, note, text: `Runs out ${when(pace.runsOut, now)}` };
 };
