@@ -8,6 +8,7 @@ export const Stat = ({
   value,
   unit,
   children,
+  compact = false,
   className,
 }: {
   label: ReactNode;
@@ -15,6 +16,7 @@ export const Stat = ({
   value: ReactNode;
   unit?: ReactNode;
   children?: ReactNode;
+  compact?: boolean;
   className?: string;
 }) => (
   <div className={cn("min-w-0 space-y-2", className)}>
@@ -25,7 +27,12 @@ export const Stat = ({
       )}
     </div>
     <div className="flex items-baseline gap-1">
-      <span className="text-4xl font-normal tracking-tight tabular-nums">
+      <span
+        className={cn(
+          "font-normal tracking-tight tabular-nums",
+          compact ? "text-2xl" : "text-4xl"
+        )}
+      >
         {value}
       </span>
       {unit === undefined ? null : (

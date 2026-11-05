@@ -10,6 +10,7 @@ import type { Daily } from "@/lib/model/weeks";
 
 import { ActivityView } from "./activity";
 import { HandOffView } from "./hand-off";
+import { SpiralView } from "./spiral";
 import { TimelineView } from "./timeline";
 import { views } from "./views";
 import type { View } from "./views";
@@ -72,8 +73,25 @@ export const Limits = ({
       );
     }
 
+    if (view === "timeline") {
+      return (
+        <TimelineView
+          plans={plans}
+          history={history}
+          now={now}
+          toggle={toggle}
+        />
+      );
+    }
+
     return (
-      <TimelineView plans={plans} history={history} now={now} toggle={toggle} />
+      <SpiralView
+        plans={plans}
+        daily={daily}
+        history={history}
+        now={now}
+        toggle={toggle}
+      />
     );
   };
 

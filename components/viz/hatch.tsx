@@ -1,5 +1,7 @@
 export const hatchId = "broadcom-hatch";
 
+export const forecastHatchId = "broadcom-hatch-forecast";
+
 export const HatchPattern = () => (
   <defs>
     <pattern
@@ -17,6 +19,22 @@ export const HatchPattern = () => (
         y2="6"
         className="stroke-bad"
         strokeWidth="2.5"
+      />
+    </pattern>
+    <pattern
+      id={forecastHatchId}
+      width="6"
+      height="6"
+      patternTransform="rotate(45)"
+      patternUnits="userSpaceOnUse"
+    >
+      <line
+        x1="0"
+        y1="0"
+        x2="0"
+        y2="6"
+        className="stroke-bad/55"
+        strokeWidth="1.5"
       />
     </pattern>
   </defs>

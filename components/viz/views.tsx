@@ -11,7 +11,7 @@ export const Views = <View extends string>({
   current: View;
   param?: string;
 }) => (
-  <nav className="flex rounded-full bg-muted p-1 text-sm">
+  <nav className="flex rounded-full bg-muted p-1 text-sm max-sm:grid max-sm:w-full max-sm:auto-cols-fr max-sm:grid-flow-col max-sm:text-[13px]">
     {views.map((view, index) => (
       <Link
         key={view.id}
@@ -20,7 +20,7 @@ export const Views = <View extends string>({
         scroll={false}
         aria-current={view.id === current ? "page" : undefined}
         className={cn(
-          "rounded-full px-3.5 py-1 text-muted-foreground transition-colors hover:text-foreground",
+          "rounded-full px-3.5 py-1 text-center whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground max-sm:px-1",
           view.id === current && "bg-card text-foreground shadow-xs"
         )}
       >
