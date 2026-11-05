@@ -1,22 +1,14 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
+import { hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot, Path, Strokes } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { activity, activityPlans, busiest } from "@/lib/model/activity";
 import type { Day, Hour } from "@/lib/model/activity";
-import { addDays, addHours, startOfDay } from "@/lib/model/calendar";
-import {
-  clock,
-  hour as hourOf,
-  plural,
-  weekday,
-  when,
-} from "@/lib/model/format";
+import { clock, hour as hourOf, plural, weekday } from "@/lib/model/format";
 import type { Points } from "@/lib/model/history";
-import { outcome } from "@/lib/model/pace";
 import type { Plan } from "@/lib/model/pool";
 import { cn } from "@/lib/utils";
 
@@ -149,107 +141,6 @@ const Matrix = ({
   );
 };
 
-const cellHours = 6;
-
-const cellsAhead = 28;
-
-const blocksFrom = (now: number) => {
-  const day = startOfDay(now);
-  const first = Math.floor(new Date(now).getHours() / cellHours) * cellHours;
-
-  return Array.from({ length: cellsAhead + 1 }, (_, index) => {
-    const hours = first + index * cellHours;
-
-    return addHours(addDays(day, Math.floor(hours / 24)), hours % 24);
-  });
-};
-
-const rowGrid =
-  "grid items-center gap-x-4 gap-y-1 sm:grid-cols-[9rem_minmax(0,1fr)_11rem]";
-
-const Axis = ({ starts }: { starts: readonly number[] }) => (
-  <div className={cn(rowGrid, "pb-1 text-xs text-muted-foreground")}>
-    <div className="max-sm:hidden" />
-    <div className="grid grid-cols-28 gap-0.5">
-      {starts.slice(0, -1).map((from, index) => (
-        <span key={from} className="overflow-visible whitespace-nowrap">
-          {index === 0 ? "Now" : null}
-          {index > 0 && new Date(from).getHours() === 0 ? weekday(from) : null}
-        </span>
-      ))}
-    </div>
-    <div className="max-sm:hidden" />
-  </div>
-);
-
-const Forecast = ({ plans, now }: { plans: readonly Plan[]; now: number }) => {
-  const starts = blocksFrom(now);
-
-  return (
-    <div className="space-y-1">
-      <Axis starts={starts} />
-      {plans.map((plan) => {
-        const { pace } = plan;
-
-        if (pace === null) {
-          return null;
-        }
-
-        const lockFrom = pace.locked ? now : pace.runsOut;
-        const result = outcome(pace, now);
-
-        return (
-          <div key={plan.id} className={cn(rowGrid, "border-t py-2.5")}>
-            <div className="truncate text-sm">{plan.name}</div>
-            <div className="grid grid-cols-28 gap-0.5">
-              {starts.slice(0, -1).map((from, index) => {
-                const to = starts[index + 1] ?? from;
-                const afterReset = from >= pace.resetsAt;
-
-                const locked =
-                  lockFrom !== null && to > lockFrom && !afterReset;
-
-                const runsOut =
-                  pace.runsOut !== null &&
-                  pace.runsOut >= from &&
-                  pace.runsOut < to;
-
-                const resets = pace.resetsAt >= from && pace.resetsAt < to;
-
-                const lockStyle = pace.locked ? hatchStyle : forecastHatchStyle;
-
-                return (
-                  <div
-                    key={from}
-                    title={clock(from)}
-                    className={cn(
-                      "relative grid h-6 place-items-center rounded-[3px]",
-                      afterReset && "border border-dashed",
-                      !afterReset && !locked && "bg-foreground/30",
-                      resets && "border-r-2 border-r-foreground"
-                    )}
-                    style={locked ? lockStyle : undefined}
-                  >
-                    {runsOut ? (
-                      <Dot tone="bad" hollow className="size-2 text-bad" />
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="text-sm">
-              <div className={cn(result.bad && "text-bad")}>{result.text}</div>
-              {result.note === null ? null : (
-                <div className="text-muted-foreground">{result.note}</div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
 export const ActivityView = ({
   plans,
   history,
@@ -270,69 +161,13 @@ export const ActivityView = ({
 
   const names = new Map(plans.map((plan) => [plan.id, plan.name]));
 
-  const locked = plans.filter((plan) => plan.pace?.locked === true);
-
-  const [runningOut] = plans
-    .flatMap((plan) =>
-      plan.pace?.runsOut === null || plan.pace === null
-        ? []
-        : [{ at: plan.pace.runsOut, name: plan.name }]
-    )
-    .toSorted((a, b) => a.at - b.at);
-
-  const [firstBack] = locked.toSorted(
-    (a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0)
-  );
-
-  const forecastTitle = () => {
-    const already = `${locked.length} already ran out`;
-
-    if (runningOut !== undefined) {
-      return `${runningOut.name} runs out ${when(runningOut.at, now)}${locked.length > 0 ? `; ${already}` : ""}`;
-    }
-
-    return locked.length > 0
-      ? `${locked.length} of ${plans.length} plans ran out`
-      : `All ${plans.length} plans last to reset`;
-  };
-
-  const ordered = plans.toSorted(
-    (a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0)
-  );
-
   return (
-    <div className="space-y-6">
-      <Section
-        title={`Busiest ${hourOf(new Date(2026, 0, 1, start).getTime())} to ${hourOf(new Date(2026, 0, 1, end).getTime())}`}
-        detail={`${plural(runOuts, "run-out")} in 7 days.`}
-        actions={toggle}
-      >
-        <Matrix days={days} names={names} peak={byHour} />
-      </Section>
-      <Section
-        title={forecastTitle()}
-        detail={
-          firstBack === undefined
-            ? undefined
-            : `${firstBack.name} is back first, ${when(firstBack.pace?.resetsAt ?? now, now)}.`
-        }
-      >
-        <Forecast plans={ordered} now={now} />
-        <Legend
-          className="mt-4"
-          items={[
-            { fill: "bg-foreground/30", key: "box", label: "Has room" },
-            { className: "text-bad", key: "hollow", label: "Runs out" },
-            { key: "hatch", label: "Locked" },
-            { key: "forecast", label: "Locked if the pace holds" },
-            {
-              fill: "border border-dashed border-muted-foreground",
-              key: "box",
-              label: "After reset",
-            },
-          ]}
-        />
-      </Section>
-    </div>
+    <Section
+      title={`Busiest ${hourOf(new Date(2026, 0, 1, start).getTime())} to ${hourOf(new Date(2026, 0, 1, end).getTime())}`}
+      detail={`${plural(runOuts, "run-out")} in 7 days.`}
+      actions={toggle}
+    >
+      <Matrix days={days} names={names} peak={byHour} />
+    </Section>
   );
 };
