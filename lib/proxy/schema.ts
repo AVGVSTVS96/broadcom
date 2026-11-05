@@ -211,3 +211,13 @@ export const PolicyResult = Schema.Struct({
 export type PolicyResult = typeof PolicyResult.Type;
 
 export const Done = Schema.Struct({});
+
+export const LimitUsage = Schema.Struct({
+  buckets: Schema.Array(Schema.Struct({ at: Millis, size: Schema.String })),
+  coverage: Schema.Struct({ limitsSince: Schema.NullOr(Millis) }),
+  rows: Schema.Array(
+    Schema.Struct({ key: Schema.String, series: Schema.Array(Schema.Number) })
+  ),
+});
+
+export type LimitUsage = typeof LimitUsage.Type;
