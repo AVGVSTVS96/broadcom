@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 
 import { Settings } from "@/features/settings/settings";
-import { redact, valuesOf } from "@/lib/model/settings";
+import { redact } from "@/lib/model/redact";
+import { valuesOf } from "@/lib/model/settings";
 import { Proxy, ProxyUnreachable, runtime } from "@/lib/proxy/proxy";
 import { Config } from "@/lib/proxy/schema";
 

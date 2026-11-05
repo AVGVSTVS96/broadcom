@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { Schema } from "effect";
 
-import { changesOf, redact, valuesOf } from "@/lib/model/settings";
+import { redact } from "@/lib/model/redact";
+import { changesOf, conflicts, patchOf, valuesOf } from "@/lib/model/settings";
 import { Config } from "@/lib/proxy/schema";
 
 const config = {
@@ -39,10 +40,38 @@ describe("settings", () => {
     expect(
       changesOf(before, { ...before, resetCommand: "", sessionAffinity: false })
     ).toEqual([
-      { path: "routing/session-affinity", value: false },
-      { path: "routing/pool/reset-command", value: "" },
+      { from: true, path: "routing/session-affinity", value: false },
+      { from: "notify", path: "routing/pool/reset-command", value: "" },
     ]);
     expect(changesOf(before, before)).toEqual([]);
+  });
+
+  test("all changes go in one nested patch", () => {
+    const before = valuesOf(Schema.decodeUnknownSync(Config)(config));
+
+    const changes = changesOf(before, {
+      ...before,
+      resetCommand: "",
+      sessionAffinity: false,
+      timezone: "UTC",
+    });
+
+    expect(patchOf(changes)).toEqual({
+      routing: { pool: { "reset-command": "" }, "session-affinity": false },
+      usage: { timezone: "UTC" },
+    });
+  });
+
+  test("a field changed elsewhere since the page loaded is a conflict", () => {
+    const before = valuesOf(Schema.decodeUnknownSync(Config)(config));
+    const changes = changesOf(before, { ...before, strategy: "fill-first" });
+
+    expect(conflicts(changes, before)).toEqual([]);
+    expect(
+      conflicts(changes, { ...before, strategy: "round-robin" }).map(
+        (field) => field.key
+      )
+    ).toEqual(["strategy"]);
   });
 
   test("hides keys, secrets and tokens and keeps the rest", () => {

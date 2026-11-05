@@ -2,8 +2,8 @@ import "server-only";
 import { Effect } from "effect";
 import { connection } from "next/server";
 
+import { namesOf } from "@/lib/model/names";
 import {
-  accountNames,
   cellsOf,
   groupings,
   oneOf,
@@ -190,7 +190,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     })
   );
 
-  const names = accountNames(view.facets.account ?? [], credits.api);
+  const names = namesOf(view.facets.account ?? [], credits.api);
 
   const rowOf = (row: UsageRow): Row => ({
     accounts: row.byAccount

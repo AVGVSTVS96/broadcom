@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { activity, busiest, gaps } from "@/lib/model/activity";
-import { duration } from "@/lib/model/format";
+import { duration, when } from "@/lib/model/format";
 import {
   HOUR,
   WEEK,
@@ -11,10 +11,12 @@ import {
   usedBetween,
 } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
+import { namesOf } from "@/lib/model/names";
 import { windowPace } from "@/lib/model/pace";
-import { logins, names } from "@/lib/model/pool";
+import { logins } from "@/lib/model/pool";
 import { windows } from "@/lib/model/timeline";
 import { weeksOf, withHistory } from "@/lib/model/weeks";
+import type { Outlook } from "@/lib/model/weeks";
 import type { Account, Grant } from "@/lib/proxy/schema";
 
 const resetsAt = Date.UTC(2026, 10, 8, 2);
@@ -96,34 +98,35 @@ describe("history", () => {
   });
 });
 
+const ramp = (from: number, to: number, perHour: number, base = 0): Points =>
+  Array.from({ length: (to - from) * 10 + 1 }, (_, index) => {
+    const hours = from + index / 10;
+
+    return [at(hours), Math.floor(base + (hours - from) * perHour)] as const;
+  });
+
 describe("windowPace", () => {
   test("even spending reads 1x", () => {
-    const points: Points = [
-      [at(0), 0],
-      [at(84), 50],
-    ];
-
-    const pace = windowPace(window(50), points, at(84));
+    const pace = windowPace(window(50), ramp(0, 84, 50 / 84), at(84));
 
     expect(pace?.pace).toBeCloseTo(1);
     expect(pace?.even).toBeCloseTo(50);
-    expect(pace?.runsOut).toBeCloseTo(at(84 + 48 * (84 / 50)));
+    expect(
+      Math.abs((pace?.runsOut ?? 0) - at(84 + 48 * (84 / 50)))
+    ).toBeLessThan(2 * HOUR);
   });
 
   test("ahead of pace runs out before reset", () => {
-    const points: Points = [
-      [at(0), 0],
-      [at(42), 50],
-    ];
-
-    const pace = windowPace(window(50), points, at(42));
+    const pace = windowPace(window(50), ramp(0, 42, 50 / 42), at(42));
 
     expect(pace?.pace).toBeCloseTo(2);
-    expect(pace?.runsOut).toBeCloseTo(at(42 + 48 * (42 / 50)));
+    expect(
+      Math.abs((pace?.runsOut ?? 0) - at(42 + 48 * (42 / 50)))
+    ).toBeLessThan(2 * HOUR);
     expect(pace?.atReset).toBe(100);
   });
 
-  test("a locked plan reports when it ran out and its pace until then", () => {
+  test("a locked plan reports when it ran out, not a pace", () => {
     const points: Points = [
       [at(0), 0],
       [at(56), 98],
@@ -134,24 +137,41 @@ describe("windowPace", () => {
 
     expect(pace?.locked).toBe(true);
     expect(pace?.ranOut).toBe(at(56));
-    expect(pace?.even).toBeCloseTo(100 / 3);
-    expect(pace?.pace).toBeCloseTo(3 * (98 / 100));
+    expect(pace?.pace).toBeNull();
     expect(pace?.runsOut).toBeNull();
+    expect(pace?.rate).toBeCloseTo(98 / (56 * HOUR));
   });
 
-  test("pace counts only what came after a plan change", () => {
+  test("a plan change restarts the window the pace and the chart count from", () => {
     const points: Points = [
       [at(0), 0],
       [at(10), 8],
       [at(12), 0],
-      [at(24), 2],
+      ...ramp(12, 24, 2 / 12),
     ];
 
     const pace = windowPace(window(2), points, at(24));
 
-    expect(pace?.line[0]).toEqual([at(12), 0]);
-    expect(pace?.even).toBeCloseTo((12 * 100) / 168);
-    expect(pace?.pace).toBeCloseTo(2 / 12 / (100 / 168));
+    expect(pace?.start).toBe(at(12));
+    expect(pace?.restarted).toBe(true);
+    expect(pace?.even).toBeCloseTo((12 * 100) / 156);
+    expect(pace?.pace).toBeCloseTo(2 / ((12 * 100) / 156));
+  });
+
+  test("a reading that hasn't ticked yet doesn't move the run-out", () => {
+    const points = ramp(0, 2, 6, 0).filter(([time]) => time <= at(2));
+
+    const runOuts = [0, 3, 6, 9].map((minutes) => {
+      const now = at(2) + minutes * 60_000;
+
+      return windowPace({ ...window(12), sampledAt: now }, points, now)
+        ?.runsOut;
+    });
+
+    const spread =
+      Math.max(...runOuts.map(Number)) - Math.min(...runOuts.map(Number));
+
+    expect(spread).toBeLessThan(15 * 60_000);
   });
 
   test("no reading means no pace", () => {
@@ -197,11 +217,16 @@ const grant = (credentialId: string, owner: string): Grant => ({
 
 describe("pool", () => {
   test("names shorten to the local part unless two would clash", () => {
-    expect(names(["a@x.com", "b@y.com", "b@z.com"])).toEqual([
-      "a",
-      "b@y.com",
-      "b@z.com",
-    ]);
+    expect(
+      namesOf(
+        [
+          { id: "1", label: "a@x.com" },
+          { id: "2", label: "b@y.com" },
+          { id: "3", label: "b@z.com" },
+        ],
+        []
+      )
+    ).toEqual({ "1": "a", "2": "b@y.com", "3": "b@z.com", none: "No account" });
   });
 
   test("an API key folds into the login that owns its credit", () => {
@@ -221,6 +246,22 @@ describe("format", () => {
     expect(duration(3 * HOUR + 38 * 60_000)).toBe("3 h 38 min");
     expect(duration(5 * 24 * HOUR + 11 * HOUR)).toBe("5 days 11 h");
     expect(duration(30_000)).toBe("<1 min");
+  });
+
+  test("duration carries instead of printing 60 min or 24 h", () => {
+    expect(duration(HOUR - 10_000)).toBe("1 h");
+    expect(duration(26 * 24 * HOUR + 23.7 * HOUR)).toBe("27 days");
+  });
+
+  test("when names the day once it isn't today, and the date past six days", () => {
+    const now = new Date(2026, 10, 5, 7, 20).getTime();
+
+    expect(when(new Date(2026, 10, 5, 20, 13).getTime(), now)).toBe("8:13 PM");
+    expect(when(new Date(2026, 10, 7, 18).getTime(), now)).toBe("Sat 6 PM");
+    expect(when(new Date(2026, 10, 7, 17, 59, 59).getTime(), now)).toBe(
+      "Sat 6 PM"
+    );
+    expect(when(new Date(2026, 10, 11, 18).getTime(), now)).toBe("Nov 11");
   });
 });
 
@@ -270,6 +311,16 @@ describe("windows", () => {
 const novemberDay = (date: number, hour = 0) =>
   new Date(2026, 10, date, hour).getTime();
 
+const outlook = (overrides: Partial<Outlook>): Outlook => ({
+  cutoff: 98,
+  locks: [],
+  rate: 0,
+  resetsAt: null,
+  room: 0,
+  since: null,
+  ...overrides,
+});
+
 describe("weeks", () => {
   const since = new Date(2026, 9, 17).getTime();
   const now = new Date(2026, 10, 5, 12).getTime();
@@ -284,11 +335,12 @@ describe("weeks", () => {
   };
 
   test("weeks split Monday to Sunday, the first one partial", () => {
-    const result = weeksOf(daily, since, now, {
-      left: 5,
-      locks: [],
-      perDay: 20 / 7,
-    });
+    const result = weeksOf(
+      daily,
+      since,
+      now,
+      outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 })
+    );
 
     expect(result.weeks).toHaveLength(4);
     expect(result.weeks[0]?.part).toBe(true);
@@ -298,20 +350,52 @@ describe("weeks", () => {
     expect(result.weeks[3]?.expected).toBeCloseTo(25);
   });
 
-  test("a locked plan expects nothing more until its reset", () => {
-    const result = weeksOf(daily, since, now, {
-      left: 0,
-      locks: [
-        [new Date(2026, 10, 3, 10).getTime(), new Date(2026, 10, 9).getTime()],
-      ],
-      perDay: 0,
-    });
+  test("the forecast starts now, so today's run-out lands on today", () => {
+    const week = weeksOf(
+      daily,
+      since,
+      now,
+      outlook({ rate: 10 / (24 * HOUR), room: 3 })
+    ).weeks.at(-1);
 
-    const week = result.weeks.at(-1);
+    expect(week?.days[3]?.forecast).toBeCloseTo(3);
+    expect(week?.days[3]?.out).toBe("forecast");
+    expect(week?.days[4]?.lock).toBe("forecast");
+  });
 
-    expect(week?.expected).toBe(20);
-    expect(week?.days[1]?.ranOut).toBe(true);
-    expect(week?.days[6]?.locked).toBe(true);
+  test("room comes back at the reset", () => {
+    const week = weeksOf(
+      daily,
+      since,
+      now,
+      outlook({
+        locks: [
+          [
+            new Date(2026, 10, 3, 10).getTime(),
+            new Date(2026, 10, 7, 18).getTime(),
+          ],
+        ],
+        rate: 10 / (24 * HOUR),
+        resetsAt: new Date(2026, 10, 7, 18).getTime(),
+      })
+    ).weeks.at(-1);
+
+    expect(week?.expected).toBeCloseTo(20 + 2.5 + 10);
+    expect(week?.days[1]?.out).toBe("real");
+    expect(week?.days[5]?.lock).toBe("real");
+    expect(week?.days[6]?.lock).toBeNull();
+  });
+
+  test("days before the account existed stay empty", () => {
+    const week = weeksOf(
+      { days: [[new Date(2026, 10, 2).getTime(), 0.002]], id: "a" },
+      since,
+      now,
+      outlook({ since: new Date(2026, 10, 4, 22).getTime() })
+    ).weeks.at(-1);
+
+    expect(week?.days[0]?.used).toBeNull();
+    expect(week?.days[2]?.used).toBe(0);
   });
 
   test("limit history replaces the usage estimate for the days it covers", () => {

@@ -1,13 +1,7 @@
 import { hatchStyle } from "@/components/viz/hatch";
-import type { Tone } from "@/components/viz/meter";
+import { fills } from "@/components/viz/meter";
+import type { Tone } from "@/lib/model/tone";
 import { cn } from "@/lib/utils";
-
-const fills = {
-  bad: "bg-bad",
-  ink: "bg-foreground",
-  ok: "bg-ok",
-  over: "bg-over",
-} as const satisfies Record<Tone, string>;
 
 export interface Segment {
   readonly id: string;

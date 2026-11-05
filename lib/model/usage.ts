@@ -1,4 +1,3 @@
-import { names } from "@/lib/model/pool";
 import type { BucketSize, UsageAmount, UsagePoints } from "@/lib/proxy/schema";
 
 export const ranges = ["today", "7d", "30d", "6m"] as const;
@@ -237,28 +236,4 @@ export const sumSeries = (lists: readonly (readonly number[])[]) => {
   }
 
   return total;
-};
-
-export const accountNames = (
-  labels: readonly { readonly id: string; readonly label: string }[],
-  grants: readonly { readonly credentialId: string; readonly account: string }[]
-): Readonly<Record<string, string>> => {
-  const logins = labels.filter((entry) => entry.label !== "");
-  const short = names(logins.map((entry) => entry.label));
-
-  const named = new Map(
-    logins.map((entry, index) => [entry.id, short[index] ?? entry.label])
-  );
-
-  for (const grant of grants) {
-    const login = named.get(grant.account);
-
-    if (login !== undefined) {
-      named.set(grant.credentialId, `${login} API`);
-    }
-  }
-
-  named.set("none", "No account");
-
-  return Object.fromEntries(named);
 };

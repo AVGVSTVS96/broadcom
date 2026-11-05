@@ -23,12 +23,23 @@ import {
   renewCredential,
   setDisabled,
 } from "@/features/accounts/actions";
-import type { Outcome } from "@/features/accounts/actions";
-import { plural, resetExpiry, when } from "@/features/accounts/format";
 import { SignIn } from "@/features/accounts/sign-in";
-import { resets, week } from "@/lib/model/accounts";
+import { resets } from "@/lib/model/accounts";
 import type { Login, Row, State } from "@/lib/model/accounts";
-import { ago, dollars, duration, utcDate } from "@/lib/model/format";
+import {
+  ago,
+  dollars,
+  duration,
+  plural,
+  utcDate,
+  when,
+} from "@/lib/model/format";
+import { WEEK } from "@/lib/model/history";
+import type { Points } from "@/lib/model/history";
+import { windowPace } from "@/lib/model/pace";
+import type { Pace } from "@/lib/model/pace";
+import { creditTone, windowTone } from "@/lib/model/tone";
+import type { Outcome } from "@/lib/proxy/attempt";
 import type { LimitWindow } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +49,7 @@ const states = {
   empty: { dot: "bg-bad", label: "Empty" },
   error: { dot: "bg-bad", label: "Error" },
   limited: { dot: "bg-bad", label: "Locked" },
+  low: { dot: "bg-over", label: "Running low" },
   next: { dot: "bg-brand", label: "Takes new work" },
   open: { dot: "bg-ok", label: "Has room" },
   "sign-in": { dot: "bg-over", label: "Needs sign-in" },
@@ -56,14 +68,32 @@ const Window = ({
   label,
   hint,
   window,
+  pace = null,
   now,
 }: {
   label: string;
-  hint: string;
+  hint?: string;
   window: LimitWindow;
+  pace?: Pace | null;
   now: number;
 }) => {
   const locked = window.used !== null && window.used >= window.cutoff;
+
+  const note = () => {
+    if (window.resetsAt === null) {
+      return "No reading";
+    }
+
+    const runsOut = pace?.runsOut ?? null;
+
+    if (runsOut !== null && !locked) {
+      return <span className="text-over">Runs out {when(runsOut, now)}</span>;
+    }
+
+    return locked
+      ? `Back ${when(window.resetsAt, now)}`
+      : `Resets in ${duration(window.resetsAt - now)}`;
+  };
 
   return (
     <Stat
@@ -75,25 +105,31 @@ const Window = ({
       {locked ? (
         <div className="h-2 rounded-full" style={hatchStyle} />
       ) : (
-        <Meter value={window.used ?? 0} />
+        <Meter value={window.used ?? 0} tone={windowTone(window, pace)} />
       )}
-      <p className="text-sm text-muted-foreground">
-        {window.resetsAt === null
-          ? "Not reported"
-          : `Resets in ${duration(window.resetsAt - now)}`}
-      </p>
+      <p className="text-sm text-muted-foreground">{note()}</p>
     </Stat>
   );
 };
 
 const Resets = ({ row, now }: { row: Row; now: number }) => {
-  const banked = resets([row], now - week);
+  const banked = resets([row], now - WEEK);
+
+  if (
+    banked.held === 0 &&
+    banked.spent.length === 0 &&
+    banked.plans.length === 0
+  ) {
+    return null;
+  }
 
   return (
-    <Stat label="Resets" hint="banked" value={banked.held} unit="full resets">
-      <p className="text-sm text-muted-foreground">
-        {resetExpiry(banked.held, banked.firstExpiry, now)}
-      </p>
+    <Stat label="Resets" hint="held" value={banked.held}>
+      {banked.firstExpiry === null ? null : (
+        <p className="text-sm text-muted-foreground">
+          First expires in {duration(banked.firstExpiry - now)}
+        </p>
+      )}
       {banked.plans.map((plan) => (
         <p key={plan} className="text-sm">
           {plan}
@@ -122,7 +158,10 @@ const Actions = ({
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
 
-  const act = (task: () => Promise<Outcome<unknown>>, done: string) => {
+  const act = (
+    task: () => Promise<Outcome<unknown>>,
+    done: string | null = null
+  ) => {
     setNotice(null);
     startTransition(async () => {
       const result = await task();
@@ -150,10 +189,7 @@ const Actions = ({
         size="sm"
         disabled={pending}
         onClick={() => {
-          act(
-            async () => await setDisabled(login.name, !login.disabled),
-            login.disabled ? "Enabled" : "Disabled"
-          );
+          act(async () => await setDisabled(login.name, !login.disabled));
         }}
       >
         {login.disabled ? <PlayIcon /> : <PauseIcon />}
@@ -198,7 +234,7 @@ const Actions = ({
             <DialogClose
               render={<Button variant="destructive" />}
               onClick={() => {
-                act(async () => await removeCredential(login.name), "Removed");
+                act(async () => await removeCredential(login.name));
               }}
             >
               Remove
@@ -214,12 +250,14 @@ const Card = ({
   row,
   now,
   title,
+  subtitle,
   children,
   facts,
 }: {
   row: Row;
   now: number;
   title: ReactNode;
+  subtitle: string | null;
   children?: ReactNode;
   facts: readonly string[];
 }) => {
@@ -232,13 +270,19 @@ const Card = ({
 
   return (
     <article
+      id={row.account?.id}
       className={cn(
-        "rounded-3xl border bg-card p-5 sm:p-6",
+        "scroll-mt-6 rounded-3xl border bg-card p-5 target:border-foreground/40 sm:p-6",
         row.state.is === "disabled" && "bg-transparent"
       )}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="min-w-0 truncate text-base font-medium">{title}</h3>
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-medium">{title}</h3>
+          {subtitle === null || subtitle === "" ? null : (
+            <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
         <div className="flex items-baseline gap-2">
           <StateChip state={row.state} now={now} />
           {sampled === null ? null : (
@@ -248,7 +292,7 @@ const Card = ({
           )}
         </div>
       </header>
-      {message === null ? null : (
+      {message === null || message === "" ? null : (
         <p className="mt-1 text-sm text-bad">{message}</p>
       )}
       {children === undefined ? null : (
@@ -274,7 +318,15 @@ const Card = ({
 const working = (row: Row) =>
   row.account === null ? [] : [`${row.account.working} working`];
 
-export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
+export const AccountCard = ({
+  row,
+  points,
+  now,
+}: {
+  row: Row;
+  points: Points;
+  now: number;
+}) => {
   const { account, credit } = row;
 
   if (credit !== null) {
@@ -282,15 +334,8 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
       <Card
         row={row}
         now={now}
-        title={
-          <>
-            {row.name}
-            <span className="text-muted-foreground">
-              {" "}
-              · {credit.organization}
-            </span>
-          </>
-        }
+        title={row.name}
+        subtitle={credit.organization}
         facts={[
           ...working(row),
           credit.lastRequestAt === null
@@ -301,14 +346,13 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
       >
         <Stat
           label="Balance"
-          hint="estimate"
           value={dollars(Math.max(0, credit.remaining))}
           unit={`of ${dollars(credit.allowance)}`}
           className="col-span-2 sm:col-span-1"
         >
           <Meter
             value={(Math.max(0, credit.remaining) / credit.allowance) * 100}
-            tone={row.state.is === "empty" ? "bad" : "ok"}
+            tone={creditTone(credit.remaining, credit.allowance)}
           />
           <a
             href="https://platform.claude.com/settings/billing"
@@ -316,7 +360,7 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
             rel="noreferrer"
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
-            Exact balance in Console ↗
+            Estimate · exact balance in Console ↗
           </a>
         </Stat>
         <Stat label="Spent" hint="via proxy" value={dollars(credit.spent)}>
@@ -346,6 +390,7 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
           )}
         </>
       }
+      subtitle={row.login?.login ?? account?.label ?? null}
       facts={[...working(row), ...signedIn]}
     >
       {account === null ? undefined : (
@@ -358,8 +403,8 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
           />
           <Window
             label="Weekly"
-            hint="7 days"
             window={account.week}
+            pace={windowPace(account.week, points, now)}
             now={now}
           />
           <Resets row={row} now={now} />

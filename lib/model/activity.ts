@@ -1,6 +1,7 @@
 import { addHours, lastDays } from "@/lib/model/calendar";
 import { HOUR, isLocked, lockedSpans, usedBetween } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
+import type { Plan as PoolPlan } from "@/lib/model/pool";
 
 export interface Plan {
   readonly id: string;
@@ -33,6 +34,16 @@ export interface Day {
 }
 
 const hoursInDay = 24;
+
+export const activityPlans = (
+  plans: readonly PoolPlan[],
+  history: Readonly<Record<string, Points>>
+): Plan[] =>
+  plans.map((plan) => ({
+    cutoff: plan.account.week.cutoff,
+    id: plan.id,
+    points: history[plan.id] ?? [],
+  }));
 
 const busySpan = 3;
 

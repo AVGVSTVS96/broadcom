@@ -3,8 +3,9 @@
 import { Effect, Schema } from "effect";
 import { refresh } from "next/cache";
 
-import { Proxy, runtime } from "@/lib/proxy/proxy";
-import type { ProxyUnreachable } from "@/lib/proxy/proxy";
+import { attempt } from "@/lib/proxy/attempt";
+import type { Outcome } from "@/lib/proxy/attempt";
+import { Proxy, ProxyUnreachable } from "@/lib/proxy/proxy";
 import {
   Done,
   Policy,
@@ -14,22 +15,13 @@ import {
   SignInStatus,
 } from "@/lib/proxy/schema";
 
-export type Outcome<A> =
-  | { readonly ok: true; readonly value: A }
-  | { readonly ok: false; readonly reason: string };
-
 const run = async <A>(
   task: (proxy: Proxy["Service"]) => Effect.Effect<A, ProxyUnreachable>
 ) =>
-  await runtime.runPromise(
+  await attempt(
     Effect.gen(function* () {
       return yield* task(yield* Proxy);
-    }).pipe(
-      Effect.match({
-        onFailure: (error): Outcome<A> => ({ ok: false, reason: error.reason }),
-        onSuccess: (value): Outcome<A> => ({ ok: true, value }),
-      })
-    )
+    })
   );
 
 const changed = async <A>(outcome: Promise<Outcome<A>>) => {
@@ -42,11 +34,16 @@ const changed = async <A>(outcome: Promise<Outcome<A>>) => {
   return result;
 };
 
-const named = (name: string) => {
+const named = (name: string): Effect.Effect<string, ProxyUnreachable> => {
   const trimmed = name.trim();
 
   return trimmed === ""
-    ? Effect.die("A credential needs a name")
+    ? Effect.fail(
+        new ProxyUnreachable({
+          path: "/credentials",
+          reason: "A credential needs a name",
+        })
+      )
     : Effect.succeed(trimmed);
 };
 

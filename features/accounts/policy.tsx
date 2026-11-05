@@ -13,13 +13,13 @@ import type {
 } from "@/lib/proxy/schema";
 
 const fields = [
-  { key: "sessionCutoff", label: "Five-hour cutoff", max: 100, unit: "%" },
+  { key: "sessionCutoff", label: "Session cutoff", max: 100, unit: "%" },
   { key: "weeklyCutoff", label: "Weekly cutoff", max: 100, unit: "%" },
   {
     key: "agentsPerAccount",
     label: "Agents per account",
     max: 500,
-    unit: "agents",
+    unit: "",
   },
 ] as const;
 
@@ -81,14 +81,14 @@ export const Policy = ({
         );
       } else {
         setDraft(null);
-        setNotice("Saved. New sessions follow it; running ones stay put.");
+        setNotice("Saved");
       }
     });
   };
 
   return (
     <Section
-      title={`New sessions skip an account at ${policy.sessionCutoff}% of its five hours or ${policy.weeklyCutoff}% of its week`}
+      title={`New work skips an account at ${policy.sessionCutoff}% session or ${policy.weeklyCutoff}% weekly`}
       detail={`Up to ${policy.agentsPerAccount} agents on a fresh account, fewer as it fills.`}
     >
       <form

@@ -1,20 +1,26 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
+import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot, Path, Strokes } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { activity, busiest } from "@/lib/model/activity";
+import { activity, activityPlans, busiest } from "@/lib/model/activity";
 import type { Day, Hour } from "@/lib/model/activity";
-import { clock, hour as hourOf, weekday } from "@/lib/model/format";
-import { HOUR } from "@/lib/model/history";
+import { addDays, addHours, startOfDay } from "@/lib/model/calendar";
+import {
+  clock,
+  hour as hourOf,
+  plural,
+  weekday,
+  when,
+} from "@/lib/model/format";
 import type { Points } from "@/lib/model/history";
+import { outcome } from "@/lib/model/pace";
 import type { Plan } from "@/lib/model/pool";
 import { cn } from "@/lib/utils";
 
-import { activityPlans, legendLevels, level, steps } from "./cells";
-import { outcome } from "./outcome";
+import { legendLevels, level, steps } from "./cells";
 
 const levelLabel = (index: number) => {
   if (index === 0) {
@@ -101,12 +107,16 @@ const Matrix = ({
             <div className="py-0.5">
               <div
                 className={cn(
-                  "h-5 rounded-[3px] text-center text-xs leading-5",
-                  day.locked === 0 ? "bg-track" : "font-medium text-foreground"
+                  "grid h-5 place-items-center rounded-[3px]",
+                  day.locked === 0 && "bg-track"
                 )}
                 style={day.locked === 0 ? undefined : hatchStyle}
               >
-                {day.locked === 0 ? null : day.locked}
+                {day.locked === 0 ? null : (
+                  <span className="rounded-[3px] bg-card px-1 text-xs leading-4 font-medium tabular-nums">
+                    {day.locked}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -139,67 +149,106 @@ const Matrix = ({
   );
 };
 
+const cellHours = 6;
+
 const cellsAhead = 28;
 
-const cellSize = 6 * HOUR;
+const blocksFrom = (now: number) => {
+  const day = startOfDay(now);
+  const first = Math.floor(new Date(now).getHours() / cellHours) * cellHours;
 
-const Forecast = ({ plans, now }: { plans: readonly Plan[]; now: number }) => (
-  <div className="space-y-1">
-    {plans.map((plan) => {
-      const { pace } = plan;
+  return Array.from({ length: cellsAhead + 1 }, (_, index) => {
+    const hours = first + index * cellHours;
 
-      if (pace === null) {
-        return null;
-      }
+    return addHours(addDays(day, Math.floor(hours / 24)), hours % 24);
+  });
+};
 
-      const lockFrom = pace.locked ? now : pace.runsOut;
-      const result = outcome(pace);
+const rowGrid =
+  "grid items-center gap-x-4 gap-y-1 sm:grid-cols-[9rem_minmax(0,1fr)_11rem]";
 
-      return (
-        <div
-          key={plan.id}
-          className="grid items-center gap-x-4 gap-y-1 border-t py-2.5 sm:grid-cols-[9rem_minmax(0,1fr)_11rem]"
-        >
-          <div className="truncate text-sm">{plan.name}</div>
-          <div className="grid grid-cols-28 gap-0.5">
-            {Array.from({ length: cellsAhead }, (_, index) => {
-              const from = now + index * cellSize;
-              const to = from + cellSize;
-              const afterReset = from >= pace.resetsAt;
-              const locked = lockFrom !== null && to > lockFrom && !afterReset;
-
-              const runsOut =
-                pace.runsOut !== null &&
-                pace.runsOut >= from &&
-                pace.runsOut < to;
-
-              const resets = pace.resetsAt >= from && pace.resetsAt < to;
-
-              return (
-                <div
-                  key={from}
-                  className={cn(
-                    "relative grid h-6 place-items-center rounded-[3px]",
-                    afterReset && "border border-dashed",
-                    !afterReset && !locked && "bg-foreground/30",
-                    resets && "border-r-2 border-r-foreground"
-                  )}
-                  style={locked ? hatchStyle : undefined}
-                >
-                  {runsOut ? <Dot tone="bad" className="size-2" /> : null}
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-sm">
-            <div className={cn(result.bad && "text-bad")}>{result.text}</div>
-            <div className="text-muted-foreground">{result.note}</div>
-          </div>
-        </div>
-      );
-    })}
+const Axis = ({ starts }: { starts: readonly number[] }) => (
+  <div className={cn(rowGrid, "pb-1 text-xs text-muted-foreground")}>
+    <div className="max-sm:hidden" />
+    <div className="grid grid-cols-28 gap-0.5">
+      {starts.slice(0, -1).map((from, index) => (
+        <span key={from} className="overflow-visible whitespace-nowrap">
+          {index === 0 ? "Now" : null}
+          {index > 0 && new Date(from).getHours() === 0 ? weekday(from) : null}
+        </span>
+      ))}
+    </div>
+    <div className="max-sm:hidden" />
   </div>
 );
+
+const Forecast = ({ plans, now }: { plans: readonly Plan[]; now: number }) => {
+  const starts = blocksFrom(now);
+
+  return (
+    <div className="space-y-1">
+      <Axis starts={starts} />
+      {plans.map((plan) => {
+        const { pace } = plan;
+
+        if (pace === null) {
+          return null;
+        }
+
+        const lockFrom = pace.locked ? now : pace.runsOut;
+        const result = outcome(pace, now);
+
+        return (
+          <div key={plan.id} className={cn(rowGrid, "border-t py-2.5")}>
+            <div className="truncate text-sm">{plan.name}</div>
+            <div className="grid grid-cols-28 gap-0.5">
+              {starts.slice(0, -1).map((from, index) => {
+                const to = starts[index + 1] ?? from;
+                const afterReset = from >= pace.resetsAt;
+
+                const locked =
+                  lockFrom !== null && to > lockFrom && !afterReset;
+
+                const runsOut =
+                  pace.runsOut !== null &&
+                  pace.runsOut >= from &&
+                  pace.runsOut < to;
+
+                const resets = pace.resetsAt >= from && pace.resetsAt < to;
+
+                const lockStyle = pace.locked ? hatchStyle : forecastHatchStyle;
+
+                return (
+                  <div
+                    key={from}
+                    title={clock(from)}
+                    className={cn(
+                      "relative grid h-6 place-items-center rounded-[3px]",
+                      afterReset && "border border-dashed",
+                      !afterReset && !locked && "bg-foreground/30",
+                      resets && "border-r-2 border-r-foreground"
+                    )}
+                    style={locked ? lockStyle : undefined}
+                  >
+                    {runsOut ? (
+                      <Dot tone="bad" hollow className="size-2 text-bad" />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-sm">
+              <div className={cn(result.bad && "text-bad")}>{result.text}</div>
+              {result.note === null ? null : (
+                <div className="text-muted-foreground">{result.note}</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const ActivityView = ({
   plans,
@@ -221,16 +270,31 @@ export const ActivityView = ({
 
   const names = new Map(plans.map((plan) => [plan.id, plan.name]));
 
-  const short = plans.filter(
-    (plan) =>
-      plan.pace !== null && (plan.pace.locked || plan.pace.runsOut !== null)
+  const locked = plans.filter((plan) => plan.pace?.locked === true);
+
+  const [runningOut] = plans
+    .flatMap((plan) =>
+      plan.pace?.runsOut === null || plan.pace === null
+        ? []
+        : [{ at: plan.pace.runsOut, name: plan.name }]
+    )
+    .toSorted((a, b) => a.at - b.at);
+
+  const [firstBack] = locked.toSorted(
+    (a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0)
   );
 
-  const [firstOut] = short.toSorted(
-    (a, b) =>
-      (a.pace?.ranOut ?? a.pace?.runsOut ?? 0) -
-      (b.pace?.ranOut ?? b.pace?.runsOut ?? 0)
-  );
+  const forecastTitle = () => {
+    const already = `${locked.length} already ran out`;
+
+    if (runningOut !== undefined) {
+      return `${runningOut.name} runs out ${when(runningOut.at, now)}${locked.length > 0 ? `; ${already}` : ""}`;
+    }
+
+    return locked.length > 0
+      ? `${locked.length} of ${plans.length} plans ran out`
+      : `All ${plans.length} plans last to reset`;
+  };
 
   const ordered = plans.toSorted(
     (a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0)
@@ -240,21 +304,17 @@ export const ActivityView = ({
     <div className="space-y-6">
       <Section
         title={`Busiest ${hourOf(new Date(2026, 0, 1, start).getTime())} to ${hourOf(new Date(2026, 0, 1, end).getTime())}`}
-        detail={`${runOuts} ${runOuts === 1 ? "run-out" : "run-outs"} in 7 days, across ${plans.length} plans. Weekly points used per hour.`}
+        detail={`${plural(runOuts, "run-out")} in 7 days.`}
         actions={toggle}
       >
         <Matrix days={days} names={names} peak={byHour} />
       </Section>
       <Section
-        title={
-          short.length === 0
-            ? "Every plan lasts to its reset"
-            : `${short.length} of ${plans.length} plans run out before reset`
-        }
+        title={forecastTitle()}
         detail={
-          firstOut === undefined
+          firstBack === undefined
             ? undefined
-            : `${firstOut.name} first, then locked until ${clock(firstOut.pace?.resetsAt ?? 0)}.`
+            : `${firstBack.name} is back first, ${when(firstBack.pace?.resetsAt ?? now, now)}.`
         }
       >
         <Forecast plans={ordered} now={now} />
@@ -262,11 +322,12 @@ export const ActivityView = ({
           className="mt-4"
           items={[
             { fill: "bg-foreground/30", key: "box", label: "Has room" },
-            { key: "dot", label: "Runs out" },
-            { key: "hatch", label: "Locked until reset" },
+            { className: "text-bad", key: "hollow", label: "Runs out" },
+            { key: "hatch", label: "Locked" },
+            { key: "forecast", label: "Locked if the pace holds" },
             {
-              className: "text-muted-foreground",
-              key: "hollow",
+              fill: "border border-dashed border-muted-foreground",
+              key: "box",
               label: "After reset",
             },
           ]}

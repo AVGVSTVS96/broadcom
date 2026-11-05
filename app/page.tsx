@@ -12,10 +12,20 @@ const OverviewPage = async () => {
     readGrants(),
   ]);
 
+  const problems = [
+    history.ok ? null : `Limit history didn't load: ${history.reason}`,
+    grants.ok ? null : `API credit didn't load: ${grants.reason}`,
+  ].filter((problem) => problem !== null);
+
   return (
     <>
       <RefreshOnStale tags={["accounts", "credits"]} />
-      <Overview history={history} grants={grants} rendered={Date.now()} />
+      <Overview
+        history={history.ok ? history.value : {}}
+        grants={grants.ok ? grants.value : null}
+        problems={problems}
+        rendered={Date.now()}
+      />
     </>
   );
 };

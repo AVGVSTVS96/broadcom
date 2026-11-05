@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Problems } from "@/components/viz/problems";
 import { AccountCard } from "@/features/accounts/account-card";
-import { Ledger } from "@/features/accounts/ledger";
 import { Policy } from "@/features/accounts/policy";
 import { SignIn } from "@/features/accounts/sign-in";
-import { useNow } from "@/features/accounts/use-now";
 import { useLive } from "@/lib/live/client";
+import { useNow } from "@/lib/live/now";
 import { accountRows, kinds } from "@/lib/model/accounts";
-import type { Credit, Kind, Login } from "@/lib/model/accounts";
+import type { Credit, Kind, Login, Row } from "@/lib/model/accounts";
+import type { Points } from "@/lib/model/history";
 
 const groups = {
   api: "Claude API keys",
@@ -20,6 +21,32 @@ const groups = {
   other: "Other",
   plan: "Claude plans",
 } as const satisfies Record<Kind, string>;
+
+const needs = {
+  disabled: "is off",
+  error: "can't sign in",
+  "sign-in": "needs to sign in again",
+} as const;
+
+const headline = (rows: readonly Row[]) => {
+  const stuck = rows.flatMap((row) =>
+    row.state.is === "disabled" ||
+    row.state.is === "error" ||
+    row.state.is === "sign-in"
+      ? [{ name: row.name, need: needs[row.state.is] }]
+      : []
+  );
+
+  const [first] = stuck;
+
+  if (first === undefined) {
+    return `All ${rows.length} accounts signed in`;
+  }
+
+  return stuck.length === 1
+    ? `${first.name} ${first.need}`
+    : `${stuck.length} of ${rows.length} accounts need you`;
+};
 
 const useRefreshOnNewAccounts = (ids: string) => {
   const router = useRouter();
@@ -36,11 +63,13 @@ const useRefreshOnNewAccounts = (ids: string) => {
 export const Accounts = ({
   logins,
   credits,
+  history,
   problems,
   at,
 }: {
   logins: readonly Login[];
   credits: readonly Credit[];
+  history: Readonly<Record<string, Points>>;
   problems: readonly string[];
   at: number;
 }) => {
@@ -64,10 +93,9 @@ export const Accounts = ({
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-medium tracking-tight">Accounts</h1>
-          {pool === null ? null : (
-            <p className="text-muted-foreground">{pool.decision}</p>
-          )}
+          <h1 className="text-2xl font-medium tracking-tight text-balance">
+            {headline(rows)}
+          </h1>
         </div>
         <div className="flex gap-2">
           <SignIn
@@ -91,17 +119,7 @@ export const Accounts = ({
         </div>
       </header>
 
-      {problems.map((problem) => (
-        <p
-          key={problem}
-          className="rounded-2xl border border-bad/40 px-4 py-3 text-sm text-bad"
-          role="alert"
-        >
-          {problem}
-        </p>
-      ))}
-
-      <Ledger rows={rows} now={now} />
+      <Problems problems={problems} />
 
       {kinds.map((kind) => {
         const members = rows.filter((row) => row.kind === kind);
@@ -115,7 +133,12 @@ export const Accounts = ({
               </span>
             </h2>
             {members.map((row) => (
-              <AccountCard key={row.key} row={row} now={now} />
+              <AccountCard
+                key={row.key}
+                row={row}
+                points={history[row.account?.id ?? ""] ?? []}
+                now={now}
+              />
             ))}
           </section>
         );

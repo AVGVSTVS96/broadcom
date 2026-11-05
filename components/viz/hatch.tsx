@@ -26,3 +26,10 @@ export const hatchStyle = {
   backgroundImage:
     "repeating-linear-gradient(135deg, var(--bad) 0 2px, color-mix(in oklch, var(--bad) 15%, transparent) 2px 6px)",
 } as const;
+
+export const forecastHatchStyle = {
+  backgroundImage:
+    "repeating-linear-gradient(135deg, color-mix(in oklch, var(--bad) 55%, transparent) 0 1.5px, transparent 1.5px 6px)",
+  outline: "1px dashed var(--bad)",
+  outlineOffset: "-1px",
+} as const;

@@ -1,3 +1,5 @@
+import { nameOf, namesOf } from "@/lib/model/names";
+import { creditTone, emptyCredit } from "@/lib/model/tone";
 import type { Account, Credential, Grant } from "@/lib/proxy/schema";
 
 export interface Login {
@@ -32,7 +34,8 @@ export type State =
   | { readonly is: "sign-in" }
   | { readonly is: "error"; readonly message: string }
   | { readonly is: "cooling"; readonly message: string }
-  | { readonly is: "empty" };
+  | { readonly is: "empty" }
+  | { readonly is: "low" };
 
 export interface Row {
   readonly key: string;
@@ -45,8 +48,6 @@ export interface Row {
   readonly state: State;
 }
 
-export const emptyBelow = 1;
-
 export const week = 7 * 86_400_000;
 
 const text = (...values: readonly (string | undefined)[]) =>
@@ -57,8 +58,7 @@ export const loginOf = (credential: Credential): Login => {
   const message = text(credential.status_message);
 
   return {
-    cooling:
-      credential.unavailable === true ? text(message, "Cooling down") : null,
+    cooling: credential.unavailable === true ? message : null,
     disabled: credential.disabled,
     error:
       credential.status === "error" ? text(message, "Sign-in failed") : null,
@@ -119,7 +119,7 @@ const stateOf = (
     return { is: "error", message: login.error };
   }
 
-  if (credit !== null && credit.remaining < emptyBelow) {
+  if (credit !== null && credit.remaining < emptyCredit) {
     return { is: "empty" };
   }
 
@@ -129,6 +129,13 @@ const stateOf = (
 
   if (login !== null && login.cooling !== null) {
     return { is: "cooling", message: login.cooling };
+  }
+
+  if (
+    credit !== null &&
+    creditTone(credit.remaining, credit.allowance) === "over"
+  ) {
+    return { is: "low" };
   }
 
   return account?.standing === "next" ? { is: "next" } : { is: "open" };
@@ -153,6 +160,14 @@ export const accountRows = ({
   const live = Object.values(accounts);
   const claimed = new Set<string>();
 
+  const named = namesOf(
+    [
+      ...live,
+      ...logins.map((entry) => ({ id: entry.name, label: entry.login })),
+    ],
+    credits.map((entry) => ({ account: entry.account, credentialId: entry.id }))
+  );
+
   const fromLogins = logins.map((entry): Row => {
     const account =
       entry.provider === "claude"
@@ -172,7 +187,7 @@ export const accountRows = ({
       key: entry.name,
       kind: kindOf(entry.provider),
       login: entry,
-      name: entry.login,
+      name: nameOf(named, account?.id ?? entry.name),
       provider: entry.provider,
       state: stateOf(entry, account, null),
     };
@@ -181,7 +196,6 @@ export const accountRows = ({
   const fromCredits = credits.map((entry): Row => {
     claimed.add(entry.id);
     const account = accounts[entry.id] ?? null;
-    const owner = accounts[entry.account]?.label;
 
     return {
       account,
@@ -189,7 +203,7 @@ export const accountRows = ({
       key: entry.id,
       kind: "api",
       login: null,
-      name: owner === undefined || owner === "" ? "API key" : `${owner} API`,
+      name: nameOf(named, entry.id),
       provider: "claude",
       state: stateOf(null, account, entry),
     };
@@ -203,7 +217,7 @@ export const accountRows = ({
       key: account.id,
       kind: account.label === "" ? "api" : "plan",
       login: null,
-      name: account.label === "" ? "API key" : account.label,
+      name: nameOf(named, account.id),
       provider: "claude",
       state: stateOf(null, account, null),
     }));
@@ -253,21 +267,5 @@ export const resets = (rows: readonly Row[], since: number): Resets => {
       )
       .filter((entry) => entry.at >= since)
       .toSorted((left, right) => right.at - left.at),
-  };
-};
-
-export const creditTotals = (rows: readonly Row[]) => {
-  const credits = rows.flatMap((row) =>
-    row.credit === null ? [] : [row.credit]
-  );
-
-  return {
-    allowance: credits.reduce((sum, entry) => sum + entry.allowance, 0),
-    count: credits.length,
-    empty: credits.filter((entry) => entry.remaining < emptyBelow).length,
-    remaining: credits.reduce(
-      (sum, entry) => sum + Math.max(0, entry.remaining),
-      0
-    ),
   };
 };
