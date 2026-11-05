@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   cacheComponents: true,
+  distDir: process.env.BROADCOM_DIST ?? ".next",
   partialPrefetching: true,
   reactCompiler: true,
   turbopack: {

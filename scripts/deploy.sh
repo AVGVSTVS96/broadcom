@@ -3,12 +3,19 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 exec 9>/tmp/broadcom-deploy.lock
 flock 9
-git pull --ff-only --quiet
+state=~/.config/broadcom
+mkdir -p "$state"
+live=$(sed -n 's/^BROADCOM_DIST=//p' "$state/env" 2>/dev/null || true)
+next=$([ "$live" = .next-a ] && echo .next-b || echo .next-a)
+git fetch --quiet origin main
+git merge --ff-only --quiet origin/main
 bun install --frozen-lockfile --silent
-bun run build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
+rm -rf "$next"
+BROADCOM_DIST=$next bun run build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
+echo "BROADCOM_DIST=$next" >"$state/env"
 systemctl --user restart broadcom.service
 for _ in $(seq 20); do
-  curl -sf -o /dev/null http://100.113.223.113:4840/ && { echo "live: $(git log -1 --format='%h %s')"; exit 0; }
+  curl -sf -o /dev/null http://100.113.223.113:4840/ && { echo "live: $(git log -1 --format='%h %s') from $next"; exit 0; }
   sleep 0.5
 done
 echo "broadcom did not answer after restart" >&2
