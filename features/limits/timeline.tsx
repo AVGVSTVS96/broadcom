@@ -85,11 +85,13 @@ const Row = ({
             x1={x(ended.to) - 0.3}
             className={cn(
               bar,
-              "bg-muted px-2 text-xs leading-10 text-muted-foreground"
+              "@container bg-muted px-2 text-xs leading-10 text-muted-foreground"
             )}
           >
             <span className="block truncate">
-              <span className="max-sm:hidden">Ended {date(ended.to)} · </span>
+              <span className="max-sm:hidden @max-[7.5rem]:hidden">
+                Ended {date(ended.to)} ·{" "}
+              </span>
               {percent(ended.used)}
             </span>
           </Band>
@@ -139,11 +141,12 @@ const Row = ({
           x1={x(next.to)}
           className={cn(
             bar,
-            "border border-dashed px-2 text-xs leading-10 text-muted-foreground"
+            "@container border border-dashed px-2 text-xs leading-10 text-muted-foreground"
           )}
         >
           <span className="block truncate max-sm:hidden">
-            Next {date(next.from)}
+            <span className="@max-[5rem]:hidden">Next </span>
+            {date(next.from)}
           </span>
         </Band>
         {locks.map(([from]) =>
