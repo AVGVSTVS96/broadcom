@@ -53,8 +53,8 @@ export const Ledger = ({
   const banked = resets(rows, now - week);
   const chatgpt = rows.filter((row) => row.kind === "chatgpt");
 
-  const used = plans.reduce(
-    (sum, row) => sum + (row.account?.week.used ?? 0),
+  const left = plans.reduce(
+    (sum, row) => sum + Math.max(0, 100 - (row.account?.week.used ?? 100)),
     0
   );
 
@@ -74,8 +74,8 @@ export const Ledger = ({
       <Cell
         name="Claude plans"
         count={plural(plans.length, "plan")}
-        label="Used this week"
-        value={`${Math.round(used)}%`}
+        label="Left this week"
+        value={`${Math.round(left)}%`}
         unit={`of ${plans.length * 100}%`}
       >
         <Segments
@@ -83,7 +83,7 @@ export const Ledger = ({
             id: row.key,
             label: row.name,
             locked: row.state.is === "limited",
-            value: row.account?.week.used ?? 0,
+            value: Math.max(0, 100 - (row.account?.week.used ?? 100)),
           }))}
         />
         <p className="text-sm text-muted-foreground">
