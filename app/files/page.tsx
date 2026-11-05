@@ -12,7 +12,7 @@ const Files = async () => {
 
   return (
     <p className="text-muted-foreground">
-      No repos yet. List them in ~/.config/broadcom/repos.json as name and path.
+      No repos yet. List them in ~/.config/broadcom/files.json.
     </p>
   );
 };

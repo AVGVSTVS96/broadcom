@@ -11,11 +11,21 @@ import { git, tryGit } from "@/lib/git/run";
 import { parseWorktrees, slug } from "@/lib/model/files";
 
 const configFile =
-  process.env.BROADCOM_REPOS ??
-  path.join(homedir(), ".config/broadcom/repos.json");
+  process.env.BROADCOM_FILES ??
+  path.join(homedir(), ".config/broadcom/files.json");
 
 const Config = Schema.fromJsonString(
-  Schema.Array(Schema.Struct({ name: Schema.String, path: Schema.String }))
+  Schema.Struct({
+    drafts: Schema.optional(
+      Schema.Struct({
+        dir: Schema.String,
+        targets: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+      })
+    ),
+    repos: Schema.Array(
+      Schema.Struct({ name: Schema.String, path: Schema.String })
+    ),
+  })
 );
 
 export interface Repo {
@@ -38,14 +48,19 @@ export interface Workspace {
 const expand = (at: string) =>
   path.resolve(at.replace(/^~(?=$|\/)/u, homedir()));
 
-export const listRepos = cache(async (): Promise<Repo[]> => {
+const readConfig = cache(async () => {
   const text = await readFile(
-    /*turbopackIgnore: true*/
     /*turbopackIgnore: true*/ configFile,
     "utf-8"
-  ).catch(() => "[]");
+  ).catch(() => '{"repos":[]}');
 
-  return Schema.decodeUnknownSync(Config)(text)
+  return Schema.decodeUnknownSync(Config)(text);
+});
+
+export const listRepos = cache(async (): Promise<Repo[]> => {
+  const config = await readConfig();
+
+  return config.repos
     .map((repo) => ({
       id: slug(repo.name),
       name: repo.name,
@@ -54,6 +69,41 @@ export const listRepos = cache(async (): Promise<Repo[]> => {
     .filter((repo) =>
       existsSync(/*turbopackIgnore: true*/ path.join(repo.path, ".git"))
     );
+});
+
+export interface Draft {
+  readonly name: string;
+  readonly file: string;
+  readonly target: { readonly ws: string; readonly file: string } | null;
+}
+
+export const listDrafts = cache(async (): Promise<Draft[]> => {
+  const { drafts } = await readConfig();
+
+  if (drafts === undefined) {
+    return [];
+  }
+
+  const dir = expand(drafts.dir);
+
+  const entries = await readdir(/*turbopackIgnore: true*/ dir, {
+    withFileTypes: true,
+  }).catch(() => []);
+
+  return entries
+    .filter((entry) => entry.isFile() && !entry.name.startsWith("."))
+    .map((entry) => {
+      const [ws = "", file = ""] = (drafts.targets?.[entry.name] ?? "").split(
+        ":"
+      );
+
+      return {
+        file: path.join(dir, entry.name),
+        name: entry.name,
+        target: ws === "" || file === "" ? null : { file, ws },
+      };
+    })
+    .toSorted((a, b) => a.name.localeCompare(b.name));
 });
 
 const adminNames = async (repo: Repo) => {
@@ -164,3 +214,24 @@ export const findWorkspace = cache(async (id: string) => {
 
   return workspaces.find((ws) => ws.id === id) ?? null;
 });
+
+export const listPlaces = async () => {
+  const repos = await listRepos();
+
+  return await Promise.all(
+    repos.map(async (repo) => {
+      const places = await listWorkspaces(repo);
+
+      return {
+        id: repo.id,
+        name: repo.name,
+        places: places.map((place) => ({
+          at: place.at,
+          id: place.id,
+          live: place.live,
+          name: place.name,
+        })),
+      };
+    })
+  );
+};
