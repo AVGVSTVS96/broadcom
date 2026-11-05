@@ -8,7 +8,6 @@ import type { Workspace } from "@/lib/git/repos";
 import { git, gitBytes, tryGit } from "@/lib/git/run";
 import {
   capPatch,
-  countLines,
   fields,
   isBinary,
   newFilePatch,
@@ -49,7 +48,11 @@ export const inside = (ws: Workspace, file: string) => {
 
 const readText = async (ws: Workspace, file: string) => {
   const full = inside(ws, file);
-  const data = full === null ? null : await readFile(full).catch(() => null);
+
+  const data =
+    full === null
+      ? null
+      : await readFile(/*turbopackIgnore: true*/ full).catch(() => null);
 
   return data === null || data.length > maxFile || isBinary(data)
     ? ""
@@ -89,6 +92,7 @@ export const listFiles = cache(async (ws: Workspace) => {
 
 export interface Changes {
   readonly files: readonly Change[];
+  readonly fresh: readonly string[];
   readonly ahead: number;
   readonly behind: number;
 }
@@ -112,27 +116,8 @@ export const readChanges = cache(async (ws: Workspace): Promise<Changes> => {
   ]);
 
   const [behind = 0, ahead = 0] = (distance ?? "").split(/\s+/u).map(Number);
-  const counted = fresh.length <= newFilesShown;
 
-  const added = await Promise.all(
-    fresh.map(async (file) =>
-      counted ? countLines(await readText(ws, file)) : 0
-    )
-  );
-
-  return {
-    ahead,
-    behind,
-    files: [
-      ...parseChanges(numstat, names),
-      ...fresh.map((file, index) => ({
-        added: added[index] ?? 0,
-        path: file,
-        removed: 0,
-        status: "untracked" as const,
-      })),
-    ].toSorted((a, b) => a.path.localeCompare(b.path)),
-  };
+  return { ahead, behind, files: parseChanges(numstat, names), fresh };
 });
 
 export const readDiff = async (ws: Workspace) => {
@@ -195,7 +180,11 @@ export const readBody = async (
   file: string
 ): Promise<FileBody> => {
   const full = inside(ws, file);
-  const stat = full === null ? null : await lstat(full).catch(() => null);
+
+  const stat =
+    full === null
+      ? null
+      : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
 
   if (full === null || stat === null) {
     return { kind: "missing" };
@@ -206,7 +195,7 @@ export const readBody = async (
   }
 
   if (stat.isSymbolicLink()) {
-    const text = await readlink(full);
+    const text = await readlink(/*turbopackIgnore: true*/ full);
 
     return {
       kind: "text",
@@ -221,7 +210,7 @@ export const readBody = async (
     return { kind: "large", size: stat.size };
   }
 
-  const data = await readFile(full);
+  const data = await readFile(/*turbopackIgnore: true*/ full);
 
   return isBinary(data)
     ? { kind: "binary", size: stat.size }
@@ -328,7 +317,11 @@ export const pictureType = (file: string) =>
 export const readPicture = async (ws: Workspace, file: string) => {
   const type = pictureType(file);
   const full = inside(ws, file);
-  const stat = full === null ? null : await lstat(full).catch(() => null);
+
+  const stat =
+    full === null
+      ? null
+      : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
 
   return type === null ||
     full === null ||
@@ -336,7 +329,7 @@ export const readPicture = async (ws: Workspace, file: string) => {
     !stat.isFile() ||
     stat.size > 5 * maxFile
     ? null
-    : { data: await readFile(full), type };
+    : { data: await readFile(/*turbopackIgnore: true*/ full), type };
 };
 
 const blobText = async (ws: Workspace, spec: string) => {

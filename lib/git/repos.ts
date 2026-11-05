@@ -40,6 +40,7 @@ const expand = (at: string) =>
 
 export const listRepos = cache(async (): Promise<Repo[]> => {
   const text = await readFile(
+    /*turbopackIgnore: true*/
     /*turbopackIgnore: true*/ configFile,
     "utf-8"
   ).catch(() => "[]");
@@ -50,7 +51,9 @@ export const listRepos = cache(async (): Promise<Repo[]> => {
       name: repo.name,
       path: expand(repo.path),
     }))
-    .filter((repo) => existsSync(path.join(repo.path, ".git")));
+    .filter((repo) =>
+      existsSync(/*turbopackIgnore: true*/ path.join(repo.path, ".git"))
+    );
 });
 
 const adminNames = async (repo: Repo) => {
@@ -64,11 +67,12 @@ const adminNames = async (repo: Repo) => {
   const common = out.trim();
 
   const dir = path.join(common, "worktrees");
-  const names = await readdir(dir).catch(() => []);
+  const names = await readdir(/*turbopackIgnore: true*/ dir).catch(() => []);
 
   const pairs = await Promise.all(
     names.map(async (name) => {
       const gitdir = await readFile(
+        /*turbopackIgnore: true*/
         path.join(dir, name, "gitdir"),
         "utf-8"
       ).catch(() => "");
@@ -126,7 +130,8 @@ export const listWorkspaces = cache(
     const trees = linked.flatMap((wt) => {
       const name = names.get(wt.path);
 
-      return name === undefined || !existsSync(wt.path)
+      return name === undefined ||
+        !existsSync(/*turbopackIgnore: true*/ wt.path)
         ? []
         : [
             {

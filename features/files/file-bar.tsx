@@ -26,7 +26,7 @@ export const Crumbs = ({ ws, file }: { ws: string; file: string }) => {
             key={at}
             className={
               last
-                ? "flex min-w-0 items-center gap-1"
+                ? "flex max-w-[60%] min-w-0 shrink-0 items-center gap-1"
                 : "flex shrink-0 items-center gap-1 max-sm:hidden"
             }
           >

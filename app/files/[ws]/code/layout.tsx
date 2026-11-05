@@ -16,10 +16,16 @@ const CodeLayout = async ({
   }
 
   const [paths, changes] = await Promise.all([listFiles(ws), readChanges(ws)]);
+  const fresh = new Set(changes.fresh);
 
   return (
     <>
-      <CodeSide ws={ws.id} paths={paths} changes={changes.files} />
+      <CodeSide
+        ws={ws.id}
+        paths={paths.filter((file) => !fresh.has(file))}
+        changes={changes.files}
+        fresh={changes.fresh}
+      />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </>
   );

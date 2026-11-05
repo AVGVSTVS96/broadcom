@@ -41,7 +41,9 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
           BROADCOM
         </Link>
         <div className="order-last w-full sm:order-none sm:w-auto">
-          <Nav />
+          <Suspense>
+            <Nav />
+          </Suspense>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">

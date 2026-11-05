@@ -2,7 +2,7 @@
 
 import type { FileTreeRowDecoration, GitStatusEntry } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef } from "react";
 
 import type { Change } from "@/lib/model/files";
 
@@ -23,6 +23,8 @@ const look = `
     --trees-git-modified-color-override: var(--over);
     --trees-git-deleted-color-override: var(--bad);
     --trees-selected-bg-override: var(--accent);
+    --trees-search-bg-override: var(--muted);
+    --trees-input-bg-override: var(--muted);
   }
   [data-file-tree-search-container] { padding: 8px 8px 6px; }
   [data-file-tree-search-input] { border-radius: 8px; height: 30px; }
@@ -48,6 +50,7 @@ const closed: readonly string[] = [];
 export const Tree = ({
   paths,
   changes,
+  fresh,
   selected,
   onPick,
   open = closed,
@@ -55,6 +58,7 @@ export const Tree = ({
 }: {
   paths: readonly string[];
   changes: readonly Change[];
+  fresh: readonly string[];
   selected: string;
   onPick: (file: string) => void;
   open?: readonly string[];
@@ -98,14 +102,16 @@ export const Tree = ({
     ...new Set([...open, selected].flatMap(ancestors)),
   ]);
 
+  const all = useMemo(() => [...paths, ...fresh].toSorted(), [paths, fresh]);
+
   useEffect(() => {
     const previous = known.current;
-    const next = new Set(paths);
+    const next = new Set(all);
 
     known.current = next;
 
     if (previous === null) {
-      model.resetPaths(paths, { initialExpandedPaths: startOpen() });
+      model.resetPaths(all, { initialExpandedPaths: startOpen() });
 
       return;
     }
@@ -114,24 +120,28 @@ export const Tree = ({
       next.has(file) ? [] : [{ path: file, type: "remove" as const }]
     );
 
-    const added = paths.flatMap((file) =>
+    const added = all.flatMap((file) =>
       previous.has(file) ? [] : [{ path: file, type: "add" as const }]
     );
 
     if (removed.length > 0 || added.length > 0) {
       model.batch([...removed, ...added]);
     }
-  }, [model, paths]);
+  }, [model, all]);
 
   useEffect(() => {
     byPath.current = new Map(changes.map((change) => [change.path, change]));
-    model.setGitStatus(
-      changes.map((change): GitStatusEntry => ({
+    model.setGitStatus([
+      ...changes.map((change): GitStatusEntry => ({
         path: change.path,
         status: change.status,
-      }))
-    );
-  }, [model, changes]);
+      })),
+      ...fresh.map((file): GitStatusEntry => ({
+        path: file,
+        status: "untracked",
+      })),
+    ]);
+  }, [model, changes, fresh]);
 
   useEffect(() => {
     for (const file of model.getSelectedPaths()) {
