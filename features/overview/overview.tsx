@@ -30,6 +30,11 @@ export const Overview = ({
   const summary = poolOf(plans);
   const next = plans.find((plan) => plan.id === pool?.next);
 
+  const active = Object.values(accounts).reduce(
+    (sum, account) => sum + account.working,
+    0
+  );
+
   return (
     <div className="space-y-10">
       <section className="space-y-6">
@@ -42,14 +47,14 @@ export const Overview = ({
                 New work goes to <span className="text-brand">{next.name}</span>
               </>
             )}
-            <span className="text-muted-foreground">
-              {" · "}
+            <span className="block text-muted-foreground sm:inline">
+              <span className="max-sm:hidden"> · </span>
               {summary.open.length} of {summary.subscriptions.length} plans{" "}
               {summary.open.length === 1 ? "has" : "have"} room
             </span>
           </h1>
           <p className="text-muted-foreground">
-            {plural(summary.working, "working session")}
+            {plural(active, "session")} active in the last 2 min
           </p>
         </div>
         <Problems problems={problems} />

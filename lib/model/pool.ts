@@ -157,7 +157,6 @@ export const poolOf = (plans: readonly Plan[]) => {
       sum(week.map((part) => part.value)),
       week.length * 100
     ),
-    working: sum(plans.map((plan) => plan.account.working)),
   };
 };
 

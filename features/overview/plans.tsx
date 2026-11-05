@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
 import { fills, texts } from "@/components/viz/meter";
-import { dollars, duration, percent, utcDate, when } from "@/lib/model/format";
+import { dollars, duration, percent, when } from "@/lib/model/format";
+import { WEEK } from "@/lib/model/history";
 import { creditLeft, creditTotal } from "@/lib/model/pool";
 import type { Plan } from "@/lib/model/pool";
 import { creditTone, windowTone } from "@/lib/model/tone";
@@ -124,38 +125,27 @@ const Credit = ({ plan }: { plan: Plan }) => {
   const total = creditTotal(plan.grants);
   const tone = creditTone(left, total);
 
-  const [ends] = plan.grants
-    .map((grant) => grant.expiresAt)
-    .toSorted((a, b) => a - b);
-
   return (
     <Cell
       label="API credit"
       value={dollars(left)}
       tone={tone}
-      note={
-        <>
-          of {dollars(total)}
-          {ends === undefined ? null : (
-            <span className="max-sm:hidden"> · ends {utcDate(ends)}</span>
-          )}
-        </>
-      }
+      note={`of ${dollars(total)} · estimate`}
     >
       <Bar value={(left / total) * 100} tone={tone} />
     </Cell>
   );
 };
 
-const facts = (plan: Plan) => {
-  const held = plan.account.heldResets.reduce(
-    (sum, reset) => sum + reset.left,
-    0
-  );
+const facts = (plan: Plan, now: number) => {
+  const { heldResets, resetsSpent = [], working } = plan.account;
+  const held = heldResets.reduce((sum, reset) => sum + reset.left, 0);
+  const spent = Math.max(0, ...resetsSpent);
 
   return [
-    plan.account.working > 0 ? `${plan.account.working} working` : null,
+    working > 0 ? `${working} active` : null,
     held > 0 ? `${held} ${held === 1 ? "reset" : "resets"} held` : null,
+    now - spent < WEEK ? `reset used ${when(spent, now)}` : null,
   ].filter((fact) => fact !== null);
 };
 
@@ -185,7 +175,7 @@ export const PlanRows = ({
             </span>
           </div>
           <div className="truncate text-sm text-muted-foreground">
-            {[plan.account.plan || "API key", ...facts(plan)].join(" · ")}
+            {[plan.account.plan || "API key", ...facts(plan, now)].join(" · ")}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 sm:gap-6">

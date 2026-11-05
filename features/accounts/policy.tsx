@@ -17,7 +17,7 @@ const fields = [
   { key: "weeklyCutoff", label: "Weekly cutoff", max: 100, unit: "%" },
   {
     key: "agentsPerAccount",
-    label: "Agents per account",
+    label: "Sessions per account",
     max: 500,
     unit: "",
   },
@@ -89,7 +89,7 @@ export const Policy = ({
   return (
     <Section
       title={`New work skips an account at ${policy.sessionCutoff}% session or ${policy.weeklyCutoff}% weekly`}
-      detail={`Up to ${policy.agentsPerAccount} agents on a fresh account, fewer as it fills.`}
+      detail={`A fresh account is sized for ${policy.agentsPerAccount} active sessions, fewer as it fills.`}
     >
       <form
         className="grid gap-4 sm:grid-cols-3"
@@ -154,7 +154,7 @@ export const Policy = ({
           ) : null}
           {dirty && !valid(values) ? (
             <span className="text-sm text-bad">
-              Cutoffs run 1–100%, agents 1–500.
+              Cutoffs run 1–100%, sessions 1–500.
             </span>
           ) : null}
           {notice === null ? null : (
