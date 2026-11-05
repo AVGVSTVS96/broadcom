@@ -9,7 +9,7 @@ import { Section } from "@/components/viz/section";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { clock, duration } from "@/lib/model/format";
+import { clock, duration, plural } from "@/lib/model/format";
 import { agentSdk, byState, threadHref, waiting } from "@/lib/model/live";
 import type { Handoff, Handoffs } from "@/lib/model/live";
 import { nameOf, namesOf } from "@/lib/model/names";
@@ -56,9 +56,6 @@ const causes = {
 
 const home = (cwd: string) =>
   cwd.replace(/^\/(?:home|Users)\/[^/]+/u, "~") || "~";
-
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count.toLocaleString("en")} ${count === 1 ? one : many}`;
 
 const useNames = (data: LiveData) => {
   const accounts = useLive((live) => live.accounts);

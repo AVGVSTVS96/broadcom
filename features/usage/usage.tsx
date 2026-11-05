@@ -25,7 +25,7 @@ import {
   unitNames,
 } from "@/features/usage/words";
 import { useLive } from "@/lib/live/client";
-import { clock, date, dollars } from "@/lib/model/format";
+import { dollars, when } from "@/lib/model/format";
 import { format } from "@/lib/model/usage";
 import type { Unit } from "@/lib/model/usage";
 import type { SessionState } from "@/lib/proxy/schema";
@@ -60,9 +60,6 @@ const stateOf = (states: ReadonlyMap<string, SessionState>, key: string) =>
   states.get(key) ??
   states.get(`session:${key.slice(key.lastIndexOf(":") + 1)}`) ??
   null;
-
-const when = (at: number, now: number) =>
-  now - at < 6 * 86_400_000 ? clock(at) : date(at);
 
 const percent = (part: number, whole: number) =>
   whole > 0 ? `${Math.round((part / whole) * 100).toLocaleString("en")}%` : "–";
