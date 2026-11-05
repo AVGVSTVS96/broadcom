@@ -187,7 +187,7 @@ const SessionLine = ({
         <div className="flex min-w-0 items-center gap-1.5">
           <Link
             href={usageHref(session.row)}
-            className="truncate underline-offset-4 hover:underline"
+            className="hit truncate underline-offset-4 hover:underline"
           >
             {session.label}
           </Link>
@@ -198,7 +198,7 @@ const SessionLine = ({
               target="_blank"
               rel="noreferrer"
               aria-label={`Open ${session.label}`}
-              className="text-muted-foreground hover:text-foreground"
+              className="hit text-muted-foreground hover:text-foreground"
             >
               <ArrowUpRightIcon className="size-3.5" />
             </a>

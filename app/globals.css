@@ -99,6 +99,18 @@
   --sidebar-ring: var(--ring);
 }
 
+@utility hit {
+  position: relative;
+
+  @media (pointer: coarse) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: -0.625rem;
+    }
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

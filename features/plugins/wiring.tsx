@@ -153,7 +153,7 @@ export const Wiring = ({
                       row.channel.source.ws,
                       row.channel.source.file
                     )}
-                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                    className="hit shrink-0 text-xs text-muted-foreground hover:text-foreground"
                   >
                     Source
                   </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -148,6 +148,19 @@ export const Settings = ({
   const [pending, startTransition] = useTransition();
   const policy = useLive((live) => live.pool?.policy ?? null);
 
+  useEffect(() => {
+    const timer =
+      notice === "Saved"
+        ? setTimeout(() => {
+            setNotice(null);
+          }, 2500)
+        : undefined;
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [notice]);
+
   if (values === null || facts === null) {
     return (
       <p
@@ -273,7 +286,7 @@ export const Settings = ({
                 Discard
               </Button>
               <Button disabled={pending} onClick={save}>
-                Save
+                {pending ? "Saving…" : "Save"}
               </Button>
             </div>
           )}

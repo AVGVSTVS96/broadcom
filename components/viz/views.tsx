@@ -57,7 +57,7 @@ export const Views = <View extends string>({
             }}
             aria-current={view.id === shown ? "page" : undefined}
             className={cn(
-              "rounded-full px-3.5 py-1 text-center whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground max-sm:px-1",
+              "rounded-full px-3.5 py-1 text-center whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground max-sm:px-1 max-sm:py-2.5",
               view.id === shown && "bg-card text-foreground shadow-xs"
             )}
           >

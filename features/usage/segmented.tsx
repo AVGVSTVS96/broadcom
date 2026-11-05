@@ -37,7 +37,7 @@ export const Segmented = <T extends string>({
       <Toggle
         key={option}
         value={option}
-        className="shrink-0 rounded-full px-2.5 py-1 text-sm whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-pressed:bg-card data-pressed:text-foreground data-pressed:shadow-xs sm:px-3"
+        className="shrink-0 rounded-full px-2.5 py-1 text-sm whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-pressed:bg-card data-pressed:text-foreground data-pressed:shadow-xs max-sm:py-2 sm:px-3"
       >
         {name}
       </Toggle>
