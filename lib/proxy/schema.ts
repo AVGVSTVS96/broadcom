@@ -221,3 +221,99 @@ export const LimitUsage = Schema.Struct({
 });
 
 export type LimitUsage = typeof LimitUsage.Type;
+
+export const UsageAmount = Schema.Struct({
+  apiUsd: Schema.Number,
+  cacheRead: Schema.Number,
+  input: Schema.Number,
+  output: Schema.Number,
+  planUsd: Schema.Number,
+  requests: Schema.Number,
+  tokens: Schema.Number,
+});
+
+export type UsageAmount = typeof UsageAmount.Type;
+
+export const UsagePoints = Schema.Struct({
+  fiveHour: NullableNumber,
+  week: NullableNumber,
+});
+
+export type UsagePoints = typeof UsagePoints.Type;
+
+export const UsageWho = Schema.Struct({
+  href: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  kind: Schema.Literals(["thread", "job", "session", "action", "project"]),
+});
+
+export const UsageRow = Schema.Struct({
+  agentSdk: Schema.Number,
+  amount: UsageAmount,
+  byAccount: Schema.Array(
+    Schema.Struct({
+      account: Schema.String,
+      fiveHour: NullableNumber,
+      week: NullableNumber,
+    })
+  ),
+  detail: Schema.String,
+  entrypoint: Schema.String,
+  key: Schema.String,
+  label: Schema.String,
+  lastActiveAt: Millis,
+  points: UsagePoints,
+  series: Schema.Array(Schema.Number),
+  sessions: Schema.Number,
+  who: Schema.NullOr(UsageWho),
+});
+
+export type UsageRow = typeof UsageRow.Type;
+
+export const UsageTotals = Schema.Struct({
+  ...UsageAmount.fields,
+  cacheHitRate: Schema.Number,
+  points: UsagePoints,
+  sessions: Schema.Number,
+});
+
+export type UsageTotals = typeof UsageTotals.Type;
+
+export const BucketSize = Schema.Literals(["1h", "4h", "1d", "1w"]);
+
+export type BucketSize = typeof BucketSize.Type;
+
+export const UsageView = Schema.Struct({
+  agentSdk: Schema.Struct({
+    apiUsd: Schema.Number,
+    factor: Schema.Number,
+    fiveHour: NullableNumber,
+    share: Schema.Number,
+  }),
+  buckets: Schema.Array(Schema.Struct({ at: Millis, size: BucketSize })),
+  coverage: Schema.Struct({ limitsSince: Schema.NullOr(Millis) }),
+  facets: Schema.Record(
+    Schema.String,
+    Schema.Array(
+      Schema.Struct({
+        count: Schema.Number,
+        id: Schema.String,
+        label: Schema.String,
+      })
+    )
+  ),
+  period: Schema.Struct({
+    from: Millis,
+    timezone: Schema.String,
+    to: Millis,
+  }),
+  previous: Schema.NullOr(UsageTotals),
+  rowCount: Schema.Number,
+  rows: Schema.Array(UsageRow),
+  series: Schema.Array(
+    Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Number) })
+  ),
+  sources: Schema.Struct({ proxySince: Schema.NullOr(Millis) }),
+  totals: UsageTotals,
+});
+
+export type UsageView = typeof UsageView.Type;
