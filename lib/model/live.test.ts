@@ -16,7 +16,7 @@ const move = (
   label: string | null = null
 ): Move => ({ at, cause, from, label, session: `${at}${label}`, to });
 
-test("handoffs count starts and moves per hour, and group bursts", () => {
+test("handoffs count starts and moves per hour, and group moves by route", () => {
   const burst = now - 2 * hour;
 
   const digest = handoffs(
@@ -26,21 +26,22 @@ test("handoffs count starts and moves per hour, and group bursts", () => {
       move(burst, "limit", "a", "b", "one"),
       move(burst + 5000, "limit", "a", "b", "two"),
       move(burst + 6000, "limit", "a", "b", "two"),
+      move(burst + 20 * 60_000, "limit", "a", "b", "four"),
       move(now - hour, "early", "b", "a", "three"),
     ],
     now
   );
 
   expect(digest.started).toBe(1);
-  expect(digest.moved).toEqual({ early: 1, limit: 3 });
+  expect(digest.moved).toEqual({ early: 1, limit: 4 });
   expect(digest.recent.map((group) => [group.count, group.labels])).toEqual([
     [1, ["three"]],
-    [3, ["one", "two"]],
+    [4, ["one", "two", "four"]],
   ]);
 
   const a = digest.lanes.find((lane) => lane.account === "a");
 
-  expect(a?.left.reduce((sum, count) => sum + count, 0)).toBe(3);
+  expect(a?.left.reduce((sum, count) => sum + count, 0)).toBe(4);
   expect(a?.started.reduce((sum, count) => sum + count, 0)).toBe(1);
 });
 

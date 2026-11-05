@@ -364,8 +364,8 @@ const hourClock = new Intl.DateTimeFormat("en-GB", {
 });
 
 const Group = ({ group, name }: { group: Handoff; name: Name }) => {
-  const shown = group.labels.slice(0, 3);
-  const more = group.count - shown.length;
+  const shown = group.labels.slice(0, 2);
+  const more = group.labels.length - shown.length;
 
   return (
     <li className="space-y-0.5 py-2.5">
@@ -386,7 +386,8 @@ const Group = ({ group, name }: { group: Handoff; name: Name }) => {
               : "text-foreground"
           )}
         >
-          {plural(group.count, "session")} {causes[group.cause]}
+          {group.count > 1 ? `${group.count}× ` : ""}
+          {causes[group.cause]}
         </span>
         {shown.length === 0
           ? null
@@ -529,12 +530,12 @@ const Moves = ({
           />
         </div>
         <div className="min-w-0 lg:border-l lg:pl-8">
-          <h3 className="text-sm">Recent moves</h3>
+          <h3 className="text-sm">Moves by route</h3>
           {moves.recent.length === 0 ? (
             <p className="py-3 text-sm text-muted-foreground">None.</p>
           ) : (
             <ul className="divide-y">
-              {moves.recent.slice(0, 12).map((group) => (
+              {moves.recent.slice(0, 8).map((group) => (
                 <Group
                   key={`${group.at} ${group.from} ${group.to}`}
                   group={group}
