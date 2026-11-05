@@ -151,6 +151,7 @@ export const WeeksView = ({
                 pace.cutoff,
                 pace.locked ? pace.resetsAt : now
               ),
+        perDay: (pace?.pace ?? 0) * evenPerDay,
       }),
     };
   });
