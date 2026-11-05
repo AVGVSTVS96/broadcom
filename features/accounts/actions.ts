@@ -99,6 +99,7 @@ const decodeProvider = Schema.decodeUnknownSync(SignInProvider);
 
 export const startSignIn = async (provider: string, target: string | null) => {
   const query = new URLSearchParams({
+    browser: "remote",
     is_webui: "true",
     provider: decodeProvider(provider),
   });
