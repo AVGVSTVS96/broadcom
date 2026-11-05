@@ -9,6 +9,7 @@ import {
   Effect,
   Layer,
   ManagedRuntime,
+  Option,
   Predicate,
   Result,
   Schema,
@@ -52,6 +53,19 @@ export class Proxy extends Context.Service<
 
 const management = `${base}/v8/management`;
 
+const decodeRefusal = Schema.decodeUnknownOption(
+  Schema.Struct({ error: Schema.String })
+);
+
+const refusal = (at: string, status: number, body: Schema.Json) =>
+  new ProxyUnreachable({
+    path: at,
+    reason: Option.match(decodeRefusal(body), {
+      onNone: () => `HTTP ${status}`,
+      onSome: (refused) => refused.error,
+    }),
+  });
+
 export const ProxyLive = Layer.effect(
   Proxy,
   Effect.gen(function* () {
@@ -61,8 +75,7 @@ export const ProxyLive = Layer.effect(
 
     const client = (yield* HttpClient.HttpClient).pipe(
       HttpClient.mapRequest(HttpClientRequest.prependUrl(management)),
-      HttpClient.mapRequest(HttpClientRequest.bearerToken(key)),
-      HttpClient.filterStatusOk
+      HttpClient.mapRequest(HttpClientRequest.bearerToken(key))
     );
 
     const decode = <S extends Decodable>(
@@ -71,37 +84,54 @@ export const ProxyLive = Layer.effect(
       request: HttpClientRequest.HttpClientRequest
     ) =>
       client.execute(request).pipe(
-        Effect.flatMap((response) => response.json),
-        Effect.flatMap(Schema.decodeUnknownEffect(schema)),
         Effect.mapError(
           (cause) => new ProxyUnreachable({ path: at, reason: cause.message })
+        ),
+        Effect.flatMap((response) =>
+          response.json.pipe(
+            Effect.orElseSucceed(() => null),
+            Effect.filterOrFail(
+              () => response.status < 400,
+              (body) => refusal(at, response.status, body)
+            )
+          )
+        ),
+        Effect.flatMap((body) =>
+          Schema.decodeUnknownEffect(schema)(body).pipe(
+            Effect.mapError(
+              (cause) =>
+                new ProxyUnreachable({ path: at, reason: cause.message })
+            )
+          )
         )
       );
 
     return {
       get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
-      live: client.execute(HttpClientRequest.get("/deck/events")).pipe(
-        Effect.map((response) => response.stream),
-        Stream.unwrap,
-        Stream.decodeText,
-        Stream.pipeThroughChannel(Sse.decode()),
-        Stream.filterMap((event) => {
-          const decoded = Predicate.isTagged(event, "Event")
-            ? decodeLiveEvent(event.data)
-            : null;
+      live: HttpClient.filterStatusOk(client)
+        .execute(HttpClientRequest.get("/deck/events"))
+        .pipe(
+          Effect.map((response) => response.stream),
+          Stream.unwrap,
+          Stream.decodeText,
+          Stream.pipeThroughChannel(Sse.decode()),
+          Stream.filterMap((event) => {
+            const decoded = Predicate.isTagged(event, "Event")
+              ? decodeLiveEvent(event.data)
+              : null;
 
-          return decoded === null ? Result.failVoid : Result.succeed(decoded);
-        }),
-        Stream.mapError(
-          (cause) =>
-            new ProxyUnreachable({
-              path: "/deck/events",
-              reason: Predicate.isTagged(cause, "Retry")
-                ? "retry"
-                : cause.message,
-            })
-        )
-      ),
+            return decoded === null ? Result.failVoid : Result.succeed(decoded);
+          }),
+          Stream.mapError(
+            (cause) =>
+              new ProxyUnreachable({
+                path: "/deck/events",
+                reason: Predicate.isTagged(cause, "Retry")
+                  ? "retry"
+                  : cause.message,
+              })
+          )
+        ),
       send: (method, at, body, schema) =>
         decode(
           at,

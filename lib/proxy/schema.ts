@@ -167,3 +167,47 @@ export const History = Schema.Struct({
 });
 
 export type History = typeof History.Type;
+
+export const Credential = Schema.Struct({
+  auth_index: Schema.String,
+  created_at: Schema.optionalKey(Schema.String),
+  disabled: Schema.Boolean,
+  email: Schema.optionalKey(Schema.String),
+  label: Schema.optionalKey(Schema.String),
+  name: Schema.String,
+  provider: Schema.String,
+  requires_sign_in: Schema.optionalKey(Schema.Boolean),
+  status: Schema.String,
+  status_message: Schema.optionalKey(Schema.String),
+  unavailable: Schema.optionalKey(Schema.Boolean),
+});
+
+export type Credential = typeof Credential.Type;
+
+export const Credentials = Schema.Struct({ files: Schema.Array(Credential) });
+
+export const SignInProvider = Schema.Literals(["claude", "codex"]);
+
+export type SignInProvider = typeof SignInProvider.Type;
+
+export const SignInStart = Schema.Struct({
+  flow: Schema.optionalKey(Schema.String),
+  state: Schema.String,
+  url: Schema.String,
+  user_code: Schema.optionalKey(Schema.String),
+});
+
+export const SignInStatus = Schema.Struct({
+  error: Schema.optionalKey(Schema.String),
+  status: Schema.Literals(["ok", "wait", "error"]),
+});
+
+export const PolicyResult = Schema.Struct({
+  conflict: Schema.Boolean,
+  pool: Pool,
+  saved: Schema.Boolean,
+});
+
+export type PolicyResult = typeof PolicyResult.Type;
+
+export const Done = Schema.Struct({});
