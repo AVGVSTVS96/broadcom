@@ -29,8 +29,16 @@ export interface Handoff {
   readonly count: number;
 }
 
+export interface Bounce {
+  readonly at: number;
+  readonly label: string | null;
+  readonly count: number;
+  readonly between: readonly string[];
+}
+
 export interface Handoffs {
   readonly from: number;
+  readonly bounce: Bounce | null;
   readonly lanes: readonly Lane[];
   readonly recent: readonly Handoff[];
   readonly started: number;
@@ -58,6 +66,57 @@ const group = (groups: Map<string, Handoff>, move: Move) => {
         : [...labels, move.label],
     to: move.to,
   });
+};
+
+const bounceAt = 6;
+
+const burstOf = (moves: readonly Move[]) => {
+  let best = { from: 0, to: 0 };
+  let from = 0;
+
+  for (const [to, move] of moves.entries()) {
+    while ((moves[from]?.at ?? move.at) < move.at - hour) {
+      from += 1;
+    }
+
+    if (to + 1 - from > best.to - best.from) {
+      best = { from, to: to + 1 };
+    }
+  }
+
+  return moves.slice(best.from, best.to);
+};
+
+const bounceOf = (moves: readonly Move[], now: number): Bounce | null => {
+  const bySession = Map.groupBy(
+    moves
+      .filter((move) => move.cause !== "start" && now - move.at <= span)
+      .toSorted((a, b) => a.at - b.at),
+    (move) => move.session
+  );
+
+  const [burst] = [...bySession.values()]
+    .map(burstOf)
+    .toSorted((a, b) => b.length - a.length);
+
+  const last = burst?.at(-1);
+
+  if (burst === undefined || last === undefined || burst.length < bounceAt) {
+    return null;
+  }
+
+  return {
+    at: last.at,
+    between: [
+      ...new Set(
+        burst.flatMap((move) =>
+          move.from === null ? [move.to] : [move.from, move.to]
+        )
+      ),
+    ],
+    count: burst.length,
+    label: last.label,
+  };
 };
 
 export const handoffs = (moves: readonly Move[], now: number): Handoffs => {
@@ -117,6 +176,7 @@ export const handoffs = (moves: readonly Move[], now: number): Handoffs => {
   }
 
   return {
+    bounce: bounceOf(moves, now),
     from,
     lanes: [...lanes].map(([account, counts]) => ({ account, ...counts })),
     moved,
@@ -155,3 +215,16 @@ const strength = { blocked: 0, idle: 2, working: 1 } as const;
 
 export const byState = (a: LiveSession, b: LiveSession) =>
   strength[a.state] - strength[b.state] || b.since - a.since;
+
+export const waiting = (sessions: readonly LiveSession[]) =>
+  sessions.filter(
+    (session) =>
+      session.state === "blocked" &&
+      session.account !== null &&
+      !sessions.some(
+        (newer) =>
+          newer.row === session.row &&
+          newer.label === session.label &&
+          newer.since > session.since
+      )
+  );

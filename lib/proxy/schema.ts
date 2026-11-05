@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
 const Millis = Schema.Number;
 const NullableNumber = Schema.NullOr(Schema.Number);
@@ -125,13 +125,24 @@ export const Credits = Schema.Struct({ api: Schema.Array(Grant) });
 
 export type Credits = typeof Credits.Type;
 
-export const MoveCause = Schema.Literals([
+const moveCauses = [
   "limit",
   "over",
   "early",
   "restart",
   "start",
-]);
+  "other",
+] as const;
+
+export const MoveCause = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.Literals(moveCauses),
+    SchemaTransformation.transform<(typeof moveCauses)[number], string>({
+      decode: (cause) => moveCauses.find((known) => known === cause) ?? "other",
+      encode: (cause) => cause,
+    })
+  )
+);
 
 export type MoveCause = typeof MoveCause.Type;
 

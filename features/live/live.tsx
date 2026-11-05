@@ -10,7 +10,7 @@ import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
 import { clock, duration } from "@/lib/model/format";
-import { agentSdk, byState, threadHref } from "@/lib/model/live";
+import { agentSdk, byState, threadHref, waiting } from "@/lib/model/live";
 import type { Handoff, Handoffs } from "@/lib/model/live";
 import { nameOf, namesOf } from "@/lib/model/names";
 import type {
@@ -43,11 +43,12 @@ const rankIn = (order: readonly string[], id: string | null) => {
   return at === -1 ? order.length : at;
 };
 
-const moveCauses = ["limit", "over", "early", "restart"] as const;
+const moveCauses = ["limit", "over", "early", "restart", "other"] as const;
 
 const causes = {
   early: "moved early",
   limit: "hit a limit",
+  other: "moved",
   over: "passed its cutoff",
   restart: "restarted",
   start: "started",
@@ -73,6 +74,9 @@ const useNames = (data: LiveData) => {
   return (id: string | null) => nameOf(named, id);
 };
 
+const listOf = (items: readonly string[]) =>
+  new Intl.ListFormat("en", { type: "conjunction" }).format(items);
+
 type Name = ReturnType<typeof useNames>;
 
 const Dot = ({ state }: { state: SessionState }) => (
@@ -87,7 +91,7 @@ const Dot = ({ state }: { state: SessionState }) => (
 const Entry = ({ entrypoint }: { entrypoint: string }) =>
   agentSdk(entrypoint) ? (
     <span
-      title="Agent SDK or claude -p: five-hour limits count it more"
+      title="Agent SDK or claude -p: 5-hour limits count it more"
       className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over"
     >
       SDK
@@ -118,26 +122,19 @@ const Waiting = ({
   name: Name;
   now: number;
 }) => {
-  const waiting = sessions.toSorted((a, b) => a.since - b.since);
-  const [oldest] = waiting;
+  const asking = waiting(sessions).toSorted((a, b) => a.since - b.since);
+  const [oldest] = asking;
 
   if (oldest === undefined) {
     return null;
   }
 
-  const today = waiting.filter((session) => now - session.since < 86_400_000);
-
   return (
     <Section
-      title={`${plural(waiting.length, "session waits", "sessions wait")} on you, the oldest for ${duration(now - oldest.since)}`}
-      detail={
-        today.length === 0
-          ? "None started waiting today."
-          : `${today.length} started waiting today.`
-      }
+      title={`${plural(asking.length, "session waits", "sessions wait")} on you, the oldest for ${duration(now - oldest.since)}`}
     >
       <ul className="-mx-2 divide-y">
-        {waiting.toReversed().map((session) => {
+        {asking.toReversed().map((session) => {
           const href = threadHref(session.row);
 
           return (
@@ -326,9 +323,14 @@ const Running = ({
     <Section
       title={title}
       detail={
-        sessions.length === 0
-          ? undefined
-          : `${sdk.length} on the Agent SDK or claude -p. On ${hosts.join(", ")}.`
+        [
+          sdk.length === 0
+            ? null
+            : `${sdk.length} on the Agent SDK or claude -p.`,
+          hosts.length > 1 ? `On ${listOf(hosts)}.` : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" ") || undefined
       }
     >
       <div className="grid gap-3 xl:grid-cols-2">
@@ -397,9 +399,37 @@ const Group = ({ group, name }: { group: Handoff; name: Name }) => {
   );
 };
 
-const Moves = ({ moves, name }: { moves: Handoffs; name: Name }) => {
+const between = (
+  ids: readonly string[],
+  name: Name,
+  keys: ReadonlySet<string>
+) => {
+  const plans = ids.flatMap((id) => (keys.has(id) ? [] : [name(id)]));
+  const apiKeys = ids.length - plans.length;
+
+  return listOf([
+    ...plans,
+    ...(apiKeys === 0 ? [] : [plural(apiKeys, "API key")]),
+  ]);
+};
+
+const limitTitle = (limit: number) =>
+  limit === 0
+    ? "No session had to change account in 24 hours"
+    : `${plural(limit, "move")} off a limit in 24 hours`;
+
+const Moves = ({
+  moves,
+  name,
+  keys,
+}: {
+  moves: Handoffs;
+  name: Name;
+  keys: ReadonlySet<string>;
+}) => {
   const accounts = useLive((live) => live.accounts);
-  const order = useLive((live) => live.pool?.order ?? []);
+  const pool = useLive((live) => live.pool);
+  const order = pool?.order ?? [];
 
   const lanes = moves.lanes.toSorted(
     (a, b) => rankIn(order, a.account) - rankIn(order, b.account)
@@ -413,30 +443,35 @@ const Moves = ({ moves, name }: { moves: Handoffs; name: Name }) => {
   );
 
   const limit = (moves.moved.limit ?? 0) + (moves.moved.over ?? 0);
-  const ranOut = lanes.filter((lane) => lane.left.some((count) => count > 0));
+  const { bounce } = moves;
 
   const moved = moveCauses
     .flatMap((cause) => {
       const count = moves.moved[cause] ?? 0;
 
-      return count === 0 ? [] : [`${count} ${causes[cause]}`];
+      return count === 0
+        ? []
+        : [`${count.toLocaleString("en")} ${causes[cause]}`];
     })
     .join(", ");
+
+  const counts = [
+    bounce === null ? null : `Last at ${clock(bounce.at)}.`,
+    `${plural(moves.started, "session")} started${moved === "" ? "" : `; ${moved}`} in 24 hours.`,
+  ]
+    .filter((part) => part !== null)
+    .join(" ");
 
   const marks = [0, 6, 12, 18].map((offset) => moves.from + offset * 3_600_000);
 
   return (
     <Section
       title={
-        limit === 0
-          ? "No session had to change account in 24 hours"
-          : `${plural(limit, "hand-off")} off a limit in 24 hours`
+        bounce === null
+          ? limitTitle(limit)
+          : `${bounce.label ?? "One session"} moved ${bounce.count} times in an hour, between ${between(bounce.between, name, keys)}`
       }
-      detail={`${plural(moves.started, "session")} started.${moved === "" ? "" : ` Moves: ${moved}.`}${
-        ranOut.length === 0
-          ? ""
-          : ` ${ranOut.map((lane) => name(lane.account)).join(", ")} ran out.`
-      }`}
+      detail={counts}
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-8">
         <div className="min-w-0 space-y-4">
@@ -472,7 +507,7 @@ const Moves = ({ moves, name }: { moves: Handoffs; name: Name }) => {
                       return (
                         <span
                           key={at}
-                          title={`${hourClock.format(at)}: ${count} started, ${arrived} moved in, ${left} left on a limit`}
+                          title={`${hourClock.format(at)}: ${count} started, ${arrived} moved in, ${left} moved off a limit`}
                           className={cn(
                             "relative flex h-7 items-center justify-center rounded-[3px]",
                             shades[shadeOf(count + arrived, peak)]
@@ -491,13 +526,13 @@ const Moves = ({ moves, name }: { moves: Handoffs; name: Name }) => {
           </div>
           <Legend
             items={[
-              { key: "box", label: "Sessions per hour, darker is more" },
-              { key: "dot", label: "Hit a limit, handed off" },
+              { key: "box", label: "Sessions per hour" },
+              { key: "dot", label: "Moved off a limit" },
             ]}
           />
         </div>
         <div className="min-w-0 lg:border-l lg:pl-8">
-          <h3 className="text-sm">Recent hand-offs</h3>
+          <h3 className="text-sm">Recent moves</h3>
           {moves.recent.length === 0 ? (
             <p className="py-3 text-sm text-muted-foreground">None.</p>
           ) : (
@@ -521,21 +556,21 @@ export const LiveView = ({ data }: { data: LiveData }) => {
   const now = useNow(data.now);
   const name = useNames(data);
   const sessions = Object.values(useLive((live) => live.sessions));
-  const blocked = sessions.filter((session) => session.state === "blocked");
   const running = sessions.filter((session) => session.state !== "blocked");
+  const keys = new Set(data.grants.map((grant) => grant.credentialId));
 
   return (
     <div className="space-y-5">
-      <Waiting sessions={blocked} name={name} now={now} />
       <Running sessions={running} name={name} now={now} />
+      <Waiting sessions={sessions} name={name} now={now} />
       {data.handoffs === null ? (
-        <Section title="Hand-offs are unavailable">
+        <Section title="Moves are unavailable">
           <p className="text-sm text-muted-foreground">
             The proxy didn&apos;t answer for its account history.
           </p>
         </Section>
       ) : (
-        <Moves moves={data.handoffs} name={name} />
+        <Moves moves={data.handoffs} name={name} keys={keys} />
       )}
     </div>
   );
