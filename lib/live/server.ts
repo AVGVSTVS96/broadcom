@@ -6,8 +6,9 @@ import { connection } from "next/server";
 
 import { decodeLiveEvent } from "@/lib/live/decode";
 import { applyChange } from "@/lib/live/event";
-import type { Live, LiveEvent } from "@/lib/live/event";
+import type { Live, LiveChange, LiveEvent } from "@/lib/live/event";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
+import type { Source } from "@/lib/proxy/proxy";
 
 interface Hub {
   live: Live | null;
@@ -17,6 +18,16 @@ interface Hub {
 }
 
 const empty: Live = { accounts: {}, pool: null, sessions: {} };
+
+const owned = (source: Source, live: Live, snapshot: Live): Live =>
+  source === "proxy"
+    ? { ...live, accounts: snapshot.accounts, pool: snapshot.pool }
+    : { ...live, sessions: snapshot.sessions };
+
+const ownChange = (source: Source, change: LiveChange): LiveChange =>
+  source === "proxy"
+    ? { ...change, sessions: {} }
+    : { ...change, accounts: {}, pool: null };
 
 const createHub = (): Hub => {
   const { promise, resolve } = Promise.withResolvers<boolean>();
@@ -28,39 +39,51 @@ const createHub = (): Hub => {
     ready: promise,
   };
 
-  const publish = (event: LiveEvent) => {
-    if (event.type === "snapshot") {
-      hub.live = event.live;
-      hub.arrived(true);
-    } else if (event.type === "patch") {
-      hub.live = applyChange(hub.live ?? empty, event.change);
-    }
-
+  const broadcast = (event: LiveEvent) => {
     for (const listener of hub.listeners) {
       listener(event);
     }
   };
 
-  runtime.runFork(
-    Effect.gen(function* () {
-      const proxy = yield* Proxy;
+  const publish = (source: Source, event: LiveEvent) => {
+    if (event.type === "snapshot") {
+      hub.live = owned(source, hub.live ?? empty, event.live);
+      hub.arrived(true);
+      broadcast({ live: hub.live, type: "snapshot" });
+    } else if (event.type === "patch") {
+      const change = ownChange(source, event.change);
 
-      yield* proxy.events.pipe(
-        Stream.runForEach((data) =>
-          Effect.sync(() => {
-            const event = decodeLiveEvent(data);
+      hub.live = applyChange(hub.live ?? empty, change);
+      broadcast({ change, type: "patch" });
+    } else {
+      broadcast(event);
+    }
+  };
 
-            if (event !== null) {
-              publish(event);
-            }
-          })
-        ),
-        Effect.ignore,
-        Effect.andThen(Effect.sleep("2 seconds")),
-        Effect.forever
-      );
-    })
-  );
+  const follow = (source: Source) =>
+    runtime.runFork(
+      Effect.gen(function* () {
+        const proxy = yield* Proxy;
+
+        yield* proxy.events(source).pipe(
+          Stream.runForEach((data) =>
+            Effect.sync(() => {
+              const event = decodeLiveEvent(data);
+
+              if (event !== null) {
+                publish(source, event);
+              }
+            })
+          ),
+          Effect.ignore,
+          Effect.andThen(Effect.sleep("2 seconds")),
+          Effect.forever
+        );
+      })
+    );
+
+  follow("proxy");
+  follow("usage");
 
   return hub;
 };

@@ -18,7 +18,15 @@ import {
 import { Sse } from "effect/encoding";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
-const base = process.env.BROADCOM_PROXY ?? "http://127.0.0.1:8317";
+const proxyBase = process.env.BROADCOM_PROXY ?? "http://127.0.0.1:8317";
+const usageBase = process.env.BROADCOM_USAGE ?? "http://127.0.0.1:8320";
+
+export type Source = "proxy" | "usage";
+
+const usagePaths = ["/deck/usage", "/deck/sessions", "/deck/credits"];
+
+const sourceOf = (at: string): Source =>
+  usagePaths.some((prefix) => at.startsWith(prefix)) ? "usage" : "proxy";
 
 const keyFile =
   process.env.BROADCOM_KEY_FILE ??
@@ -44,11 +52,9 @@ export class Proxy extends Context.Service<
       body: Schema.Json,
       schema: S
     ) => Effect.Effect<S["Type"], ProxyError>;
-    readonly events: Stream.Stream<string, ProxyError>;
+    readonly events: (source: Source) => Stream.Stream<string, ProxyError>;
   }
 >()("Proxy") {}
-
-const management = `${base}/v8/management`;
 
 const decodeRefusal = Schema.decodeUnknownOption(
   Schema.Struct({ error: Schema.String })
@@ -70,17 +76,27 @@ export const ProxyLive = Layer.effect(
       readFileSync(/*turbopackIgnore: true*/ keyFile, "utf-8").trim()
     );
 
-    const client = (yield* HttpClient.HttpClient).pipe(
-      HttpClient.mapRequest(HttpClientRequest.prependUrl(management)),
-      HttpClient.mapRequest(HttpClientRequest.bearerToken(key))
-    );
+    const http = yield* HttpClient.HttpClient;
+
+    const clientFor = (base: string) =>
+      http.pipe(
+        HttpClient.mapRequest(
+          HttpClientRequest.prependUrl(`${base}/v8/management`)
+        ),
+        HttpClient.mapRequest(HttpClientRequest.bearerToken(key))
+      );
+
+    const clients = {
+      proxy: clientFor(proxyBase),
+      usage: clientFor(usageBase),
+    } satisfies Record<Source, HttpClient.HttpClient>;
 
     const decode = <S extends Decodable>(
       at: string,
       schema: S,
       request: HttpClientRequest.HttpClientRequest
     ) =>
-      client.execute(request).pipe(
+      clients[sourceOf(at)].execute(request).pipe(
         Effect.mapError(
           (cause) => new ProxyError({ path: at, reason: cause.message })
         ),
@@ -103,28 +119,29 @@ export const ProxyLive = Layer.effect(
       );
 
     return {
-      events: HttpClient.filterStatusOk(client)
-        .execute(HttpClientRequest.get("/deck/events"))
-        .pipe(
-          Effect.map((response) => response.stream),
-          Stream.unwrap,
-          Stream.decodeText,
-          Stream.pipeThroughChannel(Sse.decode()),
-          Stream.filterMap((event) =>
-            Predicate.isTagged(event, "Event")
-              ? Result.succeed(event.data)
-              : Result.failVoid
+      events: (source) =>
+        HttpClient.filterStatusOk(clients[source])
+          .execute(HttpClientRequest.get("/deck/events"))
+          .pipe(
+            Effect.map((response) => response.stream),
+            Stream.unwrap,
+            Stream.decodeText,
+            Stream.pipeThroughChannel(Sse.decode()),
+            Stream.filterMap((event) =>
+              Predicate.isTagged(event, "Event")
+                ? Result.succeed(event.data)
+                : Result.failVoid
+            ),
+            Stream.mapError(
+              (cause) =>
+                new ProxyError({
+                  path: "/deck/events",
+                  reason: Predicate.isTagged(cause, "Retry")
+                    ? "retry"
+                    : cause.message,
+                })
+            )
           ),
-          Stream.mapError(
-            (cause) =>
-              new ProxyError({
-                path: "/deck/events",
-                reason: Predicate.isTagged(cause, "Retry")
-                  ? "retry"
-                  : cause.message,
-              })
-          )
-        ),
       get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
       send: (method, at, body, schema) =>
         decode(
