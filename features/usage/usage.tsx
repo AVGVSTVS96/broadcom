@@ -23,7 +23,7 @@ import {
   unitNotes,
 } from "@/features/usage/words";
 import { useLive } from "@/lib/live/client";
-import { day, when } from "@/lib/model/time";
+import { clock, date } from "@/lib/model/format";
 import { format, sumCells } from "@/lib/model/usage";
 import type { SessionState } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,9 @@ const stateOf = (states: ReadonlyMap<string, SessionState>, key: string) =>
   states.get(key) ??
   states.get(`session:${key.slice(key.lastIndexOf(":") + 1)}`) ??
   null;
+
+const when = (at: number, now: number) =>
+  now - at < 6 * 86_400_000 ? clock(at) : date(at);
 
 const percent = (part: number, whole: number) =>
   whole > 0 ? `${Math.round((part / whole) * 100)}%` : "–";
@@ -688,7 +691,7 @@ const Ranking = ({ usage }: { usage: Usage }) => {
             {bucketWords[usage.size]}; dashed: its average; line: now.
             {(unit === "week" || unit === "fiveHour") &&
             usage.limitsSince !== null
-              ? ` Limit readings since ${day(usage.limitsSince)}.`
+              ? ` Limit readings since ${date(usage.limitsSince)}.`
               : ""}
           </span>
           {usage.rowCount > usage.rows.length ? (
