@@ -24,18 +24,11 @@ import {
   setDisabled,
 } from "@/features/accounts/actions";
 import type { Outcome } from "@/features/accounts/actions";
-import {
-  ago,
-  money,
-  plural,
-  resetExpiry,
-  span,
-  utcDate,
-  when,
-} from "@/features/accounts/format";
+import { plural, resetExpiry, when } from "@/features/accounts/format";
 import { SignIn } from "@/features/accounts/sign-in";
 import { resets, week } from "@/lib/model/accounts";
 import type { Login, Row, State } from "@/lib/model/accounts";
+import { ago, dollars, duration, utcDate } from "@/lib/model/format";
 import type { LimitWindow } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
@@ -87,7 +80,7 @@ const Window = ({
       <p className="text-sm text-muted-foreground">
         {window.resetsAt === null
           ? "Not reported"
-          : `Resets in ${span(window.resetsAt - now)}`}
+          : `Resets in ${duration(window.resetsAt - now)}`}
       </p>
     </Stat>
   );
@@ -309,8 +302,8 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
         <Stat
           label="Balance"
           hint="estimate"
-          value={money(Math.max(0, credit.remaining))}
-          unit={`of ${money(credit.allowance)}`}
+          value={dollars(Math.max(0, credit.remaining))}
+          unit={`of ${dollars(credit.allowance)}`}
           className="col-span-2 sm:col-span-1"
         >
           <Meter
@@ -326,7 +319,7 @@ export const AccountCard = ({ row, now }: { row: Row; now: number }) => {
             Exact balance in Console ↗
           </a>
         </Stat>
-        <Stat label="Spent" hint="via proxy" value={money(credit.spent)}>
+        <Stat label="Spent" hint="via proxy" value={dollars(credit.spent)}>
           <p className="text-sm text-muted-foreground">
             {plural(credit.requests, "request")}
           </p>

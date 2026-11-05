@@ -1,42 +1,10 @@
 import type { ReactNode } from "react";
 
-import { hatchStyle } from "@/components/viz/hatch";
-import { money, plural, resetExpiry, when } from "@/features/accounts/format";
+import { Segments } from "@/components/viz/segments";
+import { plural, resetExpiry, when } from "@/features/accounts/format";
 import { creditTotals, hasRoom, resets, week } from "@/lib/model/accounts";
 import type { Row } from "@/lib/model/accounts";
-import { cn } from "@/lib/utils";
-
-const Segments = ({
-  parts,
-}: {
-  parts: readonly {
-    key: string;
-    fill: number;
-    tone: "ok" | "bad" | "locked";
-  }[];
-}) => (
-  <div className="flex h-2 gap-[2px]">
-    {parts.map((part) => (
-      <div
-        key={part.key}
-        className="h-full flex-1 overflow-hidden rounded-full bg-track"
-      >
-        <div
-          className={cn(
-            "h-full rounded-full",
-            part.tone === "ok" && "bg-ok",
-            part.tone === "bad" && "bg-bad"
-          )}
-          style={
-            part.tone === "locked"
-              ? { ...hatchStyle, width: "100%" }
-              : { width: `${Math.min(100, Math.max(0, part.fill))}%` }
-          }
-        />
-      </div>
-    ))}
-  </div>
-);
+import { dollars } from "@/lib/model/format";
 
 const Cell = ({
   name,
@@ -112,9 +80,10 @@ export const Ledger = ({
       >
         <Segments
           parts={plans.map((row) => ({
-            fill: row.account?.week.used ?? 0,
-            key: row.key,
-            tone: row.state.is === "limited" ? "locked" : "ok",
+            id: row.key,
+            label: row.name,
+            locked: row.state.is === "limited",
+            value: row.account?.week.used ?? 0,
           }))}
         />
         <p className="text-sm text-muted-foreground">
@@ -127,8 +96,8 @@ export const Ledger = ({
         name="API credit"
         count={plural(credit.count, "key")}
         label="Left"
-        value={money(credit.remaining)}
-        unit={`of ${money(credit.allowance)}`}
+        value={dollars(credit.remaining)}
+        unit={`of ${dollars(credit.allowance)}`}
       >
         <Segments
           parts={rows.flatMap((row) =>
@@ -136,12 +105,13 @@ export const Ledger = ({
               ? []
               : [
                   {
-                    fill:
+                    id: row.key,
+                    label: `${row.name} left`,
+                    tone: row.state.is === "empty" ? "bad" : "ok",
+                    value:
                       (Math.max(0, row.credit.remaining) /
                         row.credit.allowance) *
                       100,
-                    key: row.key,
-                    tone: row.state.is === "empty" ? "bad" : "ok",
                   },
                 ]
           )}
@@ -182,9 +152,10 @@ export const Ledger = ({
         ) : (
           <Segments
             parts={chatgpt.map((row) => ({
-              fill: 100,
-              key: row.key,
+              id: row.key,
+              label: row.name,
               tone: hasRoom(row) ? "ok" : "bad",
+              value: 100,
             }))}
           />
         )}
