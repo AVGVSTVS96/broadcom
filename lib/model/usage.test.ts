@@ -96,6 +96,7 @@ test("format keeps one unit per measure", () => {
   expect(format("tokens", 16_325_765_496)).toBe("16.3B");
   expect(format("week", 20.004)).toBe("20%");
   expect(format("fiveHour", 2.66)).toBe("2.7%");
+  expect(format("week", 315)).toBe("3.2 limits");
   expect(format("week", null)).toBe("–");
   expect(formatShort("api", 128.24)).toBe("$128");
   expect(formatShort("api", 4120)).toBe("$4.1K");
