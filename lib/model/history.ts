@@ -52,20 +52,22 @@ export const usedBetween = (points: Points, from: number, to: number) => {
   return sum;
 };
 
-export const lastDrop = (points: Points) => {
-  let at: number | null = null;
+export const drops = (points: Points) => {
+  const found: number[] = [];
   let before = points[0]?.[1] ?? 0;
 
   for (const [time, used] of points) {
     if (used < before - resetDrop) {
-      at = time;
+      found.push(time);
     }
 
     before = used;
   }
 
-  return at;
+  return found;
 };
+
+export const lastDrop = (points: Points) => drops(points).at(-1) ?? null;
 
 export const since = (points: Points, from: number) => {
   const first = points.findIndex(([at]) => at >= from);

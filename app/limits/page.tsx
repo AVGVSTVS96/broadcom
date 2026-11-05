@@ -16,7 +16,7 @@ const LimitsPage = async ({ searchParams }: PageProps<"/limits">) => {
 
   const [history, daily] = await Promise.all([
     readWeekHistory(),
-    view === "weeks" ? readDailyLimits() : null,
+    view === "weeks" || view === "spiral" ? readDailyLimits() : null,
   ]);
 
   const problems = [
