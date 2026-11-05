@@ -5,7 +5,6 @@ import {
   cellsOf,
   format,
   formatShort,
-  shortAccount,
   sumCells,
 } from "@/lib/model/usage";
 
@@ -98,8 +97,6 @@ test("format keeps one unit per measure", () => {
 });
 
 test("accounts are named by login, API keys by the login they bill", () => {
-  expect(shortAccount("ada@acme.com")).toBe("acme");
-  expect(shortAccount("ada101@gmail.com")).toBe("ada101");
   expect(
     accountNames(
       [
