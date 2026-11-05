@@ -115,7 +115,8 @@ const tilde = (text: string) => text.replaceAll(home, "~");
 const describeMod = async (dir: string) => {
   const manifests = await Promise.all(
     [".claude-plugin/plugin.json", "package.json"].map(
-      async (name) => await readJson(path.join(dir, name), Manifest)
+      async (name) =>
+        await readJson(path.join(/*turbopackIgnore: true*/ dir, name), Manifest)
     )
   );
 
