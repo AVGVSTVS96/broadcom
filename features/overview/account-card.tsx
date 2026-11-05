@@ -4,11 +4,11 @@ import { Meter } from "@/components/viz/meter";
 import type { Tone } from "@/components/viz/meter";
 import { ago, clock, dollars, duration, utcDate } from "@/lib/model/format";
 import { creditLeft, creditTotal, emptyCredit } from "@/lib/model/pool";
+import type { Plan } from "@/lib/model/pool";
 import type { Account, Grant, LimitWindow, Standing } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
-import { sessionTone, weekTone } from "./plans";
-import type { Plan } from "./plans";
+import { sessionTone, weekTone } from "./tones";
 
 const Figure = ({
   label,
