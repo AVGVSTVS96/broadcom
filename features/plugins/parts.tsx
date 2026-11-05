@@ -12,7 +12,7 @@ export const SourceLink = ({ source }: { source: Source | null }) =>
   source === null ? null : (
     <Link
       href={filesHref.code(source.ws, source.file)}
-      className="hit shrink-0 text-xs text-muted-foreground hover:text-foreground"
+      className="-my-2 shrink-0 py-2 text-xs text-muted-foreground hover:text-foreground"
     >
       Source
     </Link>
