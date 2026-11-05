@@ -11,7 +11,6 @@ import {
 } from "@/features/executor/parts";
 import { executorUrl, readOverview, readSource } from "@/lib/executor/api";
 import {
-  healthOf,
   needs,
   releasesBehind,
   sameSource,
@@ -64,7 +63,34 @@ const OpenExecutor = () => (
   </a>
 );
 
-const AppCard = ({
+const Meta = ({
+  app,
+  framework,
+}: {
+  app: ExecutorApp;
+  framework: string | null;
+}) => {
+  const behind = releasesBehind(app, framework);
+  const deployed = onDay(app.deployedAt);
+
+  return (
+    <div className="text-xs text-muted-foreground sm:text-right">
+      <div>
+        {deployed === null ? "Never deployed" : `Deployed ${deployed}`}
+        {app.versions > 1 && ` · ${plural(app.versions, "version")}`}
+      </div>
+      {app.pinned !== null && (
+        <div className={cn(behind > 0 && "text-over")}>
+          apps@{shortRelease(app.pinned)}
+          {behind > 0 && `, ${plural(behind, "release")} behind`}
+        </div>
+      )}
+      {!app.local && <div>Source only in Executor</div>}
+    </div>
+  );
+};
+
+const AppRow = ({
   app,
   framework,
   current,
@@ -72,125 +98,62 @@ const AppCard = ({
   app: ExecutorApp;
   framework: string | null;
   current: boolean;
-}) => {
-  const behind = releasesBehind(app, framework);
-  const deployed = onDay(app.deployedAt);
-
-  return (
-    <li>
-      <Link
-        href={`/executor/${app.slug}`}
-        aria-current={current ? "page" : undefined}
-        className="flex h-full flex-col gap-3 rounded-2xl bg-muted/60 p-4 ring-foreground/20 hover:bg-muted aria-[current=page]:ring-2"
-      >
-        <span className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium">
-            {app.name}
-          </span>
-          <Dot health={app.running ? "healthy" : "unchecked"} />
-          <span className="text-xs text-muted-foreground">
-            {app.running ? "Running" : "Not deployed"}
-          </span>
-        </span>
-        <ul className="space-y-1 text-sm">
-          {needs(app).map((need) => (
-            <li
-              key={`${need.requirement}:${need.label}`}
-              className="flex items-center gap-2"
-            >
-              <Dot health={need.health} />
-              <span className="min-w-0 flex-1 truncate">
-                {need.label ?? need.requirement}
-              </span>
-              {need.health !== "healthy" && (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {healthWords.get(need.health)}
-                </span>
-              )}
-            </li>
-          ))}
-          {app.requirements.length === 0 && (
-            <li className="text-muted-foreground">Signs in to nothing</li>
-          )}
-        </ul>
-        <span className="mt-auto flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            {deployed === null ? "Never deployed" : `Deployed ${deployed}`}
-            {app.versions > 1 && ` · ${plural(app.versions, "version")}`}
-          </span>
-          {app.pinned !== null && (
-            <span className={cn(behind > 0 && "text-over")}>
-              apps@{shortRelease(app.pinned)}
-              {behind > 0 && `, ${plural(behind, "release")} behind`}
-            </span>
-          )}
-          {!app.local && <span>Source only in Executor</span>}
-        </span>
-      </Link>
-    </li>
-  );
-};
-
-const Accounts = ({ app }: { app: ExecutorApp }) => (
-  <Section
-    title={`${app.name}'s accounts`}
-    detail="Each one is a sign-in the app acts through."
+}) => (
+  <li
+    aria-current={current ? "true" : undefined}
+    className="grid gap-x-6 gap-y-2 py-4 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-start"
   >
-    <ul className="divide-y rounded-2xl border">
-      {app.requirements.map((requirement) => {
-        const linked = app.accounts.filter(
-          (account) => account.requirement === requirement
-        );
-
-        return (
-          <li
-            key={requirement}
-            className="flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3 text-sm"
-          >
-            <span className="shrink-0 pt-0.5 font-mono text-[13px] text-muted-foreground max-sm:flex-1 sm:w-24">
-              {requirement}
+    <div className="flex min-w-0 items-center gap-2">
+      <Dot health={app.running ? "healthy" : "unchecked"} />
+      {app.local ? (
+        <Link
+          href={`/executor/${app.slug}`}
+          className={cn(
+            "truncate underline-offset-4 hover:underline",
+            current && "underline decoration-foreground/30"
+          )}
+        >
+          {app.name}
+        </Link>
+      ) : (
+        <span className="truncate">{app.name}</span>
+      )}
+      {!app.running && (
+        <span className="text-xs text-muted-foreground">Not deployed</span>
+      )}
+    </div>
+    <ul className="min-w-0 space-y-1.5 text-sm">
+      {needs(app).map((need) => (
+        <li
+          key={`${need.requirement}:${need.label}`}
+          className="flex min-w-0 items-center gap-2"
+        >
+          <Dot health={need.health} />
+          <span className="min-w-0 truncate">
+            {need.label ?? need.requirement}
+          </span>
+          {need.health !== "healthy" && (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {healthWords.get(need.health)}
             </span>
-            <ul className="min-w-0 flex-1 space-y-1 max-sm:order-last max-sm:basis-full">
-              {linked.map((account) => {
-                const health = healthOf(account.health);
-                const checked = onDay(account.checkedAt);
-
-                return (
-                  <li
-                    key={account.label}
-                    className="flex flex-wrap items-center gap-x-2"
-                  >
-                    <Dot health={health} />
-                    <span className="min-w-0 break-all">{account.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {healthWords.get(health)}
-                      {checked !== null && `, checked ${checked}`}
-                    </span>
-                  </li>
-                );
-              })}
-              {linked.length === 0 && (
-                <li className="flex items-center gap-2 text-muted-foreground">
-                  <Dot health="missing" />
-                  No account linked yet
-                </li>
-              )}
-            </ul>
-            <ConnectButton
-              slug={app.slug}
-              requirement={requirement}
-              another={linked.length > 0}
-            />
-          </li>
-        );
-      })}
-      {app.requirements.length === 0 && (
-        <li className="px-4 py-3 text-sm text-muted-foreground">
-          {app.name} signs in to nothing.
+          )}
+          {(need.health === "missing" || need.health === "failing") && (
+            <span className="ml-auto sm:ml-2">
+              <ConnectButton
+                slug={app.slug}
+                requirement={need.requirement}
+                another={false}
+              />
+            </span>
+          )}
         </li>
+      ))}
+      {app.requirements.length === 0 && (
+        <li className="text-muted-foreground">Signs in to nothing</li>
       )}
     </ul>
-  </Section>
+    <Meta app={app} framework={framework} />
+  </li>
 );
 
 const Failed = ({ reason }: { reason: string }) => (
@@ -204,18 +167,6 @@ const Failed = ({ reason }: { reason: string }) => (
 );
 
 const Source = async ({ app }: { app: ExecutorApp }) => {
-  if (!app.local) {
-    return (
-      <Section
-        title={`${app.name}'s source lives only in Executor`}
-        detail={`There's no copy in executor-apps/${app.slug}, so edit it in Executor.`}
-        actions={<OpenExecutor />}
-      >
-        {null}
-      </Section>
-    );
-  }
-
   const read = await readSource(app.slug);
 
   if (!read.ok) {
@@ -230,8 +181,8 @@ const Source = async ({ app }: { app: ExecutorApp }) => {
     <Section
       title={
         differ === 0
-          ? `All ${files.length} files match what runs`
-          : `${differ} of ${files.length} files differ from what runs`
+          ? `${app.name}: all ${files.length} files match what runs`
+          : `${app.name}: ${differ} of ${files.length} files differ from what runs`
       }
       detail={`Your copy in executor-apps/${app.slug}, against the version Executor runs.`}
       actions={
@@ -256,7 +207,8 @@ const ExecutorPage = async ({ params }: PageProps<"/executor/[[...slug]]">) => {
   }
 
   const { apps, framework } = overview.value;
-  const app = apps.find((each) => each.slug === slug.at(0)) ?? apps.at(0);
+  const local = apps.filter((each) => each.local);
+  const app = local.find((each) => each.slug === slug.at(0)) ?? local.at(0);
 
   const unhealthy = apps
     .flatMap(needs)
@@ -286,9 +238,9 @@ const ExecutorPage = async ({ params }: PageProps<"/executor/[[...slug]]">) => {
         }
         actions={<OpenExecutor />}
       >
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="divide-y border-t">
           {apps.map((each) => (
-            <AppCard
+            <AppRow
               key={each.id}
               app={each}
               framework={framework}
@@ -297,12 +249,7 @@ const ExecutorPage = async ({ params }: PageProps<"/executor/[[...slug]]">) => {
           ))}
         </ul>
       </Section>
-      {app !== undefined && (
-        <>
-          <Accounts app={app} />
-          <Source app={app} />
-        </>
-      )}
+      {app !== undefined && <Source app={app} />}
     </div>
   );
 };
