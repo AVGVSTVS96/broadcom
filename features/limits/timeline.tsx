@@ -76,8 +76,7 @@ const Row = ({
 
   const spent = (account.resetsSpent ?? []).filter((at) => x(at) > 0);
 
-  const bar =
-    "absolute top-1/2 h-9 -translate-y-1/2 overflow-hidden rounded-lg";
+  const bar = "overflow-hidden rounded-lg";
 
   return (
     <div className="grid gap-2 border-t py-3 sm:grid-cols-[13rem_minmax(0,1fr)] sm:items-center sm:gap-4">
@@ -91,14 +90,14 @@ const Row = ({
           <Chip label="Weekly" value={account.week.used} />
         </div>
       </div>
-      <div className="relative h-12">
+      <div className="relative h-10">
         {ended === null ? null : (
           <Band
             x0={x(ended.from)}
             x1={x(ended.to) - 0.3}
             className={cn(
               bar,
-              "bg-muted px-2 text-xs leading-9 text-muted-foreground"
+              "bg-muted px-2 text-xs leading-10 text-muted-foreground"
             )}
           >
             <span className="block truncate">
@@ -154,7 +153,7 @@ const Row = ({
           x1={x(next.to)}
           className={cn(
             bar,
-            "border border-dashed px-2 text-xs leading-9 text-muted-foreground"
+            "border border-dashed px-2 text-xs leading-10 text-muted-foreground"
           )}
         >
           <span className="block truncate max-sm:hidden">
