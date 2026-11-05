@@ -284,7 +284,11 @@ describe("weeks", () => {
   };
 
   test("weeks split Monday to Sunday, the first one partial", () => {
-    const result = weeksOf(daily, since, now, { left: 5, locks: [] });
+    const result = weeksOf(daily, since, now, {
+      left: 5,
+      locks: [],
+      perDay: 20 / 7,
+    });
 
     expect(result.weeks).toHaveLength(4);
     expect(result.weeks[0]?.part).toBe(true);
@@ -300,6 +304,7 @@ describe("weeks", () => {
       locks: [
         [new Date(2026, 10, 3, 10).getTime(), new Date(2026, 10, 9).getTime()],
       ],
+      perDay: 0,
     });
 
     const week = result.weeks.at(-1);

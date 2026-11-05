@@ -8,6 +8,7 @@ export interface Daily {
 }
 
 export interface Outlook {
+  readonly perDay: number;
   readonly left: number;
   readonly locks: readonly (readonly [from: number, to: number])[];
 }
@@ -67,11 +68,6 @@ export const weeksOf = (
     daily.days.map(([at, value]) => [startOfDay(at), value])
   );
 
-  const rate =
-    daily.days
-      .filter(([at]) => at <= now && at > addDays(today, -daysInWeek))
-      .reduce((sum, [, value]) => sum + value, 0) / daysInWeek;
-
   let room = outlook.left;
 
   const weeks = weekStarts(since, now).map((from): Week => {
@@ -80,7 +76,7 @@ export const weeksOf = (
       const next = addDays(day, 1);
       const locked = overlaps(outlook.locks, day, next);
       const ahead = day > today;
-      const forecast = ahead && !locked ? Math.min(rate, room) : 0;
+      const forecast = ahead && !locked ? Math.min(outlook.perDay, room) : 0;
 
       room -= forecast;
 
