@@ -140,12 +140,12 @@ const Credit = ({ plan }: { plan: Plan }) => {
 const facts = (plan: Plan, now: number) => {
   const { heldResets, resetsSpent = [], working } = plan.account;
   const held = heldResets.reduce((sum, reset) => sum + reset.left, 0);
-  const spent = Math.max(0, ...resetsSpent);
+  const spent = resetsSpent.filter((at) => now - at < WEEK).length;
 
   return [
     working > 0 ? `${working} active` : null,
     held > 0 ? `${held} ${held === 1 ? "reset" : "resets"} held` : null,
-    now - spent < WEEK ? `reset used ${when(spent, now)}` : null,
+    spent > 0 ? `${spent} ${spent === 1 ? "reset" : "resets"} used` : null,
   ].filter((fact) => fact !== null);
 };
 
