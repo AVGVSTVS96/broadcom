@@ -239,33 +239,45 @@ export const accountRows = ({
 export const hasRoom = (row: Row) =>
   row.state.is === "next" || row.state.is === "open";
 
-export interface Resets {
-  readonly held: number;
-  readonly firstExpiry: number | null;
-  readonly plans: readonly string[];
-  readonly spent: readonly { readonly name: string; readonly at: number }[];
+export interface Entry {
+  readonly row: Row;
+  readonly keys: readonly Row[];
 }
 
-export const resets = (rows: readonly Row[], since: number): Resets => {
-  const held = rows.flatMap((row) => row.account?.heldResets ?? []);
+export const ledgerOf = (rows: readonly Row[]): Entry[] => {
+  const keys = rows.filter((row) => row.credit !== null);
 
-  const expiries = held.flatMap((reset) =>
-    reset.expiresAt === null ? [] : [reset.expiresAt]
+  const entries = rows.flatMap((row) =>
+    row.kind === "api"
+      ? []
+      : [
+          {
+            keys: keys.filter(
+              (key) =>
+                row.account !== null && key.credit?.account === row.account.id
+            ),
+            row,
+          },
+        ]
   );
 
-  return {
-    firstExpiry: expiries.length === 0 ? null : Math.min(...expiries),
-    held: held.reduce((sum, reset) => sum + reset.left, 0),
-    plans: rows.flatMap((row) =>
-      row.account?.resetPlan === undefined || row.account.resetPlan === ""
-        ? []
-        : [row.account.resetPlan]
-    ),
-    spent: rows
-      .flatMap((row) =>
-        (row.account?.resetsSpent ?? []).map((at) => ({ at, name: row.name }))
-      )
-      .filter((entry) => entry.at >= since)
-      .toSorted((left, right) => right.at - left.at),
-  };
+  const placed = new Set(
+    entries.flatMap((entry) => entry.keys.map((key) => key.key))
+  );
+
+  const loose = rows.flatMap((row) =>
+    row.kind === "api" && !placed.has(row.key) ? [{ keys: [], row }] : []
+  );
+
+  const last = (entry: Entry) =>
+    Number(entry.row.kind === "chatgpt" || entry.row.kind === "other");
+
+  return [...entries, ...loose].toSorted(
+    (left, right) => last(left) - last(right)
+  );
 };
+
+export const needsYou = (row: Row) =>
+  row.state.is === "disabled" ||
+  row.state.is === "error" ||
+  row.state.is === "sign-in";

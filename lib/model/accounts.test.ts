@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { accountRows, creditOf, loginOf, resets } from "@/lib/model/accounts";
+import { accountRows, creditOf, ledgerOf, loginOf } from "@/lib/model/accounts";
 import type { Account, Credential, Grant } from "@/lib/proxy/schema";
 
 const window = (used: number | null, resetsAt: number | null = null) => ({
@@ -184,7 +184,7 @@ describe("accountRows", () => {
   });
 });
 
-describe("totals", () => {
+describe("credit", () => {
   test("a key under a tenth of its credit runs low", () => {
     const rows = accountRows({
       accounts: {},
@@ -195,29 +195,32 @@ describe("totals", () => {
 
     expect(rows[0]?.state.is).toBe("low");
   });
+});
 
-  test("resets count what's held and list recent spends", () => {
+describe("ledgerOf", () => {
+  test("a login's API key sits under it, a key with no login stands alone, ChatGPT comes last", () => {
     const rows = accountRows({
-      accounts: {
-        a1: account("a1", "a@example.com", {
-          heldResets: [
-            { expiresAt: 900, kind: "week", left: 2 },
-            { expiresAt: 400, kind: "week", left: 1 },
-          ],
-          resetPlan: "Spends one Sat 6 PM",
-          resetsSpent: [50, 500],
-        }),
-      },
-      credits: [],
-      logins: [],
-      order: [],
+      accounts: { a1: account("a1", "a@example.com") },
+      credits: [
+        creditOf(grant("claude:apikey:k", "a1", 50)),
+        creditOf(grant("claude:apikey:zzzzzz", "gone", 50)),
+      ],
+      logins: [
+        loginOf(credential("gpt@example.com", { provider: "codex" })),
+        loginOf(credential("a@example.com")),
+      ],
+      order: ["a1"],
     });
 
-    expect(resets(rows, 100)).toEqual({
-      firstExpiry: 400,
-      held: 3,
-      plans: ["Spends one Sat 6 PM"],
-      spent: [{ at: 500, name: "a" }],
-    });
+    expect(
+      ledgerOf(rows).map((entry) => [
+        entry.row.name,
+        entry.keys.map((key) => key.name),
+      ])
+    ).toEqual([
+      ["a", ["a API"]],
+      ["API key zzzzzz", []],
+      ["gpt", []],
+    ]);
   });
 });
