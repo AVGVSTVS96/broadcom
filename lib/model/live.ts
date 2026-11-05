@@ -50,8 +50,7 @@ const hours = 24;
 const empty = () => Array.from({ length: hours }, () => 0);
 
 const group = (groups: Map<string, Handoff>, move: Move) => {
-  const minute = Math.floor(move.at / 60_000);
-  const key = `${minute} ${move.from} ${move.to} ${move.cause}`;
+  const key = `${move.from} ${move.to} ${move.cause}`;
   const found = groups.get(key);
   const labels = found?.labels ?? [];
 
