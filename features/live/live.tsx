@@ -2,6 +2,7 @@
 
 import { ArrowUpRightIcon } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { Legend } from "@/components/viz/legend";
@@ -439,6 +440,12 @@ const Moves = ({
 }) => {
   const accounts = useLive((live) => live.accounts);
   const pool = useLive((live) => live.pool);
+
+  const [picked, setPicked] = useState<{
+    account: string;
+    index: number;
+  } | null>(null);
+
   const order = pool?.order ?? [];
 
   const lanes = moves.lanes.toSorted(
@@ -484,6 +491,16 @@ const Moves = ({
     ? `Between ${between(bounce.between, name, keys)}. ${counts}`
     : counts;
 
+  const describe = (lane: Handoffs["lanes"][number], index: number) =>
+    `${hourClock.format(moves.from + index * 3_600_000)}: ${lane.started[index] ?? 0} started, ${lane.arrived[index] ?? 0} moved in, ${lane.left[index] ?? 0} moved off a limit`;
+
+  const pickedLane = lanes.find((lane) => lane.account === picked?.account);
+
+  const readout =
+    picked === null || pickedLane === undefined
+      ? "Tap an hour for its counts"
+      : `${name(picked.account)}, ${describe(pickedLane, picked.index)}`;
+
   const marks = [0, 6, 12, 18].map((offset) => moves.from + offset * 3_600_000);
 
   return (
@@ -519,19 +536,34 @@ const Moves = ({
                       const left = lane.left[index] ?? 0;
                       const at = moves.from + index * 3_600_000;
 
+                      const read = describe(lane, index);
+
+                      const on =
+                        picked?.account === lane.account &&
+                        picked.index === index;
+
                       return (
-                        <span
+                        <button
                           key={at}
-                          title={`${hourClock.format(at)}: ${count} started, ${arrived} moved in, ${left} moved off a limit`}
+                          type="button"
+                          title={read}
+                          aria-label={`${name(lane.account)}, ${read}`}
+                          aria-pressed={on}
+                          onClick={() => {
+                            setPicked(
+                              on ? null : { account: lane.account, index }
+                            );
+                          }}
                           className={cn(
-                            "relative flex h-7 items-center justify-center rounded-[3px]",
-                            shades[shadeOf(count + arrived, peak)]
+                            "relative flex h-7 items-center justify-center rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            shades[shadeOf(count + arrived, peak)],
+                            on && "ring-2 ring-foreground"
                           )}
                         >
                           {left > 0 ? (
                             <span className="size-2 rounded-full bg-bad ring-2 ring-card" />
                           ) : null}
-                        </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -539,6 +571,9 @@ const Moves = ({
               );
             })}
           </div>
+          <p className="min-h-5 text-sm text-muted-foreground tabular-nums">
+            {readout}
+          </p>
           <Legend
             items={[
               { key: "box", label: "Sessions per hour" },
