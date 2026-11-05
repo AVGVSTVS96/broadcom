@@ -11,6 +11,7 @@ const pages = [
   { href: "/usage", name: "Usage" },
   { href: "/live", name: "Live" },
   { href: "/accounts", name: "Accounts" },
+  { href: "/settings", name: "Settings" },
 ] as const;
 
 export const Nav = () => {
