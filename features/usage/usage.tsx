@@ -536,12 +536,14 @@ const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => (
 const Line = ({
   usage,
   row,
+  rank,
   top,
   state,
   picked,
 }: {
   usage: Usage;
   row: Row;
+  rank: number | null;
   top: number;
   state: SessionState | null;
   picked: boolean;
@@ -570,55 +572,54 @@ const Line = ({
         event.preventDefault();
         go({ sel: picked ? null : row.key });
       }}
-      className="-mx-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-xl px-3 py-2.5 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current]:bg-muted lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_5.5rem_3rem]"
+      className="-mx-2 grid grid-cols-[1.25rem_minmax(0,1fr)_auto_2.5rem] items-center gap-x-3 gap-y-1 rounded-lg px-2 py-1.5 text-sm transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current]:bg-muted lg:grid-cols-[1.25rem_minmax(0,16rem)_minmax(0,1fr)_minmax(6rem,14rem)_5.5rem_2.5rem]"
     >
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-1.5">
-          {fill === null ? null : (
-            <span
-              aria-hidden
-              className={cn("size-2 shrink-0 rounded-[2px]", fill)}
-            />
-          )}
-          <span className="truncate">{row.label}</span>
-          {state === null ? null : (
-            <span
-              title={state}
-              aria-label={state}
-              className={cn("size-2 shrink-0 rounded-full", dots[state])}
-            />
-          )}
-          <Sdk share={row.agentSdk} />
-        </div>
-        <div className="truncate text-xs text-muted-foreground">
-          {[
-            row.detail,
-            row.sessions > 1
-              ? `${row.sessions.toLocaleString("en")} sessions`
-              : null,
-            when(row.lastActiveAt, usage.now),
-          ]
-            .filter((part) => part !== null && part !== "")
-            .join(" · ")}
-        </div>
-      </div>
-      <div
+      <span className="text-right text-xs text-muted-foreground tabular-nums">
+        {rank}
+      </span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        {fill === null ? null : (
+          <span
+            aria-hidden
+            className={cn("size-2 shrink-0 rounded-[2px]", fill)}
+          />
+        )}
+        <span className="truncate">{row.label}</span>
+        {state === null ? null : (
+          <span
+            title={state}
+            aria-label={state}
+            className={cn("size-1.5 shrink-0 rounded-full", dots[state])}
+          />
+        )}
+        <Sdk share={row.agentSdk} />
+      </span>
+      <span className="hidden truncate text-xs text-muted-foreground lg:block">
+        {[
+          row.detail,
+          row.sessions > 1
+            ? `${row.sessions.toLocaleString("en")} sessions`
+            : null,
+          when(row.lastActiveAt, usage.now),
+        ]
+          .filter((part) => part !== null && part !== "")
+          .join(" · ")}
+      </span>
+      <span
         className={cn(
-          "col-span-2 row-start-2 h-1.5 rounded-full lg:col-span-1 lg:col-start-2 lg:row-start-1",
+          "col-start-2 row-start-2 h-0.5 rounded-full lg:col-start-4 lg:row-start-1 lg:h-1",
           value === null ? "border-t border-dotted border-faint" : "bg-track"
         )}
       >
         {value === null || top <= 0 ? null : (
-          <div
-            className={cn("h-full rounded-full", fill ?? "bg-chart-3")}
+          <span
+            className={cn("block h-full rounded-full", fill ?? "bg-chart-3")}
             style={{ width: `max(2px, ${(value / top) * 100}%)` }}
           />
         )}
-      </div>
-      <span className="text-right tabular-nums lg:col-start-3">
-        {format(unit, value)}
       </span>
-      <span className="hidden text-right text-xs text-muted-foreground tabular-nums lg:block">
+      <span className="text-right tabular-nums">{format(unit, value)}</span>
+      <span className="text-right text-xs text-muted-foreground tabular-nums">
         {value === null ? "–" : percent(value, usage.total.values[unit] ?? 0)}
       </span>
     </a>
@@ -696,7 +697,7 @@ const Ranking = ({ usage }: { usage: Usage }) => {
   const top = Math.max(0, ...shown.map((row) => row.values[unit] ?? 0));
 
   return (
-    <div className="min-w-0 space-y-3 border-t pt-6">
+    <div className="min-w-0 space-y-2 border-t pt-6">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm">{groupName(usage.query.by)}</h3>
         <span className="text-xs text-muted-foreground tabular-nums">
@@ -714,6 +715,7 @@ const Ranking = ({ usage }: { usage: Usage }) => {
             <Line
               usage={usage}
               row={row}
+              rank={pinned && index === 0 ? null : index + (pinned ? 0 : 1)}
               top={top}
               state={stateOf(states, row.key)}
               picked={selected?.key === row.key}
