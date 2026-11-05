@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Problems } from "@/components/viz/problems";
 import { Views } from "@/components/viz/views";
 import { useLive } from "@/lib/live/client";
@@ -31,6 +33,8 @@ export const Limits = ({
 }) => {
   const accounts = useLive((live) => live.accounts);
   const now = useNow(rendered);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
 
   const plans = plansOf(accounts, [], history, now).filter(
     (plan) => plan.hasPlan
@@ -56,15 +60,26 @@ export const Limits = ({
     }
 
     return (
-      <SpiralView plans={plans} daily={daily} history={history} now={now} />
+      <SpiralView
+        plans={plans}
+        daily={daily}
+        history={history}
+        now={now}
+        chosen={chosen}
+        setChosen={setChosen}
+        picked={picked}
+        setPicked={setPicked}
+      />
     );
   };
 
   return (
-    <div className="space-y-5">
+    <div className="group/page space-y-5">
       <Views views={views} current={view} />
-      <Problems problems={problems} />
-      {body()}
+      <div className="space-y-5 transition-opacity delay-150 duration-300 group-has-[nav[aria-busy=true]]/page:opacity-60">
+        <Problems problems={problems} />
+        {body()}
+      </div>
     </div>
   );
 };

@@ -17,13 +17,15 @@ const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
   return (
     <>
       <RefreshOnStale tags={["usage"]} />
-      <div className="space-y-5">
+      <div className="group/page space-y-5">
         <Views views={views} current={view} />
-        {view === "wallet" ? (
-          <WalletView wallet={await readWallet()} />
-        ) : (
-          <UsageView usage={await readUsage(queryOf(params))} />
-        )}
+        <div className="space-y-5 transition-opacity delay-150 duration-300 group-has-[nav[aria-busy=true]]/page:opacity-60">
+          {view === "wallet" ? (
+            <WalletView wallet={await readWallet()} />
+          ) : (
+            <UsageView usage={await readUsage(queryOf(params))} />
+          )}
+        </div>
       </div>
     </>
   );

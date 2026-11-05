@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import { Loading } from "@/components/shell/loading";
 import { Mark } from "@/components/shell/mark";
 import { Nav } from "@/components/shell/nav";
 import { LiveProvider } from "@/lib/live/client";
@@ -35,7 +36,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
       <header className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pt-5 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2.5 font-medium tracking-tight"
+          className="hit flex items-center gap-2.5 font-medium tracking-tight"
         >
           <Mark />
           BROADCOM
@@ -47,7 +48,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <Suspense>
+        <Suspense fallback={<Loading />}>
           <Live>{children}</Live>
         </Suspense>
       </main>

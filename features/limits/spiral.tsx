@@ -618,15 +618,21 @@ export const SpiralView = ({
   daily,
   history,
   now,
+  chosen,
+  setChosen,
+  picked,
+  setPicked,
 }: {
   plans: readonly Plan[];
   daily: { since: number | null; accounts: readonly Daily[] } | null;
   history: Readonly<Record<string, Points>>;
   now: number;
+  chosen: string | null;
+  setChosen: (id: string) => void;
+  picked: number | null;
+  setPicked: (from: number | null) => void;
 }) => {
   const next = useLive((live) => live.pool?.next ?? null);
-  const [chosen, setChosen] = useState<string | null>(null);
-  const [picked, setPicked] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus | null>(null);
 
   const since = daily?.since ?? null;

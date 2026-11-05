@@ -170,6 +170,7 @@ const Actions = ({
             <Button
               variant="ghost"
               size="icon-sm"
+              className="hit"
               aria-label={`Manage ${name}`}
               disabled={pending}
             />
@@ -280,7 +281,7 @@ const LoginLine = ({ row, now }: { row: Row; now: number }) => {
                   trigger={
                     <button
                       type="button"
-                      className="text-foreground underline underline-offset-4"
+                      className="hit text-foreground underline underline-offset-4"
                     >
                       Sign in again
                     </button>
@@ -352,7 +353,7 @@ const KeyLine = ({
                 href="https://platform.claude.com/settings/billing"
                 target="_blank"
                 rel="noreferrer"
-                className="underline-offset-4 hover:underline"
+                className="hit underline-offset-4 hover:underline"
               >
                 Console balance ↗
               </a>
