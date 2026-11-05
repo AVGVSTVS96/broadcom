@@ -5,7 +5,7 @@ import { refresh } from "next/cache";
 
 import { attempt } from "@/lib/proxy/attempt";
 import type { Outcome } from "@/lib/proxy/attempt";
-import { Proxy, ProxyUnreachable } from "@/lib/proxy/proxy";
+import { Proxy, ProxyError } from "@/lib/proxy/proxy";
 import {
   Done,
   Policy,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/proxy/schema";
 
 const run = async <A>(
-  task: (proxy: Proxy["Service"]) => Effect.Effect<A, ProxyUnreachable>
+  task: (proxy: Proxy["Service"]) => Effect.Effect<A, ProxyError>
 ) =>
   await attempt(
     Effect.gen(function* () {
@@ -34,12 +34,12 @@ const changed = async <A>(outcome: Promise<Outcome<A>>) => {
   return result;
 };
 
-const named = (name: string): Effect.Effect<string, ProxyUnreachable> => {
+const named = (name: string): Effect.Effect<string, ProxyError> => {
   const trimmed = name.trim();
 
   return trimmed === ""
     ? Effect.fail(
-        new ProxyUnreachable({
+        new ProxyError({
           path: "/credentials",
           reason: "A credential needs a name",
         })

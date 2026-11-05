@@ -1,16 +1,14 @@
 import "server-only";
 import { Effect } from "effect";
 
-import { ProxyUnreachable, runtime } from "@/lib/proxy/proxy";
+import { ProxyError, runtime } from "@/lib/proxy/proxy";
 import type { Proxy } from "@/lib/proxy/proxy";
 
 export type Outcome<A> =
   | { readonly ok: true; readonly value: A }
   | { readonly ok: false; readonly reason: string };
 
-export const attempt = async <A>(
-  effect: Effect.Effect<A, ProxyUnreachable, Proxy>
-) =>
+export const attempt = async <A>(effect: Effect.Effect<A, ProxyError, Proxy>) =>
   await runtime.runPromise(
     effect.pipe(
       Effect.match({
@@ -24,7 +22,7 @@ export const attemptCached = async <A>(path: string, read: () => Promise<A>) =>
   await attempt(
     Effect.tryPromise({
       catch: () =>
-        new ProxyUnreachable({
+        new ProxyError({
           path,
           reason: "no usable answer from the proxy",
         }),

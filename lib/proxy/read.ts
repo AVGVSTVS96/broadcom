@@ -9,7 +9,7 @@ import { redact } from "@/lib/model/redact";
 import { valuesOf } from "@/lib/model/settings";
 import type { Daily } from "@/lib/model/weeks";
 import { attempt, attemptCached } from "@/lib/proxy/attempt";
-import { Proxy, ProxyUnreachable, runtime } from "@/lib/proxy/proxy";
+import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
 import {
   Config,
   Credentials,
@@ -110,8 +110,7 @@ export const readSettings = async () =>
 
       const config = yield* Schema.decodeUnknownEffect(Config)(raw).pipe(
         Effect.mapError(
-          (error) =>
-            new ProxyUnreachable({ path: "/config", reason: error.message })
+          (error) => new ProxyError({ path: "/config", reason: error.message })
         )
       );
 
