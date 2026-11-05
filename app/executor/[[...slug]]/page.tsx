@@ -147,19 +147,22 @@ const Accounts = ({ app }: { app: ExecutorApp }) => (
             key={requirement}
             className="flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3 text-sm"
           >
-            <span className="w-24 shrink-0 pt-0.5 font-mono text-[13px] text-muted-foreground">
+            <span className="shrink-0 pt-0.5 font-mono text-[13px] text-muted-foreground max-sm:flex-1 sm:w-24">
               {requirement}
             </span>
-            <ul className="min-w-0 flex-1 space-y-1">
+            <ul className="min-w-0 flex-1 space-y-1 max-sm:order-last max-sm:basis-full">
               {linked.map((account) => {
                 const health = healthOf(account.health);
                 const checked = onDay(account.checkedAt);
 
                 return (
-                  <li key={account.label} className="flex items-center gap-2">
+                  <li
+                    key={account.label}
+                    className="flex flex-wrap items-center gap-x-2"
+                  >
                     <Dot health={health} />
-                    <span className="min-w-0 truncate">{account.label}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="min-w-0 break-all">{account.label}</span>
+                    <span className="text-xs text-muted-foreground">
                       {healthWords.get(health)}
                       {checked !== null && `, checked ${checked}`}
                     </span>
