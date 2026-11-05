@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 
 import { Overview } from "@/features/overview/overview";
+import { RefreshOnStale } from "@/lib/live/client";
 import { readGrants, readWeekHistory } from "@/lib/proxy/read";
 
 const OverviewPage = async () => {
@@ -11,7 +12,12 @@ const OverviewPage = async () => {
     readGrants(),
   ]);
 
-  return <Overview history={history} grants={grants} rendered={Date.now()} />;
+  return (
+    <>
+      <RefreshOnStale tags={["accounts", "credits"]} />
+      <Overview history={history} grants={grants} rendered={Date.now()} />
+    </>
+  );
 };
 
 export default OverviewPage;

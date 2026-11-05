@@ -7,7 +7,7 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "check": "next typegen && oxlint && oxfmt --check && tsc --noEmit && bun test",
+    "check": "next typegen && oxlint && oxfmt --check && tsc --noEmit && bun test --conditions react-server",
     "fix": "oxlint --fix; oxfmt",
     "prepare": "if git rev-parse --git-dir >/dev/null 2>&1; then lefthook install; fi"
   },

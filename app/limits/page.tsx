@@ -3,6 +3,7 @@ import { connection } from "next/server";
 
 import { Limits } from "@/features/limits/limits";
 import { viewOf } from "@/features/limits/views";
+import { RefreshOnStale } from "@/lib/live/client";
 import { readDailyLimits, readWeekHistory } from "@/lib/proxy/read";
 
 export const metadata: Metadata = { title: "Limits" };
@@ -19,7 +20,15 @@ const LimitsPage = async ({ searchParams }: PageProps<"/limits">) => {
   ]);
 
   return (
-    <Limits view={view} history={history} daily={daily} rendered={Date.now()} />
+    <>
+      <RefreshOnStale tags={["accounts", "usage"]} />
+      <Limits
+        view={view}
+        history={history}
+        daily={daily}
+        rendered={Date.now()}
+      />
+    </>
   );
 };
 
