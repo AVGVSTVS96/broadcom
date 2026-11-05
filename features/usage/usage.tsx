@@ -4,27 +4,30 @@ import { SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { Legend } from "@/components/viz/legend";
 import { Section } from "@/components/viz/section";
-import { Columns, Multiples } from "@/features/usage/charts";
+import { fillOf, Parts, Stack } from "@/features/usage/charts";
 import { useNav, UsageNav } from "@/features/usage/nav";
-import type { Row, Usage } from "@/features/usage/read";
+import type { Row, Selected, Usage } from "@/features/usage/read";
 import { Segmented } from "@/features/usage/segmented";
 import {
   bucketWords,
-  cellWords,
+  groupName,
   groupNames,
   groupPlural,
+  listOf,
   presets,
   previousWords,
   rangeNames,
   rangeWords,
+  slotWords,
   unitName,
   unitNames,
-  unitNotes,
 } from "@/features/usage/words";
 import { useLive } from "@/lib/live/client";
-import { clock, date } from "@/lib/model/format";
-import { format, sumCells } from "@/lib/model/usage";
+import { clock, date, dollars } from "@/lib/model/format";
+import { format } from "@/lib/model/usage";
+import type { Unit } from "@/lib/model/usage";
 import type { SessionState } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
@@ -62,12 +65,12 @@ const when = (at: number, now: number) =>
   now - at < 6 * 86_400_000 ? clock(at) : date(at);
 
 const percent = (part: number, whole: number) =>
-  whole > 0 ? `${Math.round((part / whole) * 100)}%` : "–";
+  whole > 0 ? `${Math.round((part / whole) * 100).toLocaleString("en")}%` : "–";
 
-const Sdk = ({ share, factor }: { share: number; factor: number }) =>
+const Sdk = ({ share }: { share: number }) =>
   share < 0.05 ? null : (
     <span
-      title={`${Math.round(share * 100)}% ran on the Agent SDK or claude -p; five-hour limits count it ${factor}×`}
+      title={`${Math.round(share * 100)}% ran on the Agent SDK or claude -p`}
       className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over"
     >
       SDK{share < 0.95 ? ` ${Math.round(share * 100)}%` : ""}
@@ -88,7 +91,7 @@ const Search = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (text !== value) {
-        go({ all: null, q: text.trim(), sel: null });
+        go({ q: text.trim(), rows: null, sel: null });
       }
     }, 300);
 
@@ -145,7 +148,7 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
           value={params.get("range") ?? query.range}
           options={rangeNames}
           onChange={(range) => {
-            go({ all: null, range, sel: null });
+            go({ range, rows: null, sel: null });
           }}
         />
         <Segmented
@@ -153,7 +156,7 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
           value={params.get("by") ?? query.by}
           options={groupNames}
           onChange={(by) => {
-            go({ all: null, by, sel: null, within: null });
+            go({ by, rows: null, sel: null, within: null });
           }}
         />
       </div>
@@ -172,8 +175,8 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
               onClick={() => {
                 go(
                   pressed
-                    ? { all: null, q: null, sel: null, "w.app": null }
-                    : { ...patch, all: null, sel: null }
+                    ? { q: null, rows: null, sel: null, "w.app": null }
+                    : { ...patch, rows: null, sel: null }
                 );
               }}
             >
@@ -181,7 +184,7 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
             </Chip>
           );
         })}
-        {usage.query.within === null ? null : (
+        {query.within === null ? null : (
           <Chip
             pressed
             onClick={() => {
@@ -201,13 +204,13 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
               key={`${filter.dimension}:${filter.id}`}
               pressed
               onClick={() => {
-                const rest = query.where[filter.dimension]?.filter(
+                const left = query.where[filter.dimension]?.filter(
                   (id) => id !== filter.id
                 );
 
                 go({
                   sel: null,
-                  [`w.${filter.dimension}`]: rest?.join(",") ?? null,
+                  [`w.${filter.dimension}`]: left?.join(",") ?? null,
                 });
               }}
             >
@@ -220,10 +223,14 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
   );
 };
 
+const readingWords = (unit: Unit) =>
+  unit === "fiveHour" ? "5-hour readings" : "Weekly readings";
+
 const verdictOf = (usage: Usage) => {
   const { unit, q, range } = usage.query;
   const [top] = usage.rows;
   const total = usage.total.values[unit];
+  const { coverage } = usage;
 
   if (q !== "") {
     return `“${q}” used ${format(unit, total)} ${rangeWords[range]}`;
@@ -234,7 +241,11 @@ const verdictOf = (usage: Usage) => {
   }
 
   if (total === null) {
-    return `No limit readings ${rangeWords[range]}`;
+    return `No ${readingWords(unit).toLowerCase()} ${rangeWords[range]}`;
+  }
+
+  if (coverage !== null && coverage.share < 0.5) {
+    return `${readingWords(unit)} cover ${coverage.read.length} of ${coverage.active} ${slotWords[usage.size]}s`;
   }
 
   return `${top.label} led with ${percent(top.values[unit] ?? 0, total)} of ${format(unit, total)} ${rangeWords[range]}`;
@@ -244,202 +255,159 @@ const evidenceOf = (usage: Usage) => {
   const { unit, by, q } = usage.query;
   const total = usage.total.values[unit] ?? 0;
   const five = usage.rows.slice(0, 5);
-
-  const share = percent(
-    five.reduce((sum, row) => sum + (row.values[unit] ?? 0), 0),
-    total
-  );
+  const { coverage, agentSdk } = usage;
 
   const lead =
     q === ""
-      ? `The top ${five.length} ${groupPlural(by)} took ${share}.`
+      ? `${usage.total.sessions.toLocaleString("en")} sessions; the top ${five.length} ${groupPlural(by)} took ${percent(
+          five.reduce((sum, row) => sum + (row.values[unit] ?? 0), 0),
+          total
+        )}.`
       : `${usage.rowCount.toLocaleString("en")} ${groupPlural(by)} match.`;
 
-  return `${lead} ${unitNotes[unit].replace("{factor}", String(usage.agentSdk.factor))}`;
-};
-
-const allLabel = (usage: Usage) => {
-  if (usage.query.q !== "") {
-    return `All matches`;
+  if (coverage === null || coverage.read.length === coverage.active) {
+    return unit === "fiveHour" &&
+      agentSdk.fiveHour !== null &&
+      agentSdk.share >= 0.05
+      ? `${lead} The Agent SDK counts ${agentSdk.factor}× here, so its ${Math.round(agentSdk.share * 100)}% of spend took ${Math.round(agentSdk.fiveHour * 100)}% of points.`
+      : lead;
   }
 
-  if (usage.query.within !== null) {
-    return `All of ${usage.owner ?? "this agent"}`;
-  }
+  const read =
+    coverage.read.length === 0 ? "none" : `${listOf(coverage.read)} only`;
 
-  return `All ${groupPlural(usage.query.by)}`;
+  return coverage.share < 0.5
+    ? `Readings on ${read}; the ${dollars(coverage.missing)} spent on the rest has none.`
+    : `${lead} Readings on ${read}.`;
 };
 
-const Line = ({
-  name,
-  sub,
-  value,
-  share,
-  series,
-  usage,
-  ink,
-  selected,
-  href,
-  onPick,
-  badge,
-}: {
-  name: ReactNode;
-  sub: ReactNode;
-  value: string;
-  share: string;
-  series: readonly number[];
-  usage: Usage;
-  ink: boolean;
-  selected: boolean;
-  href: string;
-  onPick: () => void;
-  badge?: ReactNode;
-}) => (
-  <a
-    href={href}
-    aria-current={selected ? "true" : undefined}
-    onClick={(event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey) {
-        return;
-      }
+const tileNote = (usage: Usage, unit: Unit) => {
+  const { total, coverage, query } = usage;
 
-      event.preventDefault();
-      onPick();
-    }}
-    className="group grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2.5 rounded-2xl px-3 py-3 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current]:bg-muted lg:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_6.5rem] lg:items-center"
-  >
-    <div className="min-w-0 space-y-0.5">
-      <div className="flex min-w-0 items-center gap-1.5">
-        <span
+  if (unit === "api") {
+    const before = total.previous?.api;
+    const value = total.values.api;
+
+    return value === null ||
+      before === null ||
+      before === undefined ||
+      before <= 0
+      ? null
+      : `${value >= before ? "+" : "−"}${percent(Math.abs(value - before), before)} on ${previousWords[query.range]}`;
+  }
+
+  if (unit === "tokens") {
+    return total.cacheHit === null
+      ? null
+      : `${Math.round(total.cacheHit * 100)}% cache reads`;
+  }
+
+  if (unit === "plan") {
+    return "Share of plan fees";
+  }
+
+  return unit === query.unit && coverage !== null
+    ? `Readings on ${coverage.read.length} of ${coverage.active} ${slotWords[usage.size]}s`
+    : "Summed over plans";
+};
+
+const Tiles = ({ usage }: { usage: Usage }) => {
+  const { params, go } = useNav();
+  const current = params.get("unit") ?? usage.query.unit;
+
+  return (
+    <fieldset className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-5">
+      <legend className="sr-only">Unit</legend>
+      {unitNames.map(([unit, name], index) => (
+        <button
+          key={unit}
+          type="button"
+          aria-pressed={current === unit}
+          onClick={() => {
+            go({ unit: unit === "api" ? null : unit });
+          }}
           className={cn(
-            "truncate",
-            ink || selected ? "font-medium" : "text-foreground/90"
+            "group min-w-0 space-y-1.5 bg-card p-4 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-pressed:bg-muted sm:p-5",
+            index === 0 && "col-span-2 sm:col-span-1"
           )}
         >
-          {name}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground group-aria-pressed:text-foreground">
+            <span
+              aria-hidden
+              className="hidden size-1.5 rounded-full bg-foreground group-aria-pressed:block"
+            />
+            {name}
+          </div>
+          <div className="truncate text-3xl tracking-tight sm:text-4xl">
+            {format(unit, usage.total.values[unit])}
+          </div>
+          <div className="min-h-4 text-xs text-muted-foreground">
+            {tileNote(usage, unit)}
+          </div>
+        </button>
+      ))}
+    </fieldset>
+  );
+};
+
+const Activity = ({ usage }: { usage: Usage }) => {
+  const { unit } = usage.query;
+  const missing = usage.readings?.includes("missing") ?? false;
+
+  return (
+    <div className="min-w-0 space-y-4">
+      <h3 className="text-sm">
+        {unitName(unit)}
+        <span className="text-muted-foreground">
+          {" "}
+          per {bucketWords[usage.size]}
         </span>
-        {badge}
-      </div>
-      <div className="truncate text-xs text-muted-foreground">{sub}</div>
-    </div>
-    <div className="col-span-2 row-start-2 lg:col-span-1 lg:col-start-2 lg:row-start-1">
-      <Multiples
-        series={series}
+      </h3>
+      <Stack
+        layers={
+          usage.selected === null ? usage.layers : usage.layers.slice(0, 1)
+        }
         cells={usage.cells}
-        unit={usage.query.unit}
-        ink={ink || selected}
+        ticks={usage.ticks}
+        readings={usage.readings}
+        unit={unit}
       />
+      {missing ? (
+        <Legend
+          items={[
+            {
+              fill: "border border-dotted border-faint",
+              key: "box",
+              label: "Dotted: no reading",
+            },
+          ]}
+        />
+      ) : null}
     </div>
-    <div className="col-start-2 row-start-1 text-right lg:col-start-3">
-      <div className="tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground tabular-nums">{share}</div>
-    </div>
-  </a>
+  );
+};
+
+const Values = ({ usage, row }: { usage: Usage; row: Row }) => (
+  <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+    {unitNames
+      .filter(([option]) => option !== usage.query.unit)
+      .map(([option, name]) => (
+        <div key={option} className="min-w-0">
+          <dt className="text-xs text-muted-foreground">{name}</dt>
+          <dd className="text-lg tracking-tight">
+            {format(option, row.values[option])}
+          </dd>
+        </div>
+      ))}
+  </dl>
 );
 
-const Heading = ({ usage, row }: { usage: Usage; row: Row | null }) => {
-  const { go } = useNav();
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 text-lg font-medium tracking-tight break-words">
-          {row?.label ?? allLabel(usage)}
-        </h3>
-        {row === null ? null : (
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={() => {
-              go({ sel: null });
-            }}
-            className="-mr-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <XIcon className="size-4" />
-          </button>
-        )}
-      </div>
-      {row === null ? null : (
-        <p className="text-sm break-words text-muted-foreground">
-          {row.detail}
-          {row.href === null ? null : (
-            <>
-              {" · "}
-              <a
-                href={row.href}
-                target="_blank"
-                rel="noreferrer"
-                className="text-foreground underline-offset-4 hover:underline"
-              >
-                Open
-              </a>
-            </>
-          )}
-        </p>
-      )}
-    </div>
-  );
-};
-
-const changeOf = (value: number | null, before: number | null | undefined) =>
-  value === null || before === null || before === undefined || before <= 0
-    ? null
-    : `${value >= before ? "+" : "−"}${percent(Math.abs(value - before), before)}`;
-
-const Figure = ({ usage, row }: { usage: Usage; row: Row | null }) => {
-  const { unit, range } = usage.query;
-  const value = (row?.values ?? usage.total.values)[unit];
-  const total = usage.total.values[unit] ?? 0;
-
-  const change =
-    row === null ? changeOf(value, usage.total.previous?.[unit]) : null;
-
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-4xl tracking-tight">{format(unit, value)}</span>
-        <span className="text-sm text-muted-foreground">{unitName(unit)}</span>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        {row === null
-          ? `${usage.total.sessions.toLocaleString("en")} sessions ${rangeWords[range]}`
-          : `${percent(value ?? 0, total)} of all, last active ${when(row.lastActiveAt, usage.now)}`}
-        {change === null ? null : `. ${change} on ${previousWords[range]}`}
-      </p>
-    </div>
-  );
-};
-
-const Agents = ({ usage, row }: { usage: Usage; row: Row | null }) => {
-  const sdk = row?.agentSdk ?? usage.agentSdk.share;
-  const points = usage.agentSdk.fiveHour;
-
-  if (sdk < 0.05) {
-    return null;
-  }
-
-  return (
-    <p className="text-sm text-pretty">
-      <span className="font-medium text-over">
-        {Math.round(sdk * 100)}% on the Agent SDK.
-      </span>{" "}
-      <span className="text-muted-foreground">
-        Five-hour limits count it {usage.agentSdk.factor}×
-        {row === null && points !== null
-          ? `, so it took ${Math.round(points * 100)}% of five-hour points`
-          : ""}
-        .
-      </span>
-    </p>
-  );
-};
-
-const Accounts = ({ row }: { row: Row }) =>
+const Limits = ({ row }: { row: Selected }) =>
   row.accounts.length === 0 ? null : (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <h4 className="text-sm">
-        Limits by account
-        <span className="text-muted-foreground"> · week, 5 h</span>
+        By plan
+        <span className="text-muted-foreground"> · weekly, 5-hour</span>
       </h4>
       <ul className="space-y-1.5 text-sm">
         {row.accounts.map((account) => (
@@ -458,9 +426,9 @@ const Accounts = ({ row }: { row: Row }) =>
     </div>
   );
 
-const Sessions = ({ usage, row }: { usage: Usage; row: Row }) => {
+const Sessions = ({ usage, row }: { usage: Usage; row: Selected }) => {
   const { go } = useNav();
-  const { drill } = usage;
+  const { drill } = row;
   const { unit } = usage.query;
 
   if (drill === null) {
@@ -468,7 +436,7 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Row }) => {
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <h4 className="text-sm">
         Sessions
         <span className="text-muted-foreground">
@@ -486,7 +454,7 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Row }) => {
             <span className="tabular-nums">
               {format(unit, session.values[unit])}
             </span>
-            <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">
+            <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
               {when(session.lastActiveAt, usage.now)}
             </span>
           </li>
@@ -496,7 +464,7 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Row }) => {
         <button
           type="button"
           onClick={() => {
-            go({ by: "session", sel: null, within: row.key });
+            go({ by: "session", rows: null, sel: null, within: row.key });
           }}
           className="text-sm underline-offset-4 hover:underline"
         >
@@ -507,251 +475,275 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Row }) => {
   );
 };
 
-const Detail = ({ usage, row }: { usage: Usage; row: Row | null }) => {
+const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => (
+  <div className="space-y-4 rounded-2xl border p-4">
+    <p className="text-sm break-words text-muted-foreground">
+      {[row.detail, `last active ${when(row.lastActiveAt, usage.now)}`]
+        .filter((part) => part !== "")
+        .join(" · ")}
+      {row.href === null ? null : (
+        <>
+          {" · "}
+          <a
+            href={row.href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            Open
+          </a>
+        </>
+      )}
+    </p>
+    <Values usage={usage} row={row} />
+    {row.agentSdk < 0.05 ? null : (
+      <p className="text-sm text-pretty">
+        <span className="text-over">
+          {Math.round(row.agentSdk * 100)}% on the Agent SDK.
+        </span>{" "}
+        <span className="text-muted-foreground">
+          5-hour limits count it {usage.agentSdk.factor}×.
+        </span>
+      </p>
+    )}
+    <Limits row={row} />
+    <Sessions usage={usage} row={row} />
+  </div>
+);
+
+const Line = ({
+  usage,
+  row,
+  top,
+  state,
+  picked,
+}: {
+  usage: Usage;
+  row: Row;
+  top: number;
+  state: SessionState | null;
+  picked: boolean;
+}) => {
+  const { params, go } = useNav();
   const { unit } = usage.query;
-  const values = row?.values ?? usage.total.values;
-  const series = row?.series ?? usage.total.series;
+  const value = row.values[unit];
+  const fill = fillOf(usage.layers, row.key);
+  const next = new URLSearchParams(params);
+
+  if (picked) {
+    next.delete("sel");
+  } else {
+    next.set("sel", row.key);
+  }
 
   return (
-    <div className="space-y-5">
-      <Heading usage={usage} row={row} />
-      <Figure usage={usage} row={row} />
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-y py-4">
-        {unitNames
-          .filter(([option]) => option !== unit)
-          .map(([option]) => (
-            <div key={option} className="min-w-0">
-              <dt className="text-xs text-muted-foreground">
-                {unitName(option)}
-              </dt>
-              <dd className="text-lg tracking-tight">
-                {format(option, values[option])}
-              </dd>
-            </div>
-          ))}
-      </dl>
-      <Agents usage={usage} row={row} />
-      <div className="space-y-3">
-        <h4 className="text-sm">
-          {unitName(unit)} per {cellWords[usage.size]}
-          <span className="text-muted-foreground"> · dashed: average</span>
-        </h4>
-        <Columns
-          values={sumCells(series, usage.cells)}
-          cells={usage.cells}
-          unit={unit}
-        />
+    <a
+      href={`?${next}`}
+      aria-current={picked ? "true" : undefined}
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey) {
+          return;
+        }
+
+        event.preventDefault();
+        go({ sel: picked ? null : row.key });
+      }}
+      className="-mx-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-xl px-3 py-2.5 transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current]:bg-muted lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_5.5rem_3rem]"
+    >
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {fill === null ? null : (
+            <span
+              aria-hidden
+              className={cn("size-2 shrink-0 rounded-[2px]", fill)}
+            />
+          )}
+          <span className="truncate">{row.label}</span>
+          {state === null ? null : (
+            <span
+              title={state}
+              aria-label={state}
+              className={cn("size-2 shrink-0 rounded-full", dots[state])}
+            />
+          )}
+          <Sdk share={row.agentSdk} />
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {[
+            row.detail,
+            row.sessions > 1
+              ? `${row.sessions.toLocaleString("en")} sessions`
+              : null,
+            when(row.lastActiveAt, usage.now),
+          ]
+            .filter((part) => part !== null && part !== "")
+            .join(" · ")}
+        </div>
       </div>
-      {row === null ? null : <Accounts row={row} />}
-      {row === null ? null : <Sessions usage={usage} row={row} />}
+      <div
+        className={cn(
+          "col-span-2 row-start-2 h-1.5 rounded-full lg:col-span-1 lg:col-start-2 lg:row-start-1",
+          value === null ? "border-t border-dotted border-faint" : "bg-track"
+        )}
+      >
+        {value === null || top <= 0 ? null : (
+          <div
+            className={cn("h-full rounded-full", fill ?? "bg-chart-3")}
+            style={{ width: `max(2px, ${(value / top) * 100}%)` }}
+          />
+        )}
+      </div>
+      <span className="text-right tabular-nums lg:col-start-3">
+        {format(unit, value)}
+      </span>
+      <span className="hidden text-right text-xs text-muted-foreground tabular-nums lg:block">
+        {value === null ? "–" : percent(value, usage.total.values[unit] ?? 0)}
+      </span>
+    </a>
+  );
+};
+
+const Breakdown = ({ usage }: { usage: Usage }) => {
+  const { unit } = usage.query;
+
+  const sums = usage.layers.map((layer) =>
+    layer.values.reduce((sum, value) => sum + value, 0)
+  );
+
+  const whole = sums.reduce((sum, value) => sum + value, 0);
+
+  return (
+    <div className="min-w-0 space-y-4">
+      <h3 className="text-sm">Breakdown</h3>
+      <Parts layers={usage.layers} label={`${unitName(unit)} by part`} />
+      <ul className="space-y-4">
+        {usage.layers.map((layer, index) => {
+          const sum = sums[index] ?? 0;
+
+          return (
+            <li key={layer.key} className="space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "size-2 shrink-0 rounded-[2px]",
+                      fillOf(usage.layers, layer.key)
+                    )}
+                  />
+                  <span className="truncate">{layer.label}</span>
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {format(unit, sum)}
+                </span>
+              </div>
+              <div className="h-1 rounded-full bg-track">
+                <div
+                  className={cn(
+                    "h-full rounded-full",
+                    fillOf(usage.layers, layer.key)
+                  )}
+                  style={{
+                    width: `${whole > 0 ? (sum / whole) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <div className="text-right text-xs text-muted-foreground tabular-nums">
+                {percent(sum, whole)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 };
+
+const more = 50;
 
 const Ranking = ({ usage }: { usage: Usage }) => {
-  const { params, go } = useNav();
+  const { go } = useNav();
   const states = useLiveRows();
   const { unit } = usage.query;
-  const sel = params.get("sel");
-  const total = usage.total.values[unit] ?? 0;
+  const { selected } = usage;
+  const pinned = selected?.pinned === true;
 
-  const selected =
-    usage.rows.find((row) => row.key === usage.query.sel) ?? null;
+  const shown =
+    pinned && selected !== null ? [selected, ...usage.rows] : usage.rows;
 
-  const hrefOf = (key: string | null) => {
-    const next = new URLSearchParams(params);
-
-    if (key === null) {
-      next.delete("sel");
-    } else {
-      next.set("sel", key);
-    }
-
-    return `?${next}`;
-  };
+  const top = Math.max(0, ...shown.map((row) => row.values[unit] ?? 0));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
-      <div className="min-w-0">
-        <div className="-mx-3 hidden grid-cols-[minmax(0,12rem)_minmax(0,1fr)_6.5rem] gap-x-4 px-3 pb-2 text-xs text-muted-foreground lg:grid">
-          <span>
-            {groupNames.find(([option]) => option === usage.query.by)?.[1]}
-          </span>
-          <div
-            className="grid gap-2.5"
-            style={{
-              gridTemplateColumns: `repeat(${usage.cells.length}, minmax(0, 1fr))`,
-            }}
+    <div className="min-w-0 space-y-3 border-t pt-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm">{groupName(usage.query.by)}</h3>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {usage.rows.length < usage.rowCount
+            ? `${usage.rows.length} of ${usage.rowCount.toLocaleString("en")}`
+            : usage.rowCount.toLocaleString("en")}
+        </span>
+      </div>
+      <ul>
+        {shown.map((row, index) => (
+          <li
+            key={row.key}
+            className={cn(pinned && index === 0 && "mb-2 border-b pb-2")}
           >
-            {usage.cells.map((cell) => (
-              <span
-                key={cell.from}
-                className={cn(
-                  "truncate",
-                  cell.now !== null && "text-foreground"
-                )}
-              >
-                {cell.label}
-              </span>
-            ))}
-          </div>
-          <span className="text-right">{unitName(unit)}</span>
-        </div>
-        <div className="-mx-3 space-y-0.5">
-          <div
-            className="grid gap-1.5 px-3 pb-1 text-[11px] text-muted-foreground lg:hidden"
-            style={{
-              gridTemplateColumns: `repeat(${usage.cells.length}, minmax(0, 1fr))`,
-            }}
-          >
-            {usage.cells.map((cell) => (
-              <span
-                key={cell.from}
-                className={cn(
-                  "whitespace-nowrap",
-                  cell.now !== null && "text-foreground"
-                )}
-              >
-                {cell.label}
-              </span>
-            ))}
-          </div>
-          <Line
-            name={allLabel(usage)}
-            sub={`${usage.total.sessions.toLocaleString("en")} sessions`}
-            value={format(unit, usage.total.values[unit])}
-            share="100%"
-            series={usage.total.series}
-            usage={usage}
-            ink
-            selected={sel === null}
-            href={hrefOf(null)}
-            onPick={() => {
-              go({ sel: null });
-            }}
-          />
-          {usage.rows.map((row) => {
-            const state = stateOf(states, row.key);
-            const picked = sel === row.key;
-
-            return (
-              <div key={row.key}>
-                <Line
-                  name={row.label}
-                  sub={[
-                    row.detail,
-                    row.sessions > 1
-                      ? `${row.sessions.toLocaleString("en")} sessions`
-                      : null,
-                    when(row.lastActiveAt, usage.now),
-                  ]
-                    .filter((part) => part !== null && part !== "")
-                    .join(" · ")}
-                  value={format(unit, row.values[unit])}
-                  share={percent(row.values[unit] ?? 0, total)}
-                  series={row.series}
-                  usage={usage}
-                  ink={false}
-                  selected={picked}
-                  href={hrefOf(picked ? null : row.key)}
-                  onPick={() => {
-                    go({ sel: picked ? null : row.key });
-                  }}
-                  badge={
-                    <>
-                      {state === null ? null : (
-                        <span
-                          title={state}
-                          aria-label={state}
-                          className={cn(
-                            "size-2 shrink-0 rounded-full",
-                            dots[state]
-                          )}
-                        />
-                      )}
-                      <Sdk
-                        share={row.agentSdk}
-                        factor={usage.agentSdk.factor}
-                      />
-                    </>
-                  }
-                />
-                {picked && selected?.key === row.key ? (
-                  <div className="mx-3 my-3 rounded-2xl border p-4 lg:hidden">
-                    <Detail usage={usage} row={selected} />
-                  </div>
-                ) : null}
+            <Line
+              usage={usage}
+              row={row}
+              top={top}
+              state={stateOf(states, row.key)}
+              picked={selected?.key === row.key}
+            />
+            {selected?.key === row.key ? (
+              <div className="py-2">
+                <Detail usage={usage} row={selected} />
               </div>
-            );
-          })}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span>
-            Each row on its own scale. Bars: {unitName(unit)} per{" "}
-            {bucketWords[usage.size]}; dashed: its average; line: now.
-            {(unit === "week" || unit === "fiveHour") &&
-            usage.limitsSince !== null
-              ? ` Limit readings since ${date(usage.limitsSince)}.`
-              : ""}
-          </span>
-          {usage.rowCount > usage.rows.length ? (
-            <button
-              type="button"
-              onClick={() => {
-                go({ all: "1" });
-              }}
-              className="rounded-full border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
-            >
-              Show all {usage.rowCount.toLocaleString("en")}
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <div className="border-t pt-5 lg:hidden">
-        <Detail usage={usage} row={null} />
-      </div>
-      <aside className="hidden lg:block">
-        <div className="sticky top-6 border-l pl-8">
-          <Detail usage={usage} row={selected} />
-        </div>
-      </aside>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {usage.rowCount > usage.rows.length ? (
+        <button
+          type="button"
+          onClick={() => {
+            go({ rows: String(usage.rows.length + more) });
+          }}
+          className="rounded-full border px-3 py-1.5 text-sm hover:bg-muted"
+        >
+          Show {Math.min(more, usage.rowCount - usage.rows.length)} more
+        </button>
+      ) : null}
     </div>
   );
 };
 
-const Body = ({ usage }: { usage: Usage }) => {
-  const { params, go } = useNav();
-
-  return (
-    <>
-      <Toolbar usage={usage} />
-      <Section
-        title={verdictOf(usage)}
-        detail={evidenceOf(usage)}
-        actions={
-          <Segmented
-            label="Unit"
-            value={params.get("unit") ?? usage.query.unit}
-            options={unitNames}
-            onChange={(unit) => {
-              go({ unit });
-            }}
-          />
-        }
-      >
-        {usage.rows.length === 0 ? (
+const Body = ({ usage }: { usage: Usage }) => (
+  <>
+    <Toolbar usage={usage} />
+    <Section title={verdictOf(usage)} detail={evidenceOf(usage)}>
+      <div className="space-y-6">
+        <Tiles usage={usage} />
+        {usage.rows.length === 0 && usage.selected === null ? (
           <p className="py-10 text-center text-muted-foreground">
-            {usage.query.q === "" && usage.filters.length === 0
-              ? `No usage ${rangeWords[usage.query.range]}.`
-              : "Nothing matches."}
+            Nothing matches.
           </p>
         ) : (
-          <Ranking usage={usage} />
+          <>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-10">
+              <Activity usage={usage} />
+              <div className="border-t pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
+                <Breakdown usage={usage} />
+              </div>
+            </div>
+            <Ranking usage={usage} />
+          </>
         )}
-      </Section>
-    </>
-  );
-};
+      </div>
+    </Section>
+  </>
+);
 
 export const UsageView = ({ usage }: { usage: Usage }) => (
   <UsageNav>

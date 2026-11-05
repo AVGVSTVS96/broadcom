@@ -26,13 +26,20 @@ export const oneOf = <T extends string>(
 
 export type Values = Readonly<Record<Unit, number | null>>;
 
-export const valuesOf = (amount: UsageAmount, points: UsagePoints): Values => ({
-  api: amount.apiUsd,
-  fiveHour: points.fiveHour,
-  plan: amount.planUsd,
-  tokens: amount.tokens,
-  week: points.week,
-});
+export const isLimit = (unit: Unit) => unit === "fiveHour" || unit === "week";
+
+export const valuesOf = (amount: UsageAmount, points: UsagePoints): Values => {
+  const reading = (value: number | null) =>
+    value === 0 && amount.apiUsd > 0 ? null : value;
+
+  return {
+    api: amount.apiUsd,
+    fiveHour: reading(points.fiveHour),
+    plan: amount.planUsd,
+    tokens: amount.tokens,
+    week: reading(points.week),
+  };
+};
 
 const compact = new Intl.NumberFormat("en", {
   maximumFractionDigits: 1,
@@ -236,4 +243,186 @@ export const sumSeries = (lists: readonly (readonly number[])[]) => {
   }
 
   return total;
+};
+
+export interface Layer {
+  readonly key: string;
+  readonly label: string;
+  readonly values: readonly number[];
+}
+
+export const rest = "rest";
+
+export const stackOf = (
+  named: readonly Layer[],
+  total: readonly number[]
+): readonly Layer[] => {
+  const others = total.map((value, index) =>
+    Math.max(
+      0,
+      named.reduce((left, layer) => left - (layer.values[index] ?? 0), value)
+    )
+  );
+
+  return others.some((value) => value > 1e-9)
+    ? [...named, { key: rest, label: "Everything else", values: others }]
+    : named;
+};
+
+export type Reading = "read" | "missing" | null;
+
+export const readingsOf = (
+  scored: readonly number[],
+  spend: readonly number[]
+): readonly Reading[] =>
+  spend.map((paid, index) => {
+    if ((scored[index] ?? 0) > 0) {
+      return "read";
+    }
+
+    return paid > 0 ? "missing" : null;
+  });
+
+export const gapsOf = (readings: readonly Reading[]) => {
+  const gaps: { from: number; to: number }[] = [];
+  let open: { from: number; to: number } | null = null;
+
+  for (const [index, reading] of readings.entries()) {
+    if (reading === "read") {
+      open = null;
+    } else if (reading === "missing") {
+      if (open === null) {
+        open = { from: index, to: index + 1 };
+        gaps.push(open);
+      } else {
+        open.to = index + 1;
+      }
+    }
+  }
+
+  return gaps;
+};
+
+export interface Coverage {
+  readonly read: readonly string[];
+  readonly active: number;
+  readonly share: number;
+  readonly missing: number;
+}
+
+const slotLabels = {
+  "1d": (at: number, zone: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+      timeZone: zone,
+    }).format(at),
+  "1h": (at: number, zone: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      timeZone: zone,
+    }).format(at),
+  "1w": (at: number, zone: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+      timeZone: zone,
+    }).format(at),
+} as const;
+
+export const coverageOf = (
+  readings: readonly Reading[],
+  spend: readonly number[],
+  buckets: readonly { readonly at: number }[],
+  size: BucketSize,
+  cells: readonly Cell[],
+  zone: string
+): Coverage => {
+  const slots =
+    size === "4h"
+      ? cells.map((cell) => ({
+          from: cell.from,
+          label: cell.now === null ? cell.label : "today",
+          to: cell.to,
+        }))
+      : buckets.map((bucket, index) => ({
+          from: index,
+          label: slotLabels[size](bucket.at, zone),
+          to: index + 1,
+        }));
+
+  const read: string[] = [];
+  let active = 0;
+  let covered = 0;
+  let paid = 0;
+
+  for (const slot of slots) {
+    const inside = new Set(readings.slice(slot.from, slot.to));
+    const cost = spend.slice(slot.from, slot.to).reduce((a, b) => a + b, 0);
+
+    if (inside.has("read")) {
+      read.push(slot.label);
+      active += 1;
+      covered += cost;
+    } else if (inside.has("missing")) {
+      active += 1;
+    }
+
+    paid += cost;
+  }
+
+  return {
+    active,
+    missing: paid - covered,
+    read,
+    share: paid > 0 ? covered / paid : 0,
+  };
+};
+
+export const bucketLabel = (at: number, size: BucketSize, zone: string) => {
+  if (size === "1w") {
+    return `Week of ${slotLabels["1w"](at, zone)}`;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    ...(size === "1d"
+      ? { day: "numeric", month: "short" }
+      : { hour: "numeric" }),
+    timeZone: zone,
+    weekday: "short",
+  }).format(at);
+};
+
+export const totalOf = (
+  rows: readonly {
+    readonly values: Values;
+    readonly sessions: number;
+    readonly series: readonly number[];
+  }[]
+) => {
+  const sum = (unit: Unit) => {
+    let total: number | null = null;
+
+    for (const row of rows) {
+      const value = row.values[unit];
+
+      if (value !== null) {
+        total = (total ?? 0) + value;
+      }
+    }
+
+    return total;
+  };
+
+  return {
+    series: sumSeries(rows.map((row) => row.series)),
+    sessions: rows.reduce((count, row) => count + row.sessions, 0),
+    values: {
+      api: sum("api"),
+      fiveHour: sum("fiveHour"),
+      plan: sum("plan"),
+      tokens: sum("tokens"),
+      week: sum("week"),
+    },
+  };
 };

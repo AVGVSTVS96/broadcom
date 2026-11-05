@@ -23,31 +23,15 @@ export const previousWords = {
 } as const satisfies Record<Range, string>;
 
 export const unitNames = [
-  ["tokens", "Tokens"],
   ["api", "API $"],
   ["plan", "Plan $"],
-  ["fiveHour", "5 h"],
-  ["week", "Week"],
+  ["tokens", "Tokens"],
+  ["fiveHour", "5-hour"],
+  ["week", "Weekly"],
 ] as const satisfies readonly (readonly [Unit, string])[];
 
-export const unitLabels = {
-  api: "API $",
-  fiveHour: "5-hour limit",
-  plan: "Plan $",
-  tokens: "Tokens",
-  week: "Week limit",
-} as const satisfies Record<Unit, string>;
-
-export const unitName = (unit: Unit) => unitLabels[unit];
-
-export const unitNotes = {
-  api: "API $ is what the same requests cost at API prices.",
-  fiveHour:
-    "Points of a five-hour limit, summed over accounts. Agent SDK requests count {factor}×.",
-  plan: "Plan $ is each request's share of its plan's monthly fee.",
-  tokens: "Tokens include cache reads.",
-  week: "Points of a weekly limit, summed over accounts. 100% is one account's whole week.",
-} as const satisfies Record<Unit, string>;
+export const unitName = (unit: Unit) =>
+  unitNames.find(([option]) => option === unit)?.[1] ?? unit;
 
 export const groupNames = [
   ["agent", "Agents"],
@@ -57,8 +41,10 @@ export const groupNames = [
   ["account", "Accounts"],
 ] as const satisfies readonly (readonly [Grouping, string])[];
 
-export const groupPlural = (by: Grouping) =>
-  (groupNames.find(([option]) => option === by)?.[1] ?? by).toLowerCase();
+export const groupName = (by: Grouping) =>
+  groupNames.find(([option]) => option === by)?.[1] ?? by;
+
+export const groupPlural = (by: Grouping) => groupName(by).toLowerCase();
 
 export const bucketWords = {
   "1d": "day",
@@ -67,10 +53,10 @@ export const bucketWords = {
   "4h": "4 hours",
 } as const satisfies Record<BucketSize, string>;
 
-export const cellWords = {
-  "1d": "week",
-  "1h": "6 hours",
-  "1w": "month",
+export const slotWords = {
+  "1d": "day",
+  "1h": "hour",
+  "1w": "week",
   "4h": "day",
 } as const satisfies Record<BucketSize, string>;
 
@@ -79,3 +65,6 @@ export const presets = [
   ["autofork", { q: "autofork", "w.app": null }],
   ["GitHub Actions", { q: null, "w.app": "actions" }],
 ] as const;
+
+export const listOf = (items: readonly string[]) =>
+  new Intl.ListFormat("en", { type: "conjunction" }).format(items);

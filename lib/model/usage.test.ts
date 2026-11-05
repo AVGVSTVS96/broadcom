@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
 
 import { namesOf } from "@/lib/model/names";
-import { cellsOf, format, formatShort, sumCells } from "@/lib/model/usage";
+import {
+  cellsOf,
+  coverageOf,
+  format,
+  formatShort,
+  gapsOf,
+  readingsOf,
+  stackOf,
+  sumCells,
+  totalOf,
+  valuesOf,
+} from "@/lib/model/usage";
 
 const zone = "America/Los_Angeles";
 
@@ -101,4 +112,95 @@ test("accounts are named by login, API keys by the login they bill", () => {
       [{ account: "a1", credentialId: "key1" }]
     )
   ).toEqual({ a1: "ada101", key1: "ada101 API", none: "No account" });
+});
+
+const amount = {
+  apiUsd: 668,
+  cacheRead: 0,
+  input: 0,
+  output: 0,
+  planUsd: 12,
+  requests: 1,
+  tokens: 9,
+};
+
+test("a limit with spend but no points has no reading, not zero", () => {
+  expect(valuesOf(amount, { fiveHour: 0, week: 4 })).toEqual({
+    api: 668,
+    fiveHour: null,
+    plan: 12,
+    tokens: 9,
+    week: 4,
+  });
+  expect(
+    valuesOf({ ...amount, apiUsd: 0 }, { fiveHour: 0, week: 0 }).week
+  ).toBe(0);
+});
+
+test("totals skip rows with no reading instead of counting them as zero", () => {
+  const values = { api: 2, fiveHour: null, plan: 1, tokens: 3, week: 4 };
+
+  expect(
+    totalOf([
+      { series: [1, 2], sessions: 2, values },
+      { series: [0, 3], sessions: 1, values: { ...values, fiveHour: null } },
+    ])
+  ).toEqual({
+    series: [1, 5],
+    sessions: 3,
+    values: { api: 4, fiveHour: null, plan: 2, tokens: 6, week: 8 },
+  });
+});
+
+test("the stack puts what the named layers leave under everything else", () => {
+  expect(
+    stackOf(
+      [
+        { key: "a", label: "a", values: [1, 0] },
+        { key: "b", label: "b", values: [1, 2] },
+      ],
+      [5, 2]
+    ).map((layer) => layer.values)
+  ).toEqual([
+    [1, 0],
+    [1, 2],
+    [3, 0],
+  ]);
+});
+
+describe("coverage", () => {
+  const start = Date.parse("2026-10-29T00:00:00-07:00");
+  const buckets = steps(start, 18, 4 * hour);
+  const cells = cellsOf(buckets, "4h", zone, start + 17 * 4 * hour);
+
+  test("a bucket that spent with no limit points reads as missing", () => {
+    expect(readingsOf([0, 3, 0], [0, 10, 5])).toEqual([
+      null,
+      "read",
+      "missing",
+    ]);
+  });
+
+  test("missing buckets merge into gaps across idle ones", () => {
+    expect(
+      gapsOf(["read", "missing", null, "missing", "read", null, "missing"])
+    ).toEqual([
+      { from: 1, to: 4 },
+      { from: 6, to: 7 },
+    ]);
+  });
+
+  test("days name the readings and weigh coverage by spend", () => {
+    const points = Array.from({ length: 18 }, (_, index) =>
+      index === 2 || index === 14 ? 5 : 0
+    );
+
+    const spend = Array.from({ length: 18 }, (_, index) =>
+      index % 6 === 0 ? 0 : 10
+    );
+
+    expect(
+      coverageOf(readingsOf(points, spend), spend, buckets, "4h", cells, zone)
+    ).toEqual({ active: 3, missing: 50, read: ["Thu", "today"], share: 2 / 3 });
+  });
 });

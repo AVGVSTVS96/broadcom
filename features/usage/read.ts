@@ -4,15 +4,30 @@ import { connection } from "next/server";
 
 import { namesOf } from "@/lib/model/names";
 import {
+  bucketLabel,
   cellsOf,
+  coverageOf,
   groupings,
+  isLimit,
   oneOf,
   ranges,
+  readingsOf,
+  stackOf,
   sumSeries,
+  totalOf,
   units,
   valuesOf,
 } from "@/lib/model/usage";
-import type { Cell, Grouping, Range, Unit, Values } from "@/lib/model/usage";
+import type {
+  Cell,
+  Coverage,
+  Grouping,
+  Layer,
+  Range,
+  Reading,
+  Unit,
+  Values,
+} from "@/lib/model/usage";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
 import { Credits, UsageView } from "@/lib/proxy/schema";
 import type { BucketSize, UsageRow } from "@/lib/proxy/schema";
@@ -27,6 +42,8 @@ export const dimensions = [
   "account",
 ] as const;
 
+export const page = 25;
+
 export interface UsageQuery {
   readonly range: Range;
   readonly unit: Unit;
@@ -34,7 +51,7 @@ export interface UsageQuery {
   readonly q: string;
   readonly within: string | null;
   readonly sel: string | null;
-  readonly all: boolean;
+  readonly rows: number;
   readonly where: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -44,15 +61,22 @@ export interface Row {
   readonly detail: string;
   readonly href: string | null;
   readonly values: Values;
-  readonly series: readonly number[];
   readonly sessions: number;
   readonly lastActiveAt: number;
   readonly agentSdk: number;
+}
+
+export interface Selected extends Row {
+  readonly pinned: boolean;
   readonly accounts: readonly {
     readonly name: string;
-    readonly week: number;
-    readonly fiveHour: number;
+    readonly week: number | null;
+    readonly fiveHour: number | null;
   }[];
+  readonly drill: {
+    readonly rows: readonly Row[];
+    readonly count: number;
+  } | null;
 }
 
 export interface Usage {
@@ -60,12 +84,15 @@ export interface Usage {
   readonly now: number;
   readonly size: BucketSize;
   readonly cells: readonly Cell[];
-  readonly buckets: number;
+  readonly ticks: readonly string[];
+  readonly layers: readonly Layer[];
+  readonly readings: readonly Reading[] | null;
+  readonly coverage: Coverage | null;
   readonly total: {
     readonly values: Values;
-    readonly series: readonly number[];
     readonly sessions: number;
     readonly previous: Values | null;
+    readonly cacheHit: number | null;
   };
   readonly agentSdk: {
     readonly share: number;
@@ -74,13 +101,8 @@ export interface Usage {
   };
   readonly rows: readonly Row[];
   readonly rowCount: number;
-  readonly selected: Row | null;
-  readonly drill: {
-    readonly rows: readonly Row[];
-    readonly count: number;
-  } | null;
+  readonly selected: Selected | null;
   readonly owner: string | null;
-  readonly limitsSince: number | null;
   readonly filters: readonly {
     readonly dimension: string;
     readonly id: string;
@@ -94,10 +116,10 @@ const single = (value: string | string[] | undefined) =>
 export const queryOf = (
   params: Readonly<Record<string, string | string[] | undefined>>
 ): UsageQuery => ({
-  all: single(params.all) === "1",
   by: oneOf(groupings, single(params.by), "agent"),
   q: single(params.q)?.trim() ?? "",
   range: oneOf(ranges, single(params.range), "7d"),
+  rows: Math.max(page, Math.trunc(Number(single(params.rows) ?? 0)) || 0),
   sel: single(params.sel) ?? null,
   unit: oneOf(units, single(params.unit), "api"),
   where: Object.fromEntries(
@@ -114,7 +136,9 @@ export const queryOf = (
   within: single(params.within) ?? null,
 });
 
-const page = 25;
+const everyMatch = 5000;
+
+const named = 3;
 
 const pathOf = (
   query: UsageQuery,
@@ -149,116 +173,26 @@ const pathOf = (
   return `/deck/usage?${params}`;
 };
 
-const sum = (rows: readonly Row[], unit: Unit) =>
-  rows.reduce((total, row) => total + (row.values[unit] ?? 0), 0);
-
-export const readUsage = async (query: UsageQuery): Promise<Usage> => {
-  await connection();
-
-  const searching = query.q !== "";
-  const limit = searching || query.all ? 1000 : page;
-
-  const { view, credits, owner } = await runtime.runPromise(
-    Effect.gen(function* () {
-      const proxy = yield* Proxy;
-
-      return yield* Effect.all(
-        {
-          credits: proxy
-            .get("/deck/credits", Credits)
-            .pipe(Effect.orElseSucceed(() => ({ api: [] }))),
-          owner:
-            query.within === null
-              ? Effect.succeed(null)
-              : proxy
-                  .get(
-                    pathOf(query, {
-                      by: "agent",
-                      limit: "1",
-                      q: null,
-                    }),
-                    UsageView
-                  )
-                  .pipe(
-                    Effect.map((found) => found.rows[0]?.label ?? null),
-                    Effect.orElseSucceed(() => null)
-                  ),
-          view: proxy.get(pathOf(query, { limit: String(limit) }), UsageView),
-        },
-        { concurrency: "unbounded" }
-      );
-    })
-  );
-
-  const names = namesOf(view.facets.account ?? [], credits.api);
-
-  const rowOf = (row: UsageRow): Row => ({
-    accounts: row.byAccount
-      .map((share) => ({
-        fiveHour: share.fiveHour ?? 0,
-        name: names[share.account] ?? share.account,
-        week: share.week ?? 0,
-      }))
-      .filter((share) => share.week + share.fiveHour > 0),
-    agentSdk: row.agentSdk,
-    detail: row.detail,
-    href: row.who?.href ?? null,
-    key: row.key,
-    label:
-      query.by === "account"
-        ? (names[row.key.slice(2)] ?? row.label)
-        : row.label,
-    lastActiveAt: row.lastActiveAt,
-    series: row.series,
-    sessions: row.sessions,
-    values: valuesOf(row.amount, row.points),
+const get = (path: string) =>
+  Effect.gen(function* () {
+    return yield* (yield* Proxy).get(path, UsageView);
   });
 
-  const rows = view.rows.map(rowOf);
-  const shown = searching ? rows : rows.slice(0, query.all ? 1000 : page);
-  const selected = shown.find((row) => row.key === query.sel) ?? null;
-
-  const drill =
-    selected !== null && query.by === "agent" && selected.sessions > 1
-      ? await runtime
-          .runPromise(
-            Effect.gen(function* () {
-              const proxy = yield* Proxy;
-
-              return yield* proxy.get(
-                pathOf(query, {
-                  by: "session",
-                  limit: "8",
-                  q: null,
-                  within: selected.key,
-                }),
-                UsageView
-              );
-            })
-          )
-          .then(
-            (found) => ({ count: found.rowCount, rows: found.rows.map(rowOf) }),
-            () => null
-          )
-      : null;
-
-  const now = Date.now();
-  const size = view.buckets[0]?.size ?? "1d";
-
-  const total = searching
+const totalsOf = (view: UsageView, searching: boolean) =>
+  searching
     ? {
+        ...totalOf(
+          view.rows.map((row) => ({
+            series: row.series,
+            sessions: row.sessions,
+            values: valuesOf(row.amount, row.points),
+          }))
+        ),
+        cacheHit: null,
         previous: null,
-        series: sumSeries(shown.map((row) => row.series)),
-        sessions: shown.reduce((count, row) => count + row.sessions, 0),
-        values: {
-          api: sum(shown, "api"),
-          fiveHour: sum(shown, "fiveHour"),
-          plan: sum(shown, "plan"),
-          tokens: sum(shown, "tokens"),
-          week: sum(shown, "week"),
-        },
       }
     : {
+        cacheHit: view.totals.cacheHitRate,
         previous:
           view.previous === null
             ? null
@@ -268,15 +202,133 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
         values: valuesOf(view.totals, view.totals.points),
       };
 
+const spentOf = (spend: UsageView, searching: boolean) =>
+  sumSeries(
+    searching
+      ? spend.rows.map((row) => row.series)
+      : spend.series.map((line) => line.values)
+  );
+
+export const readUsage = async (query: UsageQuery): Promise<Usage> => {
+  await connection();
+
+  const searching = query.q !== "";
+
+  const agent = (key: string | null) =>
+    key === null
+      ? Effect.succeed(null)
+      : get(
+          pathOf(query, { by: "agent", limit: "1", q: null, within: key })
+        ).pipe(
+          Effect.map((found) => found.rows[0] ?? null),
+          Effect.orElseSucceed(() => null)
+        );
+
+  const { view, spend, credits, owner } = await runtime.runPromise(
+    Effect.all(
+      {
+        credits: Effect.gen(function* () {
+          return yield* (yield* Proxy).get("/deck/credits", Credits);
+        }).pipe(Effect.orElseSucceed(() => ({ api: [] }))),
+        owner: agent(query.within),
+        spend: isLimit(query.unit)
+          ? get(
+              pathOf(query, {
+                limit: searching ? String(everyMatch) : "1",
+                measure: "api",
+              })
+            )
+          : Effect.succeed(null),
+        view: get(
+          pathOf(query, {
+            limit: String(searching ? everyMatch : query.rows),
+          })
+        ),
+      },
+      { concurrency: "unbounded" }
+    )
+  );
+
+  const names = namesOf(view.facets.account ?? [], credits.api);
+
+  const rowOf = (row: UsageRow): Row => ({
+    agentSdk: row.agentSdk,
+    detail: row.detail,
+    href: row.who?.href ?? null,
+    key: row.key,
+    label:
+      query.by === "account"
+        ? (names[row.key.slice(2)] ?? row.label)
+        : row.label,
+    lastActiveAt: row.lastActiveAt,
+    sessions: row.sessions,
+    values: valuesOf(row.amount, row.points),
+  });
+
+  const shown = view.rows.slice(0, query.rows);
+  const agents = query.by === "agent";
+
+  const { picked, drill } = await runtime.runPromise(
+    Effect.gen(function* () {
+      const row =
+        view.rows.find((one) => one.key === query.sel) ??
+        (agents ? yield* agent(query.sel) : null);
+
+      if (row === null || !agents || row.sessions <= 1) {
+        return { drill: null, picked: row };
+      }
+
+      const sessions = yield* get(
+        pathOf(query, { by: "session", limit: "8", q: null, within: row.key })
+      ).pipe(
+        Effect.map((found) => ({
+          count: found.rowCount,
+          rows: found.rows.map(rowOf),
+        })),
+        Effect.orElseSucceed(() => null)
+      );
+
+      return { drill: sessions, picked: row };
+    })
+  );
+
+  const now = Date.now();
+  const size = view.buckets[0]?.size ?? "1d";
+  const zone = view.period.timezone;
+  const cells = cellsOf(view.buckets, size, zone, now);
+  const total = totalsOf(view, searching);
+
+  const layers = stackOf(
+    picked === null
+      ? view.rows.slice(0, named).map((row) => ({
+          key: row.key,
+          label: rowOf(row).label,
+          values: row.series,
+        }))
+      : [
+          {
+            key: picked.key,
+            label: rowOf(picked).label,
+            values: picked.series,
+          },
+        ],
+    total.series
+  );
+
+  const spent = spend === null ? null : spentOf(spend, searching);
+  const readings = spent === null ? null : readingsOf(total.series, spent);
+
   return {
     agentSdk: {
       factor: view.agentSdk.factor,
       fiveHour: view.agentSdk.fiveHour,
       share: view.agentSdk.share,
     },
-    buckets: view.buckets.length,
-    cells: cellsOf(view.buckets, size, view.period.timezone, now),
-    drill,
+    cells,
+    coverage:
+      readings === null || spent === null
+        ? null
+        : coverageOf(readings, spent, view.buckets, size, cells, zone),
     filters: Object.entries(query.where).flatMap(([dimension, ids]) =>
       ids.map((id) => ({
         dimension,
@@ -285,14 +337,35 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
           view.facets[dimension]?.find((facet) => facet.id === id)?.label ?? id,
       }))
     ),
-    limitsSince: view.coverage.limitsSince,
+    layers,
     now,
-    owner,
+    owner: owner?.label ?? null,
     query,
+    readings,
     rowCount: view.rowCount,
-    rows: shown,
-    selected,
+    rows: shown.map(rowOf),
+    selected:
+      picked === null
+        ? null
+        : {
+            ...rowOf(picked),
+            accounts: picked.byAccount
+              .map((share) => ({
+                fiveHour: share.fiveHour,
+                name: names[share.account] ?? share.account,
+                week: share.week,
+              }))
+              .filter((share) => (share.week ?? 0) + (share.fiveHour ?? 0) > 0),
+            drill,
+            pinned: !shown.some((row) => row.key === picked.key),
+          },
     size,
-    total,
+    ticks: view.buckets.map((bucket) => bucketLabel(bucket.at, size, zone)),
+    total: {
+      cacheHit: total.cacheHit,
+      previous: total.previous,
+      sessions: total.sessions,
+      values: total.values,
+    },
   };
 };
