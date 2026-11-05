@@ -1,14 +1,22 @@
 import "server-only";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { cacheLife } from "next/cache";
 
 import { creditOf, loginOf } from "@/lib/model/accounts";
 import { compact } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
+import { redact } from "@/lib/model/redact";
+import { valuesOf } from "@/lib/model/settings";
 import type { Daily } from "@/lib/model/weeks";
 import { attempt, attemptCached } from "@/lib/proxy/attempt";
-import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
+import { Proxy, ProxyUnreachable, runtime } from "@/lib/proxy/proxy";
+import {
+  Config,
+  Credentials,
+  Credits,
+  History,
+  LimitUsage,
+} from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
 
 const weekHistory = async (): Promise<Readonly<Record<string, Points>>> => {
@@ -92,5 +100,38 @@ export const readCredits = async () =>
       const view = yield* (yield* Proxy).get("/deck/credits", Credits);
 
       return view.api.map(creditOf);
+    })
+  );
+
+export const readSettings = async () =>
+  await attempt(
+    Effect.gen(function* () {
+      const raw = yield* (yield* Proxy).get("/config", Schema.Json);
+
+      const config = yield* Schema.decodeUnknownEffect(Config)(raw).pipe(
+        Effect.mapError(
+          (error) =>
+            new ProxyUnreachable({ path: "/config", reason: error.message })
+        )
+      );
+
+      return {
+        facts: {
+          authDir: config.oauth?.["auth-dir"] ?? null,
+          plans: (config.usage?.plans ?? []).map((plan) => ({
+            name: plan.name,
+            since: plan.since ?? null,
+            usd: plan["monthly-usd"],
+          })),
+          remote: config.management?.["allow-remote"] ?? false,
+          server:
+            config.server?.host === undefined
+              ? null
+              : `${config.server.host}:${config.server.port ?? ""}`,
+          stateDir: config.usage?.["state-dir"] ?? null,
+        },
+        raw: JSON.stringify(redact(raw), null, 2),
+        values: valuesOf(config),
+      };
     })
   );
