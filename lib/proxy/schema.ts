@@ -362,6 +362,7 @@ export const Config = Schema.Struct({
           Schema.Struct({
             "monthly-usd": Schema.Number,
             name: Schema.String,
+            providers: Maybe(Schema.Array(Schema.String)),
             since: Maybe(Schema.String),
           })
         )
