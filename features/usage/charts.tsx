@@ -201,7 +201,8 @@ export const Stack = ({
             <span
               key={cell.from}
               className={cn(
-                "truncate border-l border-border pl-1 text-[11px] text-muted-foreground",
+                "border-l border-border pl-1 text-[11px] whitespace-nowrap text-muted-foreground",
+                cell.to === count ? "overflow-visible" : "overflow-hidden",
                 cell.now !== null && "text-foreground"
               )}
               style={{ gridColumn: `${cell.from + 1} / ${cell.to + 1}` }}
