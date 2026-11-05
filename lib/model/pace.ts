@@ -14,11 +14,11 @@ export interface Pace {
   readonly resetsAt: number;
   readonly used: number;
   readonly cutoff: number;
-  readonly elapsed: number;
   readonly even: number;
   readonly pace: number | null;
   readonly locked: boolean;
   readonly ranOut: number | null;
+  readonly reached: number;
   readonly runsOut: number | null;
   readonly atReset: number;
   readonly line: Points;
@@ -26,8 +26,25 @@ export interface Pace {
 
 const minimumSpan = HOUR;
 
-const rateOf = ([points, span]: readonly [number, number]) =>
-  span > 0 ? Math.max(0, points) / span : null;
+const measure = (
+  reached: number,
+  base: number,
+  span: readonly [from: number, end: number],
+  start: number,
+  length: number
+) => {
+  const [from, end] = span;
+
+  const [gained, taken, offset] =
+    end - from >= minimumSpan
+      ? [reached - base, end - from, base]
+      : [reached, end - start, 0];
+
+  return {
+    even: Math.min(100, offset + (taken * 100) / length),
+    rate: taken > 0 ? Math.max(0, gained) / taken : null,
+  };
+};
 
 export const windowPace = (
   window: LimitWindow,
@@ -50,13 +67,7 @@ export const windowPace = (
   const from = Math.max(counted, line[0]?.[0] ?? counted);
   const base = valueAt(points, from) ?? 0;
   const reached = ranOut === null ? used : cutoff;
-  const span = end - from;
-
-  const rate = rateOf(
-    span >= minimumSpan ? [reached - base, span] : [reached, end - start]
-  );
-
-  const elapsed = Math.min(1, Math.max(0, (now - start) / length));
+  const { rate, even } = measure(reached, base, [from, end], start, length);
   const left = Math.max(0, resetsAt - now);
   const projected = locked || rate === null ? used : used + rate * left;
 
@@ -68,12 +79,12 @@ export const windowPace = (
   return {
     atReset: Math.min(100, projected),
     cutoff,
-    elapsed,
-    even: elapsed * 100,
+    even,
     line,
     locked,
     pace: rate === null ? null : rate / (100 / length),
     ranOut,
+    reached,
     resetsAt,
     runsOut,
     start,

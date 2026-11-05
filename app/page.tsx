@@ -1,19 +1,17 @@
-"use client";
+import { connection } from "next/server";
 
-import { useLive } from "@/lib/live/client";
+import { Overview } from "@/features/overview/overview";
+import { readGrants, readWeekHistory } from "@/lib/proxy/read";
 
-const Overview = () => {
-  const accounts = useLive((live) => live.accounts);
-  const decision = useLive((live) => live.pool?.decision ?? "");
+const OverviewPage = async () => {
+  await connection();
 
-  return (
-    <section className="space-y-2">
-      <h1 className="text-2xl font-medium tracking-tight">{decision}</h1>
-      <p className="text-muted-foreground">
-        {Object.keys(accounts).length} accounts
-      </p>
-    </section>
-  );
+  const [history, grants] = await Promise.all([
+    readWeekHistory(),
+    readGrants(),
+  ]);
+
+  return <Overview history={history} grants={grants} rendered={Date.now()} />;
 };
 
-export default Overview;
+export default OverviewPage;

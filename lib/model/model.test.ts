@@ -134,6 +134,7 @@ describe("windowPace", () => {
 
     expect(pace?.locked).toBe(true);
     expect(pace?.ranOut).toBe(at(56));
+    expect(pace?.even).toBeCloseTo(100 / 3);
     expect(pace?.pace).toBeCloseTo(3 * (98 / 100));
     expect(pace?.runsOut).toBeNull();
   });
@@ -149,6 +150,7 @@ describe("windowPace", () => {
     const pace = windowPace(window(2), points, at(24));
 
     expect(pace?.line[0]).toEqual([at(12), 0]);
+    expect(pace?.even).toBeCloseTo((12 * 100) / 168);
     expect(pace?.pace).toBeCloseTo(2 / 12 / (100 / 168));
   });
 
