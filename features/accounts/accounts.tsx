@@ -128,7 +128,10 @@ export const Accounts = ({
   const plans = rows.filter((row) => row.credit === null);
   const keys = rows.filter((row) => row.credit !== null);
   const ending = firstSignOut(plans, now);
-  const next = plans.find((row) => row.state.is === "next");
+
+  const next =
+    plans.find((row) => row.state.is === "next") ??
+    plans.find((row) => row.state.is === "open");
 
   const name = (id: string | null) =>
     rows.find((row) => row.account?.id === id)?.name ?? "no account";
