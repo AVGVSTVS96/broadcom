@@ -8,6 +8,7 @@ import "./globals.css";
 import { Loading } from "@/components/shell/loading";
 import { Mark } from "@/components/shell/mark";
 import { Nav } from "@/components/shell/nav";
+import { Toaster } from "@/components/ui/sonner";
 import { LiveProvider } from "@/lib/live/client";
 import { readLive } from "@/lib/live/server";
 
@@ -52,6 +53,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
           <Live>{children}</Live>
         </Suspense>
       </main>
+      <Toaster />
     </body>
   </html>
 );

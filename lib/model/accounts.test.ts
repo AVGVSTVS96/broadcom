@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { accountRows, creditOf, ledgerOf, loginOf } from "@/lib/model/accounts";
+import { accountRows, creditOf, loginOf } from "@/lib/model/accounts";
 import type { Account, Credential, Grant } from "@/lib/proxy/schema";
 
 const window = (used: number | null, resetsAt: number | null = null) => ({
@@ -141,7 +141,44 @@ describe("accountRows", () => {
       order: ["a1"],
     });
 
-    expect(rows[0]?.state).toEqual({ is: "limited", until: 5000 });
+    expect(rows[0]?.state).toEqual({
+      is: "limited",
+      until: 5000,
+      window: "week",
+    });
+  });
+
+  test("Anthropic's rate limit on a working sign-in is a limit, not a failed sign-in", () => {
+    const limited = JSON.stringify({
+      error: {
+        message: "This request would exceed your account's rate limit.",
+        type: "rate_limit_error",
+      },
+      type: "error",
+    });
+
+    const rows = accountRows({
+      accounts: {
+        a1: account("a1", "a@example.com", {
+          standing: "limited",
+          week: window(100, 5000),
+        }),
+      },
+      credits: [],
+      logins: [
+        loginOf(
+          credential("a@example.com", {
+            status: "error",
+            status_message: limited,
+            unavailable: true,
+          })
+        ),
+      ],
+      order: ["a1"],
+    });
+
+    expect(rows[0]?.state.is).toBe("limited");
+    expect(rows[0]?.login?.error).toBeNull();
   });
 
   test("orders plans by the pool, then API keys, then ChatGPT", () => {
@@ -182,6 +219,23 @@ describe("accountRows", () => {
       message: "refresh token revoked",
     });
   });
+
+  test("a failed sign-in shows Anthropic's words, not its JSON", () => {
+    const login = loginOf(
+      credential("a@example.com", {
+        status: "error",
+        status_message: JSON.stringify({
+          error: {
+            message: "Invalid bearer token",
+            type: "authentication_error",
+          },
+          type: "error",
+        }),
+      })
+    );
+
+    expect(login.error).toBe("Invalid bearer token");
+  });
 });
 
 describe("credit", () => {
@@ -194,33 +248,5 @@ describe("credit", () => {
     });
 
     expect(rows[0]?.state.is).toBe("low");
-  });
-});
-
-describe("ledgerOf", () => {
-  test("a login's API key sits under it, a key with no login stands alone, ChatGPT comes last", () => {
-    const rows = accountRows({
-      accounts: { a1: account("a1", "a@example.com") },
-      credits: [
-        creditOf(grant("claude:apikey:k", "a1", 50)),
-        creditOf(grant("claude:apikey:zzzzzz", "gone", 50)),
-      ],
-      logins: [
-        loginOf(credential("gpt@example.com", { provider: "codex" })),
-        loginOf(credential("a@example.com")),
-      ],
-      order: ["a1"],
-    });
-
-    expect(
-      ledgerOf(rows).map((entry) => [
-        entry.row.name,
-        entry.keys.map((key) => key.name),
-      ])
-    ).toEqual([
-      ["a", ["a API"]],
-      ["API key zzzzzz", []],
-      ["gpt", []],
-    ]);
   });
 });

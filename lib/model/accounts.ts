@@ -1,6 +1,13 @@
+import { Option, Schema } from "effect";
+
 import { nameOf, namesOf } from "@/lib/model/names";
 import { creditTone, emptyCredit } from "@/lib/model/tone";
-import type { Account, Credential, Grant } from "@/lib/proxy/schema";
+import type {
+  Account,
+  Credential,
+  Grant,
+  LimitWindow,
+} from "@/lib/proxy/schema";
 
 export interface Login {
   readonly name: string;
@@ -29,7 +36,11 @@ export type Kind = "plan" | "api" | "chatgpt" | "other";
 export type State =
   | { readonly is: "next" }
   | { readonly is: "open" }
-  | { readonly is: "limited"; readonly until: number | null }
+  | {
+      readonly is: "limited";
+      readonly window: "week" | "session";
+      readonly until: number | null;
+    }
   | { readonly is: "disabled" }
   | { readonly is: "sign-in" }
   | { readonly is: "error"; readonly message: string }
@@ -54,14 +65,32 @@ const text = (...values: readonly (string | undefined)[]) =>
   values.map((value) => value?.trim() ?? "").find((value) => value !== "") ??
   "";
 
+const Refusal = Schema.Struct({
+  error: Schema.Struct({ message: Schema.String, type: Schema.String }),
+});
+
+const decodeRefusal = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Refusal)
+);
+
+export const problemOf = (message: string) =>
+  Option.match(decodeRefusal(message), {
+    onNone: () => ({ limit: /rate.?limit/iu.test(message), text: message }),
+    onSome: ({ error }) => ({
+      limit: error.type === "rate_limit_error",
+      text: error.message,
+    }),
+  });
+
 export const loginOf = (credential: Credential): Login => {
-  const message = text(credential.status_message);
+  const problem = problemOf(text(credential.status_message));
+  const failed = credential.status === "error" && !problem.limit;
+  const reason = problem.limit ? "Anthropic's rate limit" : problem.text;
 
   return {
-    cooling: credential.unavailable === true ? message : null,
+    cooling: credential.unavailable === true || problem.limit ? reason : null,
     disabled: credential.disabled,
-    error:
-      credential.status === "error" ? text(message, "Sign-in failed") : null,
+    error: failed ? text(problem.text, "Sign-in failed") : null,
     login: text(credential.email, credential.label, credential.name),
     name: credential.name,
     provider: credential.provider,
@@ -89,17 +118,22 @@ const kindOf = (provider: string): Kind => {
   return provider === "codex" ? "chatgpt" : "other";
 };
 
-const limitedUntil = (account: Account) => {
+const full = (window: LimitWindow) =>
+  window.used !== null && window.used >= window.cutoff;
+
+const limitedOf = (account: Account): State => {
   const windows = [account.week, account.fiveHour].filter(
-    (window) =>
-      window.used !== null &&
-      window.used >= window.cutoff &&
-      window.resetsAt !== null
+    (window) => full(window) && window.resetsAt !== null
   );
 
-  return windows.length === 0
-    ? null
-    : Math.max(...windows.map((window) => window.resetsAt ?? 0));
+  return {
+    is: "limited",
+    until:
+      windows.length === 0
+        ? null
+        : Math.max(...windows.map((window) => window.resetsAt ?? 0)),
+    window: full(account.fiveHour) && !full(account.week) ? "session" : "week",
+  };
 };
 
 const stateOf = (
@@ -124,7 +158,7 @@ const stateOf = (
   }
 
   if (account?.standing === "limited") {
-    return { is: "limited", until: limitedUntil(account) };
+    return limitedOf(account);
   }
 
   if (login !== null && login.cooling !== null) {
@@ -236,48 +270,15 @@ export const accountRows = ({
   );
 };
 
-export const hasRoom = (row: Row) =>
-  row.state.is === "next" || row.state.is === "open";
-
-export interface Entry {
-  readonly row: Row;
-  readonly keys: readonly Row[];
-}
-
-export const ledgerOf = (rows: readonly Row[]): Entry[] => {
-  const keys = rows.filter((row) => row.credit !== null);
-
-  const entries = rows.flatMap((row) =>
-    row.kind === "api"
-      ? []
-      : [
-          {
-            keys: keys.filter(
-              (key) =>
-                row.account !== null && key.credit?.account === row.account.id
-            ),
-            row,
-          },
-        ]
-  );
-
-  const placed = new Set(
-    entries.flatMap((entry) => entry.keys.map((key) => key.key))
-  );
-
-  const loose = rows.flatMap((row) =>
-    row.kind === "api" && !placed.has(row.key) ? [{ keys: [], row }] : []
-  );
-
-  const last = (entry: Entry) =>
-    Number(entry.row.kind === "chatgpt" || entry.row.kind === "other");
-
-  return [...entries, ...loose].toSorted(
-    (left, right) => last(left) - last(right)
-  );
-};
-
 export const needsYou = (row: Row) =>
   row.state.is === "disabled" ||
   row.state.is === "error" ||
   row.state.is === "sign-in";
+
+const soon = 2 * 86_400_000;
+
+export const endsSoon = (row: Row, now: number) => {
+  const until = row.account?.signInUntil ?? null;
+
+  return until !== null && until - now < soon;
+};

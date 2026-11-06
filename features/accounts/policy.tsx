@@ -108,7 +108,7 @@ export const Policy = ({
                 min={1}
                 max={field.max}
                 step={1}
-                className="h-9 tabular-nums"
+                className="h-9 w-24 tabular-nums"
                 value={Number.isNaN(values[field.key]) ? "" : values[field.key]}
                 onChange={(event) => {
                   setPreview(null);
