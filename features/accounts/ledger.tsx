@@ -153,7 +153,7 @@ const Line = ({
 }) => (
   <div
     id={id}
-    className="grid scroll-mt-6 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-start gap-x-5 gap-y-3 py-4 target:bg-muted/50 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_2rem] sm:gap-x-6"
+    className="grid scroll-mt-6 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-start gap-x-5 gap-y-3 py-4 target:-mx-3 target:rounded-lg target:bg-muted/50 target:px-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_2rem] sm:gap-x-6"
   >
     <div className="col-span-2 min-w-0 sm:col-span-1">
       <div className="flex items-center gap-2">
