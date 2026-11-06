@@ -127,7 +127,7 @@ const Credit = ({ plan }: { plan: Plan }) => {
 
   return (
     <Cell
-      label="API credit"
+      label="Free credit"
       value={dollars(left)}
       tone={tone}
       note={`of ${dollars(total)} · estimate`}

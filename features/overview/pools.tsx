@@ -74,7 +74,7 @@ export const Pools = ({
           : `Next reset in ${duration(sessionReset - now)}`}
       </Column>
       <Column
-        label="API credit"
+        label="Free credit"
         value={credit.parts.length === 0 ? "–" : dollars(credit.left)}
         unit={credit.parts.length === 0 ? "" : `of ${dollars(credit.total)}`}
         totals={credit}

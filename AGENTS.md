@@ -12,6 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 The dashboard for a CLIProxyAPI account pool: which account takes new work, how much each plan and API credit has left, how fast it's going, who spent it, and adding or removing accounts. Next.js 16 (Cache Components, React Compiler), shadcn on Base UI, Tailwind 4, Effect 4.
 
+The pool spends cheapest first: plans, then free credit, then paid extra usage. Free credit costs nothing: API keys holding the monthly API credit a Max or Ultra plan includes, in an organization with no card, so they need no extra-usage switch. Paid extra usage bills money, and only on an account whose owner turned extra usage on. Call each by those names; "API credit" alone doesn't say which.
+
 ## Layers
 
 - `lib/proxy/`: the only code that talks to the proxy. `schema.ts` holds the Effect Schemas for every payload; `proxy.ts` is the `Proxy` service (management key read on the server, never sent to a browser). A new proxy API is a new Layer here, nothing else changes.
