@@ -188,7 +188,7 @@ export const Accounts = ({
       {keys.length === 0 ? null : (
         <Section
           title={creditTitle(keys)}
-          detail="Monthly API credit the plans include, at no cost. The pool spends it only after the plans."
+          detail="Free API credit grants, at no cost. The pool spends them only after the plans."
           actions={
             <a
               href="https://platform.claude.com/settings/billing"
