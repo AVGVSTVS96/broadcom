@@ -49,6 +49,7 @@ import {
 import { creditTone, windowTone } from "@/lib/model/tone";
 import type { Tone } from "@/lib/model/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
+import type { LimitWindow } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
 const dots = {
@@ -169,8 +170,8 @@ const Line = ({
         {[labelOf(state), note].filter(Boolean).join(" · ")}
       </div>
     </div>
-    <div className="min-w-0">{first}</div>
-    <div className="col-span-2 min-w-0 sm:col-span-1">{second}</div>
+    <div className="col-span-3 min-w-0 sm:col-span-1">{first}</div>
+    <div className="col-span-3 min-w-0 sm:col-span-1">{second}</div>
     <div className="col-start-3 row-start-1 -mt-1 flex justify-end sm:col-start-4">
       {actions}
     </div>
@@ -298,30 +299,37 @@ const planNote = (row: Row) => {
     : undefined;
 };
 
-const Weekly = ({ row, now }: { row: Row; now: number }) => {
-  if (row.account === null) {
-    return <Cell label="Weekly" value="–" note="No reading" />;
+const UsageWindow = ({
+  label,
+  window,
+  now,
+}: {
+  label: string;
+  window: LimitWindow | null;
+  now: number;
+}) => {
+  if (window === null || window.used === null) {
+    return <Cell label={label} value="–" note="No reading" />;
   }
 
-  const window = row.account.week;
-  const locked = row.state.is === "limited" && row.state.window === "week";
+  const locked = window.used >= window.cutoff;
   const tone = windowTone(window);
 
   return (
     <Cell
-      label="Weekly"
+      label={label}
       value={
         <span className={tone === "ok" ? undefined : texts[tone]}>
-          {window.used === null ? "–" : percent(window.used)}
+          {percent(window.used)}
         </span>
       }
       note={
         window.resetsAt === null
-          ? "No reading"
+          ? "No reset time"
           : `${locked ? "Back" : "Resets"} ${when(window.resetsAt, now)}`
       }
     >
-      <Bar value={window.used ?? 0} tone={tone} locked={locked} />
+      <Bar value={window.used} tone={tone} locked={locked} />
     </Cell>
   );
 };
@@ -368,7 +376,20 @@ export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
       state={row.state}
       plan={account?.plan}
       note={planNote(row)}
-      first={<Weekly row={row} now={now} />}
+      first={
+        <div className="space-y-3">
+          <UsageWindow
+            label="5-hour used"
+            window={account?.fiveHour ?? null}
+            now={now}
+          />
+          <UsageWindow
+            label="Weekly used"
+            window={account?.week ?? null}
+            now={now}
+          />
+        </div>
+      }
       second={<SignedIn row={row} now={now} />}
       actions={
         login === null ? null : (
