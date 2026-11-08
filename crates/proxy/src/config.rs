@@ -120,7 +120,7 @@ pub fn ensure_secret(path: &Path) -> Result<bool> {
         return Ok(false);
     }
     let mut key = [0u8; 24];
-    rand::RngCore::fill_bytes(&mut rand::rng(), &mut key);
+    rand::fill(&mut key);
     files::write_atomic(path, format!("{}\n", hex(&key)).as_bytes())
         .with_context(|| format!("writing {}", path.display()))?;
     Ok(true)

@@ -21,13 +21,13 @@ notify = "8"
 postcard = { version = "1", features = ["use-std"] }
 regex = "1"
 reqwest = { workspace = true, features = ["rustls", "json", "gzip"] }
-parking_lot = "0.12"
-rusqlite = { version = "0.37", features = ["bundled"] }
+parking_lot = "0.13"
+rusqlite = { version = "0.41", features = ["bundled"] }
 schemars = { version = "1", features = ["indexmap2"] }
 serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true, features = ["preserve_order", "float_roundtrip", "raw_value"] }
 sha2.workspace = true
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "process", "io-util", "sync", "time"] }
 tokio-stream = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
