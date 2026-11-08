@@ -2,7 +2,7 @@
 
 import { ArrowUpRightIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Problems } from "@/components/viz/problems";
@@ -15,6 +15,7 @@ import { useNow } from "@/lib/live/now";
 import { accountRows, endsSoon, needsYou } from "@/lib/model/accounts";
 import type { Credit, Login, Row, State } from "@/lib/model/accounts";
 import { dollars, plural, when } from "@/lib/model/format";
+import { useImperative } from "@/lib/outside";
 
 const needs: Partial<Record<State["is"], string>> = {
   disabled: "is disabled",
@@ -87,7 +88,7 @@ const useRefreshOnNewAccounts = (ids: string) => {
   const router = useRouter();
   const seen = useRef(ids);
 
-  useEffect(() => {
+  useImperative(() => {
     if (seen.current !== ids) {
       seen.current = ids;
       router.refresh();

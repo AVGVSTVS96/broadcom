@@ -2,9 +2,10 @@
 
 import type { FileTreeRowDecoration, GitStatusEntry } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
-import { useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import type { Change } from "@/lib/model/files";
+import { useImperative } from "@/lib/outside";
 
 const ancestors = (file: string) => {
   const parts = file.split("/").slice(0, -1);
@@ -62,11 +63,11 @@ export const Tree = ({
 }) => {
   const known = useRef<Set<string> | null>(null);
   const byPath = useRef(new Map<string, Change>());
-  const latest = useRef({ onPick, selected });
+  const latest = useRef({ onPick, open, selected });
 
-  useEffect(() => {
-    latest.current = { onPick, selected };
-  }, [onPick, selected]);
+  useImperative(() => {
+    latest.current = { onPick, open, selected };
+  }, [onPick, open, selected]);
 
   const { model } = useFileTree({
     density: "compact",
@@ -94,18 +95,20 @@ export const Tree = ({
     unsafeCSS: look,
   });
 
-  const startOpen = useEffectEvent(() => [...new Set([...open, selected].flatMap(ancestors))]);
-
   const all = useMemo(() => [...paths, ...fresh].toSorted(), [paths, fresh]);
 
-  useEffect(() => {
+  useImperative(() => {
     const previous = known.current;
     const next = new Set(all);
 
     known.current = next;
 
     if (previous === null) {
-      model.resetPaths(all, { initialExpandedPaths: startOpen() });
+      const { open: opened, selected: chosen } = latest.current;
+
+      model.resetPaths(all, {
+        initialExpandedPaths: [...new Set([...opened, chosen].flatMap(ancestors))],
+      });
 
       return;
     }
@@ -123,7 +126,7 @@ export const Tree = ({
     }
   }, [model, all]);
 
-  useEffect(() => {
+  useImperative(() => {
     byPath.current = new Map(changes.map((change) => [change.path, change]));
     model.setGitStatus([
       ...changes.map((change): GitStatusEntry => ({
@@ -137,7 +140,7 @@ export const Tree = ({
     ]);
   }, [model, changes, fresh]);
 
-  useEffect(() => {
+  useImperative(() => {
     for (const file of model.getSelectedPaths()) {
       if (file !== selected) {
         model.getItem(file)?.deselect();

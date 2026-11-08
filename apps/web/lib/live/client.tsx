@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, use, useEffect, useState, useSyncExternalStore } from "react";
+import { createContext, use, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { applyChange } from "@/lib/live/event";
 import type { Live, LiveEvent } from "@/lib/live/event";
+import { useSubscription } from "@/lib/outside";
 
 const refreshEvery = 30_000;
 
@@ -60,7 +61,7 @@ export const LiveProvider = ({ initial, children }: { initial: Live; children: R
   const [store] = useState(() => createStore(initial));
   const router = useRouter();
 
-  useEffect(() => {
+  useSubscription(() => {
     const source = new EventSource("/api/live");
     let last = 0;
     let pending: ReturnType<typeof setTimeout> | undefined;
@@ -110,7 +111,7 @@ export const RefreshOnStale = ({ tags }: { tags: readonly string[] }) => {
   const { wanted } = useStore();
   const key = tags.join(" ");
 
-  useEffect(() => {
+  useSubscription(() => {
     const names = key.split(" ");
 
     for (const name of names) {

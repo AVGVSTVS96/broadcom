@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -140,19 +140,6 @@ export const Settings = ({
   const [pending, startTransition] = useTransition();
   const policy = useLive((live) => live.pool?.policy ?? null);
 
-  useEffect(() => {
-    const timer =
-      notice === "Saved"
-        ? setTimeout(() => {
-            setNotice(null);
-          }, 2500)
-        : undefined;
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [notice]);
-
   if (values === null || facts === null) {
     return (
       <p className="rounded-2xl border border-bad/40 px-4 py-3 text-sm text-bad" role="alert">
@@ -178,6 +165,9 @@ export const Settings = ({
       } else {
         setDraft(null);
         setNotice("Saved");
+        setTimeout(() => {
+          setNotice((shown) => (shown === "Saved" ? null : shown));
+        }, 2500);
       }
     });
   };

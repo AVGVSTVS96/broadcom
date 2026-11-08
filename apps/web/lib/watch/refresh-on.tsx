@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+
+import { useSubscription } from "@/lib/outside";
 
 export const RefreshOn = ({ src }: { src: string }) => {
   const router = useRouter();
 
-  useEffect(() => {
+  useSubscription(() => {
     const source = new EventSource(src);
 
     source.addEventListener("message", () => {
