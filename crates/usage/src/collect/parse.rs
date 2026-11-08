@@ -212,8 +212,8 @@ fn ordinal_value(ordinal: Val, line: usize) -> Ordinal {
     }
 }
 
-fn fallback_id(harness: &str, session: &str, stamp: &str, ordinal: Ordinal) -> String {
-    let ordinal = match &ordinal {
+fn fallback_id(harness: &str, session: &str, stamp: &str, ordinal: &Ordinal) -> String {
+    let ordinal = match ordinal {
         Ordinal::Num(n) => J::F(*n),
         Ordinal::Text(s) => J::S(s),
         Ordinal::Line(n) => J::I(*n as i64),
@@ -361,7 +361,7 @@ impl Claude {
         } else if !uuid.text().is_empty() {
             format!("claude:uuid:{}", uuid.text())
         } else {
-            fallback_id("claude", &session, &stamp, ordinal_value(ordinal, line))
+            fallback_id("claude", &session, &stamp, &ordinal_value(ordinal, line))
         };
         let sidechain = sidechain == Val::True;
         let (cwd, via) = (cwd.text(), via.text());
@@ -393,7 +393,7 @@ impl Claude {
                 output_details.fields(["thinking_tokens", "reasoning_tokens"]);
             let mut e = new_event(Harness::Claude, &stamp, &session, model_name(model), &cwd);
             e.id = usage_id;
-            e.entrypoint = via.clone();
+            e.entrypoint.clone_from(&via);
             e.input_tokens = number(input);
             e.output_tokens = number(output);
             e.cache_read_tokens = number(cache_read);
@@ -433,8 +433,11 @@ impl Claude {
                 );
                 let before = lines.len();
                 append(&mut lines, value, model, advisor_id, true);
-                if index as i64 != ordinal && lines.len() > before {
-                    lines.last_mut().unwrap().legacy_event_id = format!(
+                if index as i64 != ordinal
+                    && lines.len() > before
+                    && let Some(last) = lines.last_mut()
+                {
+                    last.legacy_event_id = format!(
                         "claude:advisor:{}",
                         sha256_hex(&json_array(&[J::S(&id), J::I(index as i64)]))
                     );
@@ -574,7 +577,7 @@ fn codex_task_start(payload: Val) -> Option<(f64, f64)> {
         }
     }
     let precision = match started_at.num() {
-        Some(n) if n == n.trunc() && n <= 1e11 => 1000.0,
+        Some(n) if n.fract() == 0.0 && n <= 1e11 => 1000.0,
         _ => 1.0,
     };
     (!started.is_empty()).then(|| (parse_date(&started), precision))
@@ -769,13 +772,13 @@ pub fn parse_codex<R: BufRead>(r: &mut R, file: &str) -> std::io::Result<Parsed>
                 }
                 let mut current = ctx.clone();
                 let explicit = codex_model(payload);
-                if !explicit.is_empty() {
-                    current.model = explicit;
-                } else {
+                if explicit.is_empty() {
                     let model = codex_model(info);
                     if !model.is_empty() {
                         current.model = model;
                     }
+                } else {
+                    current.model = explicit;
                 }
                 let mut e = codex_event(&stamp, &parsed.session_id, &current, &tokens);
                 if e.token_total() > 0 {
@@ -837,14 +840,14 @@ pub fn parse_codex<R: BufRead>(r: &mut R, file: &str) -> std::io::Result<Parsed>
                         "codex",
                         &parsed.session_id,
                         &stamp,
-                        ordinal_value(ordinal, line),
+                        &ordinal_value(ordinal, line),
                     )
                 } else {
                     format!("codex:response:{response_id}")
                 };
                 let mut tier = tier.text();
                 if tier.is_empty() {
-                    tier = ctx.tier.clone();
+                    tier.clone_from(&ctx.tier);
                 }
                 precise.push(Precise {
                     entry: Candidate {
@@ -918,7 +921,7 @@ pub fn parse_codex<R: BufRead>(r: &mut R, file: &str) -> std::io::Result<Parsed>
                         || matches!((pending.thread_tokens, s.total), (Some(a), Some(b)) if a == b))
             });
             if let Some(covered) = covered {
-                covered.entry.usage.id = pending.entry.usage.id.clone();
+                covered.entry.usage.id.clone_from(&pending.entry.usage.id);
                 if let Some(i) = covered.appended {
                     parsed.events[i].usage.id = pending.entry.usage.id;
                 }
@@ -926,10 +929,10 @@ pub fn parse_codex<R: BufRead>(r: &mut R, file: &str) -> std::io::Result<Parsed>
             }
         }
         if let Some(turn) = contexts.get(&pending.turn_id) {
-            pending.entry.usage.model = turn.model.clone();
+            pending.entry.usage.model.clone_from(&turn.model);
             pending.entry.usage.project = project_text(&turn.cwd);
             if pending.entry.tier.is_empty() {
-                pending.entry.tier = turn.tier.clone();
+                pending.entry.tier.clone_from(&turn.tier);
             }
         }
         if !pending.explicit_model.is_empty() {
@@ -1021,7 +1024,7 @@ pub fn parse_pi<R: BufRead>(r: &mut R, file: &str) -> std::io::Result<Parsed> {
                 "pi",
                 &parsed.session_id,
                 &stamp,
-                ordinal_value(ordinal, line),
+                &ordinal_value(ordinal, line),
             )
         } else {
             format!("pi:{}:{}", parsed.session_id, id.text())
@@ -1183,7 +1186,7 @@ impl Muse {
         ]);
         let mut model = event_model.text();
         if model.is_empty() {
-            model = self.model.clone();
+            model.clone_from(&self.model);
         }
         let mut e = new_event(
             Harness::Muse,
@@ -1205,15 +1208,15 @@ impl Muse {
         if native_id.is_empty() {
             native_id = id.text();
         }
-        e.id = if !native_id.is_empty() {
-            format!("muse:record:{native_id}")
-        } else {
+        e.id = if native_id.is_empty() {
             let ordinal = match sequence.num() {
                 Some(n) => Ordinal::Num(n),
                 None if !child_path.is_empty() => Ordinal::Text(format!("{line}:{child_path}")),
                 None => ordinal_value(sequence, line),
             };
-            fallback_id("muse", &self.parsed.session_id, &stamp, ordinal)
+            fallback_id("muse", &self.parsed.session_id, &stamp, &ordinal)
+        } else {
+            format!("muse:record:{native_id}")
         };
         self.parsed.events.push(Candidate {
             usage: e,
@@ -1250,7 +1253,7 @@ pub mod tests {
         std::io::Cursor::new(
             records
                 .iter()
-                .map(|r| format!("{r}\n"))
+                .flat_map(|r| [*r, "\n"])
                 .collect::<String>()
                 .into_bytes(),
         )

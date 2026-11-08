@@ -10,7 +10,7 @@ use super::json::{Val, read_lines, valid};
 use super::parse::{Candidate, Harness, Parsed, Usage};
 
 struct Session {
-    session_id: String,
+    id: String,
     project: String,
     model: String,
     parent_id: String,
@@ -38,7 +38,7 @@ fn turn_number(e: &Usage) -> i64 {
 
 fn count(v: Val) -> Option<i64> {
     v.num()
-        .filter(|n| *n >= 0.0 && *n <= 9007199254740991.0 && *n == n.trunc())
+        .filter(|n| *n >= 0.0 && *n <= 9_007_199_254_740_991.0 && n.fract() == 0.0)
         .map(|n| n as i64)
 }
 
@@ -109,10 +109,10 @@ fn append_usage(
             model
         };
         let mut e = Usage {
-            id: turn_id(&s.session_id, turn, &model),
+            id: turn_id(&s.id, turn, &model),
             timestamp: at.into(),
             harness: Harness::Grok,
-            session_id: s.session_id.clone(),
+            session_id: s.id.clone(),
             model,
             project: s.project.clone(),
             input_tokens: input - cache_read - cache_write,
@@ -140,13 +140,13 @@ fn append_usage(
 
 fn parse_ledger(data: &str, s: &Session) -> Parsed {
     let mut parsed = Parsed {
-        session_id: s.session_id.clone(),
+        session_id: s.id.clone(),
         ..Default::default()
     };
     let ledger = Val::parse(data);
     let turns = ledger.get("turns");
     let id = ledger.get("sessionId").text();
-    if !ledger.is_object() || !turns.is_array() || (!id.is_empty() && id != s.session_id) {
+    if !ledger.is_object() || !turns.is_array() || (!id.is_empty() && id != s.id) {
         parsed.malformed += 1;
         return parsed;
     }
@@ -164,7 +164,7 @@ fn parse_ledger(data: &str, s: &Session) -> Parsed {
 
 fn parse_updates(data: &[u8], s: &Session) -> Parsed {
     let mut parsed = Parsed {
-        session_id: s.session_id.clone(),
+        session_id: s.id.clone(),
         ..Default::default()
     };
     let mut turn = 0;
@@ -323,7 +323,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                     .unwrap_or_default();
                 let field = |path: &str| text_of(&summary, path);
                 let mut s = Session {
-                    session_id: field("info.id"),
+                    id: field("info.id"),
                     project: field("info.cwd"),
                     model: field("current_model_id"),
                     parent_id: field("parent_session_id"),
@@ -333,14 +333,14 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                     updates: Some(directory.join("updates.jsonl")).filter(|f| regular_file(f)),
                     parsed: None,
                 };
-                if s.session_id.is_empty() {
-                    s.session_id = directory
+                if s.id.is_empty() {
+                    s.id = directory
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default();
                 }
                 if s.project.is_empty() {
-                    s.project = group_project.clone();
+                    s.project.clone_from(&group_project);
                 }
                 if s.project.is_empty() {
                     s.project = "Unknown project".into();
@@ -351,7 +351,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                 if s.forked_at.is_empty() {
                     s.forked_at = stamp(summary_val.get("created_at"));
                 }
-                let session_id = s.session_id.clone();
+                let session_id = s.id.clone();
                 sessions.push(s);
                 let subagents = directory.join("subagents");
                 if !fs::symlink_metadata(&subagents).is_ok_and(|m| m.is_dir()) {
@@ -368,7 +368,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                     let child_id = text_of(&data, "child_session_id");
                     let mut parent_id = text_of(&data, "parent_session_id");
                     if parent_id.is_empty() {
-                        parent_id = session_id.clone();
+                        parent_id.clone_from(&session_id);
                     }
                     if !child_id.is_empty() && child_id != parent_id {
                         parents.insert(child_id, parent_id);
@@ -377,8 +377,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
             }
         }
     }
-    let subagent =
-        |s: &Session| s.kind.starts_with("subagent") || parents.contains_key(&s.session_id);
+    let subagent = |s: &Session| s.kind.starts_with("subagent") || parents.contains_key(&s.id);
     for s in &mut sessions {
         if (s.ledger.is_none() && s.updates.is_none()) || subagent(s) {
             continue;
@@ -401,13 +400,10 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
         }
     }
 
-    let by_id: HashMap<&str, &Session> = sessions
-        .iter()
-        .map(|s| (s.session_id.as_str(), s))
-        .collect();
+    let by_id: HashMap<&str, &Session> = sessions.iter().map(|s| (s.id.as_str(), s)).collect();
     let mut native_turns: HashMap<&str, HashMap<String, HashSet<i64>>> = HashMap::new();
     for s in &sessions {
-        let turns = native_turns.entry(&s.session_id).or_default();
+        let turns = native_turns.entry(&s.id).or_default();
         for entry in s.parsed.iter().flat_map(|p| &p.events) {
             let key = format!("{}:{}", turn_number(&entry.usage), entry.usage.model);
             turns
@@ -422,13 +418,13 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
         .filter(|s| {
             let parent_of = |s: &Session| {
                 parents
-                    .get(&s.session_id)
+                    .get(&s.id)
                     .cloned()
                     .unwrap_or_else(|| s.parent_id.clone())
             };
             let mut parent = by_id.get(parent_of(s).as_str()).copied();
-            let mut visited = HashSet::from([s.session_id.as_str()]);
-            while let Some(p) = parent.filter(|p| subagent(p) && visited.insert(&p.session_id)) {
+            let mut visited = HashSet::from([s.id.as_str()]);
+            while let Some(p) = parent.filter(|p| subagent(p) && visited.insert(&p.id)) {
                 parent = by_id.get(parent_of(p).as_str()).copied();
             }
             parent.is_none_or(|p| (p.ledger.is_none() && p.updates.is_none()) || p.parsed.is_none())
@@ -450,7 +446,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
             let e = &mut entry.usage;
             let mut owner = s;
             let mut visited = HashSet::new();
-            while !owner.parent_id.is_empty() && visited.insert(owner.session_id.as_str()) {
+            while !owner.parent_id.is_empty() && visited.insert(owner.id.as_str()) {
                 let parent = by_id.get(owner.parent_id.as_str()).copied();
                 let stamps = native_turns
                     .get(owner.parent_id.as_str())
@@ -465,12 +461,12 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                 if !inherited && !before_copy && !absent_parent_tie {
                     break;
                 }
-                e.session_id = owner.parent_id.clone();
+                e.session_id.clone_from(&owner.parent_id);
                 let Some(parent) = parent else { break };
                 owner = parent;
             }
             e.id = turn_id(&e.session_id, turn_number(e), &e.model);
-            entry.sidechain = e.session_id != s.session_id;
+            entry.sidechain = e.session_id != s.id;
         }
         files.push(file);
     }

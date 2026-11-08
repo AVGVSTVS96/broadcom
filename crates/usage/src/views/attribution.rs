@@ -159,42 +159,35 @@ pub fn attribute_limits(
                     windows[w].since >= manual_reset_at
                         && (reset - windows[w].resets_at).abs() <= SAME_RESET
                 });
-                let open = match current {
-                    Some(open) => {
-                        let (w, peak) = opened[open];
-                        if value > peak {
-                            charge(&mut windows, w, last, row.at, value - peak);
-                            opened[open].1 = value;
-                        }
-                        open
+                let open = if let Some(open) = current {
+                    let (w, peak) = opened[open];
+                    if value > peak {
+                        charge(&mut windows, w, last, row.at, value - peak);
+                        opened[open].1 = value;
                     }
-                    None => {
-                        let w = windows.len();
-                        windows.push(LimitWindow {
-                            account: account.to_string(),
-                            kind,
-                            resets_at: reset,
-                            since: row.at,
-                            until: row.at,
-                            sampled: 0.0,
-                            unassigned: Vec::new(),
-                        });
-                        opened.push((w, value));
-                        let start = reset - period;
-                        // A window opened while monitored rose from zero; otherwise its first
-                        // reading is a baseline nothing logged here can explain.
-                        if value > 0.0
-                            && start >= monitored_since
-                            && start >= last
-                            && start < row.at
-                        {
-                            charge(&mut windows, w, start, row.at, value);
-                        } else if value > 0.0 {
-                            windows[w].sampled += value;
-                            windows[w].unassigned.push((row.at, value));
-                        }
-                        opened.len() - 1
+                    open
+                } else {
+                    let w = windows.len();
+                    windows.push(LimitWindow {
+                        account: account.to_string(),
+                        kind,
+                        resets_at: reset,
+                        since: row.at,
+                        until: row.at,
+                        sampled: 0.0,
+                        unassigned: Vec::new(),
+                    });
+                    opened.push((w, value));
+                    let start = reset - period;
+                    // A window opened while monitored rose from zero; otherwise its first
+                    // reading is a baseline nothing logged here can explain.
+                    if value > 0.0 && start >= monitored_since && start >= last && start < row.at {
+                        charge(&mut windows, w, start, row.at, value);
+                    } else if value > 0.0 {
+                        windows[w].sampled += value;
+                        windows[w].unassigned.push((row.at, value));
                     }
+                    opened.len() - 1
                 };
                 current = Some(open);
                 last = row.at;

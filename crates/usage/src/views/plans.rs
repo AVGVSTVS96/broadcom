@@ -246,7 +246,7 @@ impl PlanPricing {
     fn month_of(&self, millis: f64) -> Option<usize> {
         let (mut low, mut high) = (0isize, self.months.len() as isize - 1);
         while low <= high {
-            let i = (low + high) / 2;
+            let i = isize::midpoint(low, high);
             let m = self.months[i as usize];
             if millis < m.start {
                 high = i - 1;

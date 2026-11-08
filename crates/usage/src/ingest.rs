@@ -50,7 +50,7 @@ pub fn validate(batch: &Batch, local: &str) -> Option<&'static str> {
             e.requests.unwrap_or(0),
         ];
         let costs = [e.cost_usd, e.reported_cost_usd.unwrap_or(0.0)];
-        if counts.iter().any(|&n| n < 0) || costs.iter().any(|&c| !(c >= 0.0) || c.is_infinite()) {
+        if counts.iter().any(|&n| n < 0) || costs.iter().any(|&c| !c.is_finite() || c < 0.0) {
             return Some("Usage records need nonnegative token counts and cost.");
         }
     }

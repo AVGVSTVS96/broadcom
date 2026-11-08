@@ -1,8 +1,8 @@
 //! One SSE stream per tab: a snapshot of the live keys on connect, then only the keys
 //! whose JSON changed, and `stale` frames naming resources to refetch.
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::Mutex;
 
 use serde_json::value::RawValue;
 use tokio::sync::mpsc;
@@ -27,7 +27,7 @@ fn object(keys: &[String], values: &Live) -> String {
         if i > 0 {
             out.push(',');
         }
-        out.push_str(&serde_json::to_string(key).unwrap());
+        out.push_str(&serde_json::Value::from(key.as_str()).to_string());
         out.push(':');
         out.push_str(values.get(key).map_or("null", |v| v.get()));
     }
@@ -41,12 +41,12 @@ fn frame(kind: &str, body: &str) -> String {
 
 impl Stream {
     pub fn listeners(&self) -> usize {
-        self.state.lock().unwrap().clients.len()
+        self.state.lock().clients.len()
     }
 
     /// A new client's channel, which starts with the snapshot.
     pub fn subscribe(&self) -> mpsc::Receiver<String> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
         let (tx, rx) = mpsc::channel(64);
         let _ = tx.try_send(frame("snapshot", &object(&state.keys, &state.live)));
         state.clients.push(tx);
@@ -55,7 +55,7 @@ impl Stream {
 
     /// Replaces the live keys, sending the ones that changed; a removed key is sent as null.
     pub fn publish(&self, entries: Vec<(String, Box<RawValue>)>) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
         let mut next = Live::with_capacity(entries.len());
         let mut keys = Vec::with_capacity(entries.len());
         let mut changed = Vec::new();
@@ -89,7 +89,7 @@ impl Stream {
         state.live = next;
         if !changed.is_empty() {
             let message = frame("patch", &object(&changed, &patch));
-            send(&mut state, message);
+            send(&mut state, &message);
         }
     }
 
@@ -101,19 +101,19 @@ impl Stream {
             "data: {}\n\n",
             serde_json::json!({"type": "stale", "tags": tags})
         );
-        send(&mut self.state.lock().unwrap(), message);
+        send(&mut self.state.lock(), &message);
     }
 
     pub fn heartbeat(&self) {
-        send(&mut self.state.lock().unwrap(), ": \n\n".into());
+        send(&mut self.state.lock(), ": \n\n");
     }
 }
 
 /// Drops a client too slow to keep up; its tab reconnects and takes a fresh snapshot.
-fn send(state: &mut State, message: String) {
+fn send(state: &mut State, message: &str) {
     state
         .clients
-        .retain(|client| client.try_send(message.clone()).is_ok());
+        .retain(|client| client.try_send(message.to_owned()).is_ok());
 }
 
 #[cfg(test)]

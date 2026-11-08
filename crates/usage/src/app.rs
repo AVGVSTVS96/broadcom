@@ -113,7 +113,7 @@ pub fn start(app: Arc<App>) {
     });
     let pool = app.config.pool_dir.clone();
     spawn_watch(
-        vec![(pool.clone(), false), (pool.join("plans"), false)],
+        &[(pool.clone(), false), (pool.join("plans"), false)],
         Duration::from_secs(1),
         {
             let deck = deck.clone();
@@ -126,7 +126,7 @@ pub fn start(app: Arc<App>) {
     let claude = &app.config.claude;
     let hex_state = app.config.hex.join("state");
     spawn_watch(
-        vec![
+        &[
             (claude.join("sessions"), false),
             (claude.join("jobs"), true),
             (hex_state, true),
@@ -244,7 +244,7 @@ fn collect(app: &App) {
 /// Calls `changed` once things go quiet for `wait` after a burst of changes under
 /// `paths` (each watched alone, or with its direct subfolders).
 fn spawn_watch(
-    paths: Vec<(PathBuf, bool)>,
+    paths: &[(PathBuf, bool)],
     wait: Duration,
     changed: impl Fn() + Send + Sync + 'static,
 ) {
@@ -256,7 +256,7 @@ fn spawn_watch(
         }
     });
     let Ok(mut watcher) = watcher else { return };
-    for (path, children) in &paths {
+    for (path, children) in paths {
         let mode = if *children {
             RecursiveMode::Recursive
         } else {
@@ -347,8 +347,8 @@ pub async fn follow_files(app: Arc<App>) {
         loop {
             tokio::select! {
                 more = rx.recv() => if more.is_none() { return },
-                _ = tokio::time::sleep(Duration::from_secs(1)) => break,
-                _ = tokio::time::sleep_until(deadline) => break,
+                () = tokio::time::sleep(Duration::from_secs(1)) => break,
+                () = tokio::time::sleep_until(deadline) => break,
             }
         }
         pass(app.clone()).await;
