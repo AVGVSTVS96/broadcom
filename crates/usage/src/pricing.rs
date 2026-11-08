@@ -1,9 +1,10 @@
 //! The LiteLLM-derived price catalog and saved rules, as an immutable policy.
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
@@ -19,7 +20,7 @@ const SOURCE: &str =
 const DOWNLOAD: &str =
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 const FILE: &str = "pricing-state.json";
-const REFRESH_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
+const REFRESH_EVERY: Duration = Duration::from_hours(24);
 
 /// USD per token, by LiteLLM field name (`input_cost_per_token_priority`, ...).
 pub type Rates = HashMap<String, f64>;
@@ -592,11 +593,11 @@ impl Pricing {
     }
 
     pub fn policy(&self) -> Arc<Policy> {
-        self.state.lock().unwrap().policy.clone()
+        self.state.lock().policy.clone()
     }
 
     fn until_due(&self) -> Duration {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock();
         let checked = state
             .checked_at
             .as_deref()
@@ -612,7 +613,7 @@ impl Pricing {
     /// saved rules. A failed download keeps the previous catalog and records why.
     pub async fn refresh(&self) -> Result<()> {
         let downloaded = download(&self.download).await;
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
         state.checked_at = Some(iso_now());
         let result = match downloaded {
             Err(err) => {
@@ -883,7 +884,7 @@ mod tests {
             ])
         );
         assert!(policy.catalog.models.contains_key("gpt-5") && policy.rules == test_rules());
-        assert!(pricing.until_due() > Duration::from_secs(23 * 60 * 60));
+        assert!(pricing.until_due() > Duration::from_hours(23));
         assert_eq!(Pricing::open(&dir, None).policy().revision, policy.revision);
         assert_eq!(
             std::fs::read(&seed).unwrap(),
@@ -916,12 +917,12 @@ mod tests {
             "claude-opus-4-5-20251101",
             1000,
             2000,
-            300000,
+            300_000,
             5000,
         );
         let (cost, known) = policy.estimate_cost(&opus, 2000, "standard");
         assert!(
-            known && near(cost, 0.24374999999999997),
+            known && near(cost, 0.243_75),
             "opus standard {cost} {known}"
         );
         assert_eq!(
@@ -933,13 +934,13 @@ mod tests {
             !policy.estimate_cost(&opus, 0, "priority").1,
             "a catalog price never borrows standard rates for another tier"
         );
-        let gpt = test_event("codex", "gpt-5", 250000, 1000, 30000, 0);
+        let gpt = test_event("codex", "gpt-5", 250_000, 1000, 30000, 0);
         assert!(
             near(policy.estimate_cost(&gpt, 0, "").0, 0.32625),
             "gpt-5 above 272k"
         );
         assert!(
-            near(policy.estimate_cost(&gpt, 0, "flex").0, 0.163125),
+            near(policy.estimate_cost(&gpt, 0, "flex").0, 0.163_125),
             "gpt-5 flex"
         );
     }
@@ -947,7 +948,7 @@ mod tests {
     #[test]
     fn reprice_rules_and_legacy() {
         let policy = Policy::new(BUNDLED.clone(), test_rules());
-        let mut alias = test_event("codex", "my-model", 250000, 1000, 30000, 0);
+        let mut alias = test_event("codex", "my-model", 250_000, 1000, 30000, 0);
         alias.service_tier = Some(String::new());
         alias.cache_write_1h_tokens = Some(0);
         let got = policy.reprice(&alias).unwrap();
@@ -969,7 +970,7 @@ mod tests {
             "claude-opus-4-5-20251101",
             1000,
             2000,
-            300000,
+            300_000,
             5000,
         );
         legacy.cost_usd = 1.25;

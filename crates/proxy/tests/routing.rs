@@ -1,5 +1,7 @@
 //! The proxy end to end against a stand-in for Anthropic that answers per credential.
 
+#![allow(clippy::unwrap_used)]
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},

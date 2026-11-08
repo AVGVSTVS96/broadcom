@@ -8,13 +8,15 @@ use std::time::{Duration, Instant};
 use regex::Regex;
 
 static SCP_REMOTE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(?:[^@/]+@)?([^/:]+):([^/].*)$").unwrap());
+    LazyLock::new(|| Regex::new(r"^(?:[^@/]+@)?([^/:]+):([^/].*)$").expect("a valid regex"));
 static REMOTE_SECTION: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"^\s*\[\s*remote\s+"([^"]+)"\s*\]"#).unwrap());
-static ANY_SECTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*\[").unwrap());
-static URL_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\s*url\s*=\s*(.*)$").unwrap());
+    LazyLock::new(|| Regex::new(r#"^\s*\[\s*remote\s+"([^"]+)"\s*\]"#).expect("a valid regex"));
+static ANY_SECTION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*\[").expect("a valid regex"));
+static URL_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*url\s*=\s*(.*)$").expect("a valid regex"));
 static GITDIR_LINE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?m)^gitdir:\s*(.+)$").unwrap());
+    LazyLock::new(|| Regex::new(r"(?m)^gitdir:\s*(.+)$").expect("a valid regex"));
 
 /// Lexically cleans a path as Go's filepath.Clean does, made absolute against the
 /// working directory.

@@ -184,12 +184,11 @@ pub fn seats_of(rows: &[Binding], now: i64) -> Vec<(String, String)> {
         if row.millis < since {
             continue;
         }
-        match at.get(row.session_id.as_str()) {
-            Some(&i) => seats[i].1 = account.to_string(),
-            None => {
-                at.insert(&row.session_id, seats.len());
-                seats.push((row.session_id.clone(), account.to_string()));
-            }
+        if let Some(&i) = at.get(row.session_id.as_str()) {
+            seats[i].1 = account.to_string();
+        } else {
+            at.insert(&row.session_id, seats.len());
+            seats.push((row.session_id.clone(), account.to_string()));
         }
     }
     seats
@@ -222,6 +221,10 @@ impl Live {
 /// Builds the live sessions. `first_seen` holds when each session was first seen, for
 /// those with no start time of their own; sessions no longer live leave it. `tracked`
 /// is the 7d (else today) session usage; `now` is unix ms.
+#[expect(
+    clippy::implicit_hasher,
+    reason = "the deck owns the one map, a foldhash one"
+)]
 pub fn live_map(
     found: &Processes,
     seats: &[(String, String)],
@@ -280,7 +283,7 @@ pub fn live_map(
         if let Some(r) = record {
             key = &r.key;
             if cwd.is_empty() {
-                cwd = r.cwd.clone();
+                cwd.clone_from(&r.cwd);
             }
             if since == 0.0 {
                 since = r.first_at;
@@ -295,7 +298,7 @@ pub fn live_map(
             row: row_of(&ranked, key),
             app: (ranked.kind == "thread").then(|| ranked.app.clone()),
             state: state.to_string(),
-            account: seats.get(id).map(|a| a.to_string()),
+            account: seats.get(id).map(std::string::ToString::to_string),
             host: "server".into(),
             cwd,
             since,

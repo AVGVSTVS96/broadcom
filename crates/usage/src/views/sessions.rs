@@ -295,39 +295,38 @@ pub fn session_usage(
             previous_sessions.insert(key);
             continue;
         }
-        let at = match index.get(&key) {
-            Some(&at) => at,
-            None => {
-                index.insert(key.clone(), rows.len());
-                rows.push(Tally {
-                    session: Session {
-                        key,
-                        device_id: device.to_string(),
-                        harness: event.harness.to_string(),
-                        session_id: event.session_id.to_string(),
-                        project: event
-                            .repository
-                            .as_deref()
-                            .unwrap_or(&event.project)
-                            .to_string(),
-                        repository: event.repository.as_deref().map(String::from),
-                        cwd: event.project.to_string(),
-                        title: None,
-                        entrypoint: String::new(),
-                        first_at: millis,
-                        last_at: millis,
-                        amount: Amount::default(),
-                        models: Amounts::default(),
-                        accounts: Amounts::default(),
-                        series: Vec::new(),
-                        limits: Vec::new(),
-                    },
-                    series: BTreeMap::new(),
-                    limits: HashMap::new(),
-                    titled_at: f64::NEG_INFINITY,
-                });
-                rows.len() - 1
-            }
+        let at = if let Some(&at) = index.get(&key) {
+            at
+        } else {
+            index.insert(key.clone(), rows.len());
+            rows.push(Tally {
+                session: Session {
+                    key,
+                    device_id: device.to_string(),
+                    harness: event.harness.to_string(),
+                    session_id: event.session_id.to_string(),
+                    project: event
+                        .repository
+                        .as_deref()
+                        .unwrap_or(&event.project)
+                        .to_string(),
+                    repository: event.repository.as_deref().map(String::from),
+                    cwd: event.project.to_string(),
+                    title: None,
+                    entrypoint: String::new(),
+                    first_at: millis,
+                    last_at: millis,
+                    amount: Amount::default(),
+                    models: Amounts::default(),
+                    accounts: Amounts::default(),
+                    series: Vec::new(),
+                    limits: Vec::new(),
+                },
+                series: BTreeMap::new(),
+                limits: HashMap::new(),
+                titled_at: f64::NEG_INFINITY,
+            });
+            rows.len() - 1
         };
         let row = &mut rows[at];
         let s = &mut row.session;

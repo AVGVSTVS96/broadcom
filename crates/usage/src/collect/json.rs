@@ -203,7 +203,7 @@ fn value_end(s: &str, i: usize) -> usize {
                 }
             }
             b',' if depth == 0 => return j,
-            c if depth == 0 && c <= b' ' => return j,
+            byte if depth == 0 && byte <= b' ' => return j,
             _ => {}
         }
         j += 1;
@@ -309,10 +309,7 @@ impl Validator<'_> {
         loop {
             let rest = self.0.get(i..)?;
             let k = memchr::memchr2(b'"', b'\\', rest)?;
-            if rest[..k]
-                .iter()
-                .fold(false, |control, &c| control | (c < b' '))
-            {
+            if rest[..k].iter().any(|&c| c < b' ') {
                 return None;
             }
             i += k;
@@ -551,14 +548,14 @@ mod tests {
                 String::from_utf8(line.unwrap().to_vec()).unwrap(),
                 n,
                 complete,
-            ))
+            ));
         })
         .unwrap();
         assert_eq!(
             seen,
             [
                 ("a".into(), 1, true),
-                ("".into(), 2, true),
+                (String::new(), 2, true),
                 ("b".into(), 3, true),
                 ("c".into(), 4, false)
             ]

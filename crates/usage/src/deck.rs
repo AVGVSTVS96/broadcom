@@ -2,8 +2,9 @@
 //! rebuilt when usage, limits or plans change while someone looks at it, and every
 //! query over it is answered from that and cached.
 
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, anyhow};
@@ -18,9 +19,9 @@ use crate::views::{
 };
 
 /// A range older than this reloads behind the request that finds it.
-const FRESH_FOR: Duration = Duration::from_secs(5 * 60);
+const FRESH_FOR: Duration = Duration::from_mins(5);
 /// Ranges asked for this recently reload when usage changes.
-const VIEWED_FOR: Duration = Duration::from_secs(10 * 60);
+const VIEWED_FOR: Duration = Duration::from_mins(10);
 const MAX_VIEWS: usize = 64;
 
 #[derive(Default)]
@@ -35,7 +36,7 @@ struct RangeCache {
 /// costs reading the rows it touched, not the history.
 #[derive(Default)]
 struct Rows {
-    rows: Vec<Row>,
+    sorted: Vec<Row>,
     ids: Vec<i64>,
     at: HashMap<i64, usize>,
     rev: Option<i64>,
@@ -54,18 +55,18 @@ impl Rows {
         self.rev = Some(latest);
         for (id, visible, row) in changes {
             if let Some(&i) = self.at.get(&id) {
-                if visible && self.rows[i].millis == row.millis {
-                    self.rows[i] = row;
+                if visible && self.sorted[i].millis == row.millis {
+                    self.sorted[i] = row;
                     continue;
                 }
-                self.rows.remove(i);
+                self.sorted.remove(i);
                 self.ids.remove(i);
                 self.at.remove(&id);
                 self.reindex(i);
             }
             if visible {
-                let i = self.rows.partition_point(|r| r.millis <= row.millis);
-                self.rows.insert(i, row);
+                let i = self.sorted.partition_point(|r| r.millis <= row.millis);
+                self.sorted.insert(i, row);
                 self.ids.insert(i, id);
                 self.reindex(i);
             }
@@ -81,7 +82,7 @@ impl Rows {
 
     /// The rows from `since` (unix ms) on.
     fn since(&self, since: f64) -> &[Row] {
-        &self.rows[self.rows.partition_point(|r| r.millis < since)..]
+        &self.sorted[self.sorted.partition_point(|r| r.millis < since)..]
     }
 }
 
@@ -159,13 +160,13 @@ impl Deck {
     }
 
     fn bindings(&self) -> Vec<Binding> {
-        self.bindings.lock().unwrap().read().0.to_vec()
+        self.bindings.lock().read().0.to_vec()
     }
 
     /// Computes these ranges' session usage from one read of the span they need.
     fn load(&self, ranges: &[Range]) -> Result<Vec<SessionUsage>> {
         let now = now_millis();
-        let readings = self.readings.lock().unwrap().read().0.to_vec();
+        let readings = self.readings.lock().read().0.to_vec();
         let bindings = self.bindings();
         let (readings, bindings) = (&readings[..], &bindings[..]);
         let from = ranges
@@ -175,7 +176,7 @@ impl Deck {
                     .min(views::pricing_from(r, self.zone, now))
             })
             .fold(f64::INFINITY, f64::min);
-        let mut rows = self.rows.lock().unwrap();
+        let mut rows = self.rows.lock();
         rows.sync(&self.store)?;
         let prepared = views::prepare(rows.since(from));
         let plans = views::read_plans(
@@ -208,7 +209,7 @@ impl Deck {
         let started = Instant::now();
         let _loading = self.loader.lock().await;
         let ranges: Vec<Range> = {
-            let state = self.state.lock().unwrap();
+            let state = self.state.lock();
             ranges
                 .into_iter()
                 .filter(|r| {
@@ -230,7 +231,7 @@ impl Deck {
         let mut stale = false;
         for (r, value) in ranges.into_iter().zip(values) {
             let changed = {
-                let mut state = self.state.lock().unwrap();
+                let mut state = self.state.lock();
                 let cache = state.ranges.entry(r).or_default();
                 let changed = cache.value.as_ref().is_none_or(|old| {
                     old.sessions != value.sessions || old.windows != value.windows
@@ -258,7 +259,7 @@ impl Deck {
     pub async fn sessions(self: &Arc<Self>, r: Range) -> Result<Arc<SessionUsage>> {
         loop {
             let (value, at) = {
-                let mut state = self.state.lock().unwrap();
+                let mut state = self.state.lock();
                 let cache = state.ranges.entry(r).or_default();
                 cache.viewed = Some(Instant::now());
                 (cache.value.clone(), cache.at)
@@ -294,7 +295,7 @@ impl Deck {
         let range = q.range;
         let tracked = self.sessions(q.range).await?;
         let names = {
-            let state = self.state.lock().unwrap();
+            let state = self.state.lock();
             match (&state.names, &state.names_error) {
                 (Some(names), _) => names.clone(),
                 (None, Some(e)) => return Err(anyhow!(e.clone())),
@@ -305,53 +306,50 @@ impl Deck {
         let cached = self
             .state
             .lock()
-            .unwrap()
             .ranges
             .get(&q.range)
             .and_then(|c| c.views.get(&key).cloned());
-        let view = match cached {
-            Some(view) => view,
-            None => {
-                let week = self
-                    .state
-                    .lock()
-                    .unwrap()
-                    .ranges
-                    .get(&Range::Week)
-                    .and_then(|c| c.value.clone());
-                let deck = self.clone();
-                let tracked = tracked.clone();
-                let view = tokio::task::spawn_blocking(move || -> Result<UsageView> {
-                    let labels = deck.labels(week.as_deref().unwrap_or(&tracked));
-                    let parts: Vec<_> = tracked
-                        .sessions
-                        .iter()
-                        .flat_map(|s| views::parts_of(s, &names))
-                        .collect();
-                    let mut view =
-                        views::usage_view(&tracked, &parts, &labels, &q, &deck.config.agent_sdk());
-                    view.sources.proxy_since = deck.store.proxy_since()?.map(|ms| ms as f64);
-                    Ok(view)
-                })
-                .await??;
-                let view = Arc::new(view);
-                let mut state = self.state.lock().unwrap();
-                if let Some(cache) = state.ranges.get_mut(&range) {
-                    if cache.views.len() > MAX_VIEWS {
-                        cache.views.clear();
-                    }
-                    cache.views.insert(key, view.clone());
+        let view = if let Some(view) = cached {
+            view
+        } else {
+            let week = self
+                .state
+                .lock()
+                .ranges
+                .get(&Range::Week)
+                .and_then(|c| c.value.clone());
+            let deck = self.clone();
+            let tracked = tracked.clone();
+            let view = tokio::task::spawn_blocking(move || -> Result<UsageView> {
+                let labels = deck.labels(week.as_deref().unwrap_or(&tracked));
+                let parts: Vec<_> = tracked
+                    .sessions
+                    .iter()
+                    .flat_map(|s| views::parts_of(s, &names))
+                    .collect();
+                let mut view =
+                    views::usage_view(&tracked, &parts, &labels, &q, &deck.config.agent_sdk());
+                view.sources.proxy_since = deck.store.proxy_since()?.map(|ms| ms as f64);
+                Ok(view)
+            })
+            .await??;
+            let view = Arc::new(view);
+            let mut state = self.state.lock();
+            if let Some(cache) = state.ranges.get_mut(&range) {
+                if cache.views.len() > MAX_VIEWS {
+                    cache.views.clear();
                 }
-                view
+                cache.views.insert(key, view.clone());
             }
+            view
         };
-        let live = self.state.lock().unwrap().live.sessions.clone();
+        let live = self.state.lock().live.sessions.clone();
         Ok(views::with_live(&view, &live))
     }
 
     /// The API-credit grants, carried forward by the proxy's receipts since their reading.
     pub async fn credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
-        if let Some(view) = self.state.lock().unwrap().credits.clone() {
+        if let Some(view) = self.state.lock().credits.clone() {
             return view;
         }
         self.refresh_credits().await
@@ -375,7 +373,7 @@ impl Deck {
         .await
         .unwrap_or_else(|e| Err(e.to_string()));
         let view = Arc::new(view);
-        let previous = self.state.lock().unwrap().credits.replace(view.clone());
+        let previous = self.state.lock().credits.replace(view.clone());
         if previous.is_none_or(|p| p != view) {
             self.stream.stale(&["credits"]);
         }
@@ -386,7 +384,7 @@ impl Deck {
     pub fn usage_changed(self: &Arc<Self>) {
         let listening = self.stream.listeners() > 0;
         let due: Vec<Range> = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state.credits = None;
             state
                 .ranges
@@ -416,7 +414,7 @@ impl Deck {
     /// Re-reads hex's thread names; past thread names are read once.
     pub fn refresh_names(&self) {
         let hex = &self.config.hex;
-        let mut past = self.past.lock().unwrap();
+        let mut past = self.past.lock();
         if past.is_none() {
             match views::read_past(hex) {
                 Ok(p) => *past = Some(p),
@@ -425,7 +423,7 @@ impl Deck {
         }
         let empty = Past::default();
         let result = views::load_names(hex, past.as_ref().unwrap_or(&empty));
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
         match result {
             Ok(names) => {
                 state.names = Some(Arc::new(names));
@@ -445,14 +443,14 @@ impl Deck {
 
     pub fn refresh_processes(&self) {
         let found = views::read_processes(&self.config.claude, &self.config.hex);
-        self.state.lock().unwrap().processes = found;
+        self.state.lock().processes = found;
     }
 
     /// Sends the live keys that changed.
     pub fn publish(&self) {
         let seats = views::seats_of(&self.bindings(), now_millis());
         let entries = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             let tracked = [Range::Week, Range::Today]
                 .iter()
                 .find_map(|r| state.ranges.get(r).and_then(|c| c.value.clone()));
@@ -507,7 +505,7 @@ mod tests {
             label: device.into(),
             synced_at: None,
         };
-        let deleted_ids = deleted.iter().map(|s| s.to_string()).collect();
+        let deleted_ids = deleted.iter().map(ToString::to_string).collect();
         store
             .apply(
                 &Batch {
@@ -538,7 +536,7 @@ mod tests {
                 r.sync(&store).unwrap();
                 r
             };
-            let outputs = |r: &Rows| r.rows.iter().map(|r| r.output_tokens).collect::<Vec<_>>();
+            let outputs = |r: &Rows| r.sorted.iter().map(|r| r.output_tokens).collect::<Vec<_>>();
             assert_eq!(outputs(rows), want);
             assert_eq!(
                 outputs(rows),

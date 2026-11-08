@@ -3,10 +3,10 @@
 
 use serde::{Deserialize, Serialize};
 
-fn is_false(b: &bool) -> bool {
-    !*b
-}
-
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde passes a reference"
+)]
 fn is_zero(n: &i64) -> bool {
     *n == 0
 }
@@ -22,7 +22,7 @@ pub struct Event {
     pub upstream_request_id: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub account_id: String,
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub failed: bool,
     #[serde(default)]
     pub id: String,
