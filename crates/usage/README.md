@@ -1,8 +1,8 @@
 # broadcom-usage
 
 Collects AI coding-agent usage (Claude Code, Codex, Pi, Grok, Muse) from this machine,
-other machines' pushes, GitHub Actions artifacts and a proxy's per-request receipts,
-prices it, and answers [BROADCOM](https://github.com/AVGVSTVS96/broadcom)'s Usage,
+other machines' pushes, GitHub Actions artifacts and [broadcom-proxy](../proxy)'s
+per-request receipts, prices it, and answers [BROADCOM](../../apps/web)'s Usage,
 Sessions and Credits views and its live-sessions stream.
 
 ```
@@ -22,8 +22,10 @@ receipts ────┘   records → events  └─ GET /deck/events (SSE: s:<
 
 ## Run
 
+From the repo root; [systemd/](../../systemd/broadcom-usage.service) has a user service for it.
+
 ```
-cargo install --path .
+cargo install --path crates/usage
 broadcom-usage serve --config ~/.config/broadcom-usage/config.json
 ```
 
