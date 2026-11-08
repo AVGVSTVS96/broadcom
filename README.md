@@ -1,6 +1,12 @@
 # BROADCOM
 
-A dashboard for a [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) account pool: where new work goes, what every plan and free API credit has left, how fast it's being spent, and by whom.
+A Claude account pool and its dashboard: where new work goes, what every plan and free API credit has left, how fast it's being spent, and by whom.
+
+| Folder                         | What it is                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/web`](apps/web)         | the dashboard, for a [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) pool or broadcom-proxy                                    |
+| [`crates/proxy`](crates/proxy) | broadcom-proxy: one address for all your Claude subscriptions. `cargo install --git https://github.com/AVGVSTVS96/broadcom broadcom-proxy` |
+| [`crates/usage`](crates/usage) | broadcom-usage: collects agent usage and answers the dashboard's Usage views                                                               |
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.png">
@@ -28,7 +34,7 @@ Next.js 16, shadcn on Base UI, Tailwind 4, Effect 4.
 
 ```sh
 bun install
-BROADCOM_PROXY=http://127.0.0.1:8317 bun run dev
+BROADCOM_PROXY=http://127.0.0.1:8317 bun --filter @broadcom/web dev
 ```
 
 `BROADCOM_KEY_FILE` points at the proxy's management key (default `~/.config/cliproxyapi/key`). The key stays on the server.

@@ -1,0 +1,15 @@
+[Unit]
+Description=broadcom: the BROADCOM dashboard (Next.js)
+After=network-online.target tailscaled.service cliproxyapi.service
+
+[Service]
+WorkingDirectory=%h/Developer/broadcom/apps/web
+ExecStart=%h/Developer/broadcom/apps/web/node_modules/.bin/next start -H ${BROADCOM_HOST} -p 4840
+Environment=NODE_ENV=production
+EnvironmentFile=%h/.config/broadcom/env
+EnvironmentFile=-%h/.config/broadcom/slot
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
