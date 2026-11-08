@@ -23,7 +23,8 @@ use crate::{
 };
 
 const CLAUDE_CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const CLAUDE_SCOPE: &str = "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
+const CLAUDE_SCOPE: &str =
+    "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload";
 const CLAUDE_PASTE_PAGE: &str = "https://platform.claude.com/oauth/code/callback";
 const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CODEX_DEVICE_PAGE: &str = "https://auth.openai.com/codex/device";
@@ -51,14 +52,22 @@ impl std::fmt::Display for RefreshError {
 /// A fresh token for an account whose token Anthropic just refused, or None. The account
 /// owner refreshes it; any other process rereads the file the owner keeps current.
 pub async fn renew(app: &App, account: &str, failed: &Target) -> Option<String> {
-    let Target::Plan { token: refused, .. } = failed else { return None };
+    let Target::Plan { token: refused, .. } = failed else {
+        return None;
+    };
     let current = |app: &App| {
         let state = app.state();
-        state.accounts.iter().find(|a| a.id() == account).map(|a| a.login.clone())
+        state
+            .accounts
+            .iter()
+            .find(|a| a.id() == account)
+            .map(|a| a.login.clone())
     };
     if !app.config.account_owner {
         app.rescan();
-        return current(app).map(|l| l.get("access_token").to_string()).filter(|t| t != refused);
+        return current(app)
+            .map(|l| l.get("access_token").to_string())
+            .filter(|t| t != refused);
     }
     let path = current(app)?.path;
     match refresh_if(app, &path, |l| l.get("access_token") == refused).await {
@@ -72,7 +81,11 @@ pub async fn renew(app: &App, account: &str, failed: &Target) -> Option<String> 
 
 /// Refreshes every login that expires within four hours. Only the account owner runs this.
 pub async fn refresh_due(app: &App) {
-    let due = |l: &Login| !l.disabled() && l.expires_at().is_none_or(|at| at - files::now_ms() <= REFRESH_AHEAD);
+    let due = |l: &Login| {
+        !l.disabled()
+            && l.expires_at()
+                .is_none_or(|at| at - files::now_ms() <= REFRESH_AHEAD)
+    };
     let paths: Vec<PathBuf> = {
         let state = app.state();
         state
@@ -93,20 +106,32 @@ pub async fn refresh_due(app: &App) {
 
 /// Refreshes the login at `path` if `needed` still says so once no other refresh is running,
 /// so a refresh token is never spent twice. Returns the login as it stands after.
-pub async fn refresh_if(app: &App, path: &Path, needed: impl FnOnce(&Login) -> bool) -> Result<Login, RefreshError> {
+pub async fn refresh_if(
+    app: &App,
+    path: &Path,
+    needed: impl FnOnce(&Login) -> bool,
+) -> Result<Login, RefreshError> {
     let _one = app.refreshing.lock().await;
     let login = {
         let state = app.state();
-        state.accounts.iter().map(|a| &a.login).chain(state.others.iter()).find(|l| l.path == path).cloned()
+        state
+            .accounts
+            .iter()
+            .map(|a| &a.login)
+            .chain(state.others.iter())
+            .find(|l| l.path == path)
+            .cloned()
     };
-    let Some(login) = login else { return Err(RefreshError::Failed("the login is gone".into())) };
+    let Some(login) = login else {
+        return Err(RefreshError::Failed("the login is gone".into()));
+    };
     if !needed(&login) {
         return Ok(login);
     }
     match refresh(app, &login).await {
-        Ok(fields) => {
-            app.update_login(path, fields).ok_or_else(|| RefreshError::Failed("the login was removed".into()))
-        }
+        Ok(fields) => app
+            .update_login(path, fields)
+            .ok_or_else(|| RefreshError::Failed("the login was removed".into())),
         Err(err) => {
             if let RefreshError::SignedOut(_) = err {
                 mark_signed_out(app, &login);
@@ -118,7 +143,11 @@ pub async fn refresh_if(app: &App, path: &Path, needed: impl FnOnce(&Login) -> b
 
 fn mark_signed_out(app: &App, login: &Login) {
     let mut state = app.state();
-    if let Some(a) = state.accounts.iter_mut().find(|a| a.login.path == login.path) {
+    if let Some(a) = state
+        .accounts
+        .iter_mut()
+        .find(|a| a.login.path == login.path)
+    {
         a.needs_reauth = true;
     }
     drop(state);
@@ -133,28 +162,38 @@ async fn refresh(app: &App, login: &Login) -> Result<Fields, RefreshError> {
         return Err(RefreshError::SignedOut("no refresh token".into()));
     }
     let request = if login.kind() == "codex" {
-        app.http.post(format!("{}/oauth/token", app.ends.openai_auth)).header("accept", "application/json").form(&[
-            ("client_id", CODEX_CLIENT_ID),
-            ("grant_type", "refresh_token"),
-            ("refresh_token", &refresh_token),
-            ("scope", "openid profile email"),
-        ])
+        app.http
+            .post(format!("{}/oauth/token", app.ends.openai_auth))
+            .header("accept", "application/json")
+            .form(&[
+                ("client_id", CODEX_CLIENT_ID),
+                ("grant_type", "refresh_token"),
+                ("refresh_token", &refresh_token),
+                ("scope", "openid profile email"),
+            ])
     } else {
         claude_token_request(app).json(&json!({"client_id": CLAUDE_CLIENT_ID, "grant_type": "refresh_token", "refresh_token": refresh_token, "scope": CLAUDE_SCOPE}))
     };
-    let response =
-        request.timeout(Duration::from_secs(30)).send().await.map_err(|e| RefreshError::Failed(e.to_string()))?;
+    let response = request
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| RefreshError::Failed(e.to_string()))?;
     let status = response.status();
     let body: Value = response.json().await.unwrap_or_default();
     if !status.is_success() {
-        let reason = body.pointer("/error").map(Value::to_string).unwrap_or_default();
+        let reason = body
+            .pointer("/error")
+            .map(Value::to_string)
+            .unwrap_or_default();
         return Err(if reason.contains("invalid_grant") {
             RefreshError::SignedOut(reason)
         } else {
             RefreshError::Failed(format!("{status} {reason}"))
         });
     }
-    let tokens: Tokens = serde_json::from_value(body).map_err(|e| RefreshError::Failed(e.to_string()))?;
+    let tokens: Tokens =
+        serde_json::from_value(body).map_err(|e| RefreshError::Failed(e.to_string()))?;
     let mut fields = tokens.fields(now);
     if login.kind() == "claude" {
         fill_profile(app, &mut fields).await;
@@ -163,7 +202,8 @@ async fn refresh(app: &App, login: &Login) -> Result<Fields, RefreshError> {
 }
 
 fn claude_token_request(app: &App) -> reqwest::RequestBuilder {
-    app.http.post(format!("{}/v1/oauth/token", app.ends.claude_platform))
+    app.http
+        .post(format!("{}/v1/oauth/token", app.ends.claude_platform))
 }
 
 #[derive(Deserialize)]
@@ -195,10 +235,16 @@ impl Tokens {
             out.insert("expired".into(), files::local(now + s * SECOND).into());
         }
         if let Some(s) = self.refresh_token_expires_in.filter(|&s| s > 0) {
-            out.insert("refresh_expired".into(), files::local(now + s * SECOND).into());
+            out.insert(
+                "refresh_expired".into(),
+                files::local(now + s * SECOND).into(),
+            );
         }
         let text = |v: &Option<Value>, key: &str| {
-            v.as_ref().and_then(|v| v.get(key)).and_then(Value::as_str).map(String::from)
+            v.as_ref()
+                .and_then(|v| v.get(key))
+                .and_then(Value::as_str)
+                .map(String::from)
         };
         for (field, value) in [
             ("account_uuid", text(&self.account, "uuid")),
@@ -217,10 +263,25 @@ impl Tokens {
 
 /// Fills in a Claude login's account, email and organization from its profile.
 async fn fill_profile(app: &App, fields: &mut Fields) {
-    let token = fields.get("access_token").and_then(Value::as_str).unwrap_or("").to_string();
-    let Ok(response) = crate::sampler::anthropic_get(app, &token, "/api/oauth/profile").await else { return };
-    let Ok(profile) = response.json::<Value>().await else { return };
-    let text = |p: &str| profile.pointer(p).and_then(Value::as_str).filter(|v| !v.is_empty()).map(String::from);
+    let token = fields
+        .get("access_token")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let Ok(response) = crate::sampler::anthropic_get(app, &token, "/api/oauth/profile").await
+    else {
+        return;
+    };
+    let Ok(profile) = response.json::<Value>().await else {
+        return;
+    };
+    let text = |p: &str| {
+        profile
+            .pointer(p)
+            .and_then(Value::as_str)
+            .filter(|v| !v.is_empty())
+            .map(String::from)
+    };
     for (field, pointer) in [
         ("account_uuid", "/account/uuid"),
         ("email", "/account/email"),
@@ -293,7 +354,12 @@ impl SignIns {
     }
 
     pub fn status(&self, state: &str) -> Status {
-        self.get(state).map_or(Status::Error { error: "unknown or expired sign-in".into() }, |s| s.status)
+        self.get(state).map_or(
+            Status::Error {
+                error: "unknown or expired sign-in".into(),
+            },
+            |s| s.status,
+        )
     }
 
     pub fn cancel(&self, state: &str) {
@@ -307,7 +373,11 @@ fn random(bytes: usize) -> String {
     URL_SAFE_NO_PAD.encode(buf)
 }
 
-pub async fn start(app: &std::sync::Arc<App>, provider: Provider, target: Option<String>) -> anyhow::Result<Started> {
+pub async fn start(
+    app: &std::sync::Arc<App>,
+    provider: Provider,
+    target: Option<String>,
+) -> anyhow::Result<Started> {
     let state = random(24);
     let now = files::now_ms();
     match provider {
@@ -327,42 +397,94 @@ pub async fn start(app: &std::sync::Arc<App>, provider: Provider, target: Option
                     ("state", &state),
                 ],
             )?;
-            app.sign_ins.put(&state, SignIn { provider, verifier, target, started: now, status: Status::Wait });
-            Ok(Started { state, url: url.into(), flow: "code", user_code: None })
+            app.sign_ins.put(
+                &state,
+                SignIn {
+                    provider,
+                    verifier,
+                    target,
+                    started: now,
+                    status: Status::Wait,
+                },
+            );
+            Ok(Started {
+                state,
+                url: url.into(),
+                flow: "code",
+                user_code: None,
+            })
         }
         Provider::Codex => {
             let answer: Value = app
                 .http
-                .post(format!("{}/api/accounts/deviceauth/usercode", app.ends.openai_auth))
+                .post(format!(
+                    "{}/api/accounts/deviceauth/usercode",
+                    app.ends.openai_auth
+                ))
                 .json(&json!({"client_id": CODEX_CLIENT_ID}))
                 .send()
                 .await?
                 .error_for_status()?
                 .json()
                 .await?;
-            let text = |k: &str| answer.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+            let text = |k: &str| {
+                answer
+                    .get(k)
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string()
+            };
             let (device, code) = (
                 text("device_auth_id"),
-                [text("user_code"), text("usercode")].into_iter().find(|c| !c.is_empty()).unwrap_or_default(),
+                [text("user_code"), text("usercode")]
+                    .into_iter()
+                    .find(|c| !c.is_empty())
+                    .unwrap_or_default(),
             );
-            anyhow::ensure!(!device.is_empty() && !code.is_empty(), "OpenAI gave no device code");
+            anyhow::ensure!(
+                !device.is_empty() && !code.is_empty(),
+                "OpenAI gave no device code"
+            );
             let every = answer
                 .get("interval")
                 .and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok()))
                 .unwrap_or(5)
                 .max(1);
-            let sign_in = SignIn { provider, verifier: String::new(), target, started: now, status: Status::Wait };
+            let sign_in = SignIn {
+                provider,
+                verifier: String::new(),
+                target,
+                started: now,
+                status: Status::Wait,
+            };
             app.sign_ins.put(&state, sign_in);
-            tokio::spawn(wait_for_device(app.clone(), state.clone(), device, code.clone(), every));
-            Ok(Started { state, url: CODEX_DEVICE_PAGE.into(), flow: "device", user_code: Some(code) })
+            tokio::spawn(wait_for_device(
+                app.clone(),
+                state.clone(),
+                device,
+                code.clone(),
+                every,
+            ));
+            Ok(Started {
+                state,
+                url: CODEX_DEVICE_PAGE.into(),
+                flow: "device",
+                user_code: Some(code),
+            })
         }
     }
 }
 
 /// Trades the code Claude's page showed for tokens and adds the account to the pool.
 pub async fn finish_claude(app: &App, state: &str, code: &str) -> Status {
-    let Some(sign_in) = app.sign_ins.get(state).filter(|s| s.provider == Provider::Claude) else {
-        return Status::Error { error: "unknown or expired sign-in".into() };
+    let Some(sign_in) = app
+        .sign_ins
+        .get(state)
+        .filter(|s| s.provider == Provider::Claude)
+    else {
+        return Status::Error {
+            error: "unknown or expired sign-in".into(),
+        };
     };
     let body = json!({
         "grant_type": "authorization_code", "code": code.trim(), "redirect_uri": CLAUDE_PASTE_PAGE,
@@ -371,23 +493,38 @@ pub async fn finish_claude(app: &App, state: &str, code: &str) -> Status {
     let request = claude_token_request(app).json(&body);
     let status = match exchange(app, request, "claude", sign_in.target.as_deref()).await {
         Ok(()) => Status::Ok,
-        Err(err) => Status::Error { error: err.to_string() },
+        Err(err) => Status::Error {
+            error: err.to_string(),
+        },
     };
     app.sign_ins.finish(state, status.clone());
     status
 }
 
-async fn wait_for_device(app: std::sync::Arc<App>, state: String, device: String, code: String, every: i64) {
+async fn wait_for_device(
+    app: std::sync::Arc<App>,
+    state: String,
+    device: String,
+    code: String,
+    every: i64,
+) {
     let deadline = files::now_ms() + SIGN_IN_FOR;
     let status = loop {
         tokio::time::sleep(Duration::from_secs(every as u64)).await;
-        let Some(sign_in) = app.sign_ins.get(&state) else { return };
+        let Some(sign_in) = app.sign_ins.get(&state) else {
+            return;
+        };
         if files::now_ms() > deadline {
-            break Status::Error { error: "The device code expired before it was entered.".into() };
+            break Status::Error {
+                error: "The device code expired before it was entered.".into(),
+            };
         }
         let poll = app
             .http
-            .post(format!("{}/api/accounts/deviceauth/token", app.ends.openai_auth))
+            .post(format!(
+                "{}/api/accounts/deviceauth/token",
+                app.ends.openai_auth
+            ))
             .json(&json!({"device_auth_id": device, "user_code": code}))
             .send()
             .await;
@@ -395,21 +532,35 @@ async fn wait_for_device(app: std::sync::Arc<App>, state: String, device: String
         if matches!(response.status().as_u16(), 403 | 404) {
             continue;
         }
-        let Ok(answer) = response.error_for_status().map(reqwest::Response::json::<Value>) else {
-            break Status::Error { error: "OpenAI refused the device sign-in.".into() };
+        let Ok(answer) = response
+            .error_for_status()
+            .map(reqwest::Response::json::<Value>)
+        else {
+            break Status::Error {
+                error: "OpenAI refused the device sign-in.".into(),
+            };
         };
-        let Ok(answer) = answer.await else { break Status::Error { error: "OpenAI's answer was unreadable.".into() } };
+        let Ok(answer) = answer.await else {
+            break Status::Error {
+                error: "OpenAI's answer was unreadable.".into(),
+            };
+        };
         let text = |k: &str| answer.get(k).and_then(Value::as_str).unwrap_or("");
-        let request = app.http.post(format!("{}/oauth/token", app.ends.openai_auth)).form(&[
-            ("grant_type", "authorization_code"),
-            ("client_id", CODEX_CLIENT_ID),
-            ("code", text("authorization_code")),
-            ("redirect_uri", CODEX_DEVICE_CALLBACK),
-            ("code_verifier", text("code_verifier")),
-        ]);
+        let request = app
+            .http
+            .post(format!("{}/oauth/token", app.ends.openai_auth))
+            .form(&[
+                ("grant_type", "authorization_code"),
+                ("client_id", CODEX_CLIENT_ID),
+                ("code", text("authorization_code")),
+                ("redirect_uri", CODEX_DEVICE_CALLBACK),
+                ("code_verifier", text("code_verifier")),
+            ]);
         break match exchange(&app, request, "codex", sign_in.target.as_deref()).await {
             Ok(()) => Status::Ok,
-            Err(err) => Status::Error { error: err.to_string() },
+            Err(err) => Status::Error {
+                error: err.to_string(),
+            },
         };
     };
     app.sign_ins.finish(&state, status);
@@ -417,7 +568,12 @@ async fn wait_for_device(app: std::sync::Arc<App>, state: String, device: String
 
 /// Sends a code exchange and adds the login it returns to the pool: onto the login for the
 /// same account, or the one the dashboard named, or as a new file.
-async fn exchange(app: &App, request: reqwest::RequestBuilder, kind: &str, target: Option<&str>) -> anyhow::Result<()> {
+async fn exchange(
+    app: &App,
+    request: reqwest::RequestBuilder,
+    kind: &str,
+    target: Option<&str>,
+) -> anyhow::Result<()> {
     let now = files::now_ms();
     let response = request.timeout(Duration::from_secs(30)).send().await?;
     let status = response.status();
@@ -425,10 +581,16 @@ async fn exchange(app: &App, request: reqwest::RequestBuilder, kind: &str, targe
     anyhow::ensure!(
         status.is_success(),
         "The code exchange failed ({status}): {}",
-        body.pointer("/error").map(Value::to_string).unwrap_or_default()
+        body.pointer("/error")
+            .map(Value::to_string)
+            .unwrap_or_default()
     );
     let tokens: Tokens = serde_json::from_value(body)?;
-    let mut login = Login { path: PathBuf::new(), fields: tokens.fields(now), modified: None };
+    let mut login = Login {
+        path: PathBuf::new(),
+        fields: tokens.fields(now),
+        modified: None,
+    };
     login.set("type", kind);
     let name = if kind == "claude" {
         fill_profile(app, &mut login.fields).await;
@@ -437,7 +599,10 @@ async fn exchange(app: &App, request: reqwest::RequestBuilder, kind: &str, targe
         codex_fields(&mut login);
         codex_file_name(&login)
     };
-    anyhow::ensure!(!login.get("email").is_empty(), "The sign-in returned no email.");
+    anyhow::ensure!(
+        !login.get("email").is_empty(),
+        "The sign-in returned no email."
+    );
     let account = login.get("account_uuid").to_string();
     let same = |l: &Login| {
         l.kind() == kind
@@ -447,8 +612,13 @@ async fn exchange(app: &App, request: reqwest::RequestBuilder, kind: &str, targe
     };
     let mut guard = app.state();
     let state = &mut *guard;
-    let existing =
-        state.accounts.iter().map(|a| &a.login).chain(state.others.iter()).find(|l| same(l)).map(|l| l.path.clone());
+    let existing = state
+        .accounts
+        .iter()
+        .map(|a| &a.login)
+        .chain(state.others.iter())
+        .find(|l| same(l))
+        .map(|l| l.path.clone());
     if let Some(path) = existing {
         state.update_login(&path, login.fields);
         if let Some(a) = state.accounts.iter_mut().find(|a| a.login.path == path) {
@@ -476,9 +646,15 @@ async fn exchange(app: &App, request: reqwest::RequestBuilder, kind: &str, targe
 
 /// `claude-<hash of org>-<email>.json`, as CLIProxyAPI names Claude logins.
 fn claude_file_name(login: &Login) -> String {
-    let identity = [login.get("organization_uuid"), login.get("account_uuid")].into_iter().find(|s| !s.is_empty());
+    let identity = [login.get("organization_uuid"), login.get("account_uuid")]
+        .into_iter()
+        .find(|s| !s.is_empty());
     match identity {
-        Some(id) => format!("claude-{}-{}.json", &hex(&Sha256::digest(id.as_bytes()))[..8], login.get("email")),
+        Some(id) => format!(
+            "claude-{}-{}.json",
+            &hex(&Sha256::digest(id.as_bytes()))[..8],
+            login.get("email")
+        ),
         None => format!("claude-{}.json", login.get("email")),
     }
 }
@@ -492,20 +668,40 @@ fn codex_fields(login: &mut Login) {
         .and_then(|p| URL_SAFE_NO_PAD.decode(p.trim_end_matches('=')).ok())
         .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
         .unwrap_or_default();
-    let text = |p: &str| claims.pointer(p).and_then(Value::as_str).unwrap_or("").to_string();
+    let text = |p: &str| {
+        claims
+            .pointer(p)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
     login.set("email", text("/email"));
-    login.set("account_id", text("/https:~1~1api.openai.com~1auth/chatgpt_account_id"));
+    login.set(
+        "account_id",
+        text("/https:~1~1api.openai.com~1auth/chatgpt_account_id"),
+    );
     let plan = text("/https:~1~1api.openai.com~1auth/chatgpt_plan_type");
-    login.set("plan_type", if plan.is_empty() { "free".into() } else { plan });
+    login.set(
+        "plan_type",
+        if plan.is_empty() { "free".into() } else { plan },
+    );
 }
 
 /// `codex-<hash of account>-<email>-<plan>.json`, as CLIProxyAPI names ChatGPT logins.
 fn codex_file_name(login: &Login) -> String {
-    let plan: String =
-        login.get("plan_type").chars().filter(char::is_ascii_alphanumeric).collect::<String>().to_lowercase();
+    let plan: String = login
+        .get("plan_type")
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect::<String>()
+        .to_lowercase();
     match login.get("account_id") {
         "" => format!("codex-{}-{plan}.json", login.get("email")),
-        id => format!("codex-{}-{}-{plan}.json", &hex(&Sha256::digest(id.as_bytes()))[..8], login.get("email")),
+        id => format!(
+            "codex-{}-{}-{plan}.json",
+            &hex(&Sha256::digest(id.as_bytes()))[..8],
+            login.get("email")
+        ),
     }
 }
 
@@ -514,23 +710,37 @@ mod tests {
     use super::*;
 
     fn login(fields: Value) -> Login {
-        Login { path: PathBuf::new(), fields: serde_json::from_value(fields).unwrap(), modified: None }
+        Login {
+            path: PathBuf::new(),
+            fields: serde_json::from_value(fields).unwrap(),
+            modified: None,
+        }
     }
 
     #[test]
     fn names_files_the_way_cliproxyapi_does() {
         let claude = login(json!({"email": "a@example.com", "organization_uuid": "org"}));
         let hash = &hex(&Sha256::digest(b"org"))[..8];
-        assert_eq!(claude_file_name(&claude), format!("claude-{hash}-a@example.com.json"));
-        let codex = login(json!({"email": "a@example.com", "account_id": "acc", "plan_type": "Pro"}));
+        assert_eq!(
+            claude_file_name(&claude),
+            format!("claude-{hash}-a@example.com.json")
+        );
+        let codex =
+            login(json!({"email": "a@example.com", "account_id": "acc", "plan_type": "Pro"}));
         let hash = &hex(&Sha256::digest(b"acc"))[..8];
-        assert_eq!(codex_file_name(&codex), format!("codex-{hash}-a@example.com-pro.json"));
+        assert_eq!(
+            codex_file_name(&codex),
+            format!("codex-{hash}-a@example.com-pro.json")
+        );
     }
 
     #[test]
     fn a_refresh_keeps_the_old_refresh_token_when_none_comes_back() {
-        let mut l = login(json!({"type": "claude", "access_token": "old", "refresh_token": "keep", "other": 1}));
-        let tokens: Tokens = serde_json::from_value(json!({"access_token": "new", "expires_in": 28800})).unwrap();
+        let mut l = login(
+            json!({"type": "claude", "access_token": "old", "refresh_token": "keep", "other": 1}),
+        );
+        let tokens: Tokens =
+            serde_json::from_value(json!({"access_token": "new", "expires_in": 28800})).unwrap();
         l.fields.extend(tokens.fields(1_800_000_000_000));
         assert_eq!(l.get("access_token"), "new");
         assert_eq!(l.get("refresh_token"), "keep");
@@ -544,6 +754,9 @@ mod tests {
         let token = format!("x.{}.y", URL_SAFE_NO_PAD.encode(claims.to_string()));
         let mut l = login(json!({"id_token": token}));
         codex_fields(&mut l);
-        assert_eq!((l.get("email"), l.get("account_id"), l.get("plan_type")), ("a@example.com", "acc", "plus"));
+        assert_eq!(
+            (l.get("email"), l.get("account_id"), l.get("plan_type")),
+            ("a@example.com", "acc", "plus")
+        );
     }
 }

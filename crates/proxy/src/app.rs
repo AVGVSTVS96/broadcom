@@ -79,8 +79,15 @@ pub struct Seat {
 /// A credential a request can go out on, with what it needs to authenticate.
 #[derive(Clone, Debug)]
 pub enum Target {
-    Key { id: String, name: String, key: String },
-    Plan { id: String, token: String },
+    Key {
+        id: String,
+        name: String,
+        key: String,
+    },
+    Plan {
+        id: String,
+        token: String,
+    },
 }
 
 impl Target {
@@ -114,7 +121,12 @@ const WORKING: i64 = 2 * MINUTE;
 const READING_EVERY: i64 = 15 * MINUTE;
 
 impl App {
-    pub fn new(config_path: PathBuf, config: Config, revision: String, ends: Endpoints) -> anyhow::Result<Self> {
+    pub fn new(
+        config_path: PathBuf,
+        config: Config,
+        revision: String,
+        ends: Endpoints,
+    ) -> anyhow::Result<Self> {
         let client_keys = read_secret(&config.client_keys_file)?
             .lines()
             .map(str::trim)
@@ -122,7 +134,11 @@ impl App {
             .map(String::from)
             .collect();
         let management_key = read_secret(&config.management_key_file)?;
-        let keys = config.api_keys.iter().map(ApiKey::load).collect::<anyhow::Result<_>>()?;
+        let keys = config
+            .api_keys
+            .iter()
+            .map(ApiKey::load)
+            .collect::<anyhow::Result<_>>()?;
         let state = State {
             policy: config.policy,
             revision,
@@ -172,8 +188,15 @@ impl App {
         let mut held = std::mem::take(&mut state.others);
         for login in logins {
             if login.kind() != "claude" {
-                let newer = held.iter().position(|l| l.path == login.path).map(|i| held.swap_remove(i));
-                state.others.push(newer.filter(|l| l.modified >= login.modified).unwrap_or(login));
+                let newer = held
+                    .iter()
+                    .position(|l| l.path == login.path)
+                    .map(|i| held.swap_remove(i));
+                state.others.push(
+                    newer
+                        .filter(|l| l.modified >= login.modified)
+                        .unwrap_or(login),
+                );
                 continue;
             }
             let account = match accounts.iter().position(|a| a.login.path == login.path) {
@@ -208,9 +231,15 @@ impl App {
     }
 
     pub fn client_allowed(&self, headers: &HeaderMap) -> bool {
-        let bearer = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer "));
+        let bearer = headers
+            .get("authorization")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "));
         let api_key = headers.get("x-api-key").and_then(|v| v.to_str().ok());
-        [bearer, api_key].into_iter().flatten().any(|k| self.client_keys.iter().any(|c| c == k.trim()))
+        [bearer, api_key]
+            .into_iter()
+            .flatten()
+            .any(|k| self.client_keys.iter().any(|c| c == k.trim()))
     }
 
     pub fn weight(&self, entrypoint: &str) -> f64 {
@@ -224,8 +253,11 @@ impl App {
     pub fn route(&self, inbound: &Inbound, now: i64) -> Route {
         let state = self.state();
         let mut route = Route::default();
-        let available: Vec<&Account> =
-            state.accounts.iter().filter(|a| !a.login.disabled() && a.cool_until <= now).collect();
+        let available: Vec<&Account> = state
+            .accounts
+            .iter()
+            .filter(|a| !a.login.disabled() && a.cool_until <= now)
+            .collect();
         let weight = self.weight(&inbound.entrypoint);
         let views = state.views(&available, now, self.config.agent_sdk_factor);
         let rows = pool::rank(&views, &state.policy, now, weight);
@@ -248,24 +280,42 @@ impl App {
         let (plans, spent): (Vec<usize>, Vec<usize>) = order.into_iter().partition(open);
         let plan = |i: usize| {
             let a = available[i];
-            Target::Plan { id: a.id(), token: a.login.get("access_token").to_string() }
+            Target::Plan {
+                id: a.id(),
+                token: a.login.get("access_token").to_string(),
+            }
         };
         let paid_on = |k: &ApiKey| {
-            state
-                .accounts
-                .iter()
-                .any(|a| a.extra_usage && !a.login.disabled() && a.label().eq_ignore_ascii_case(k.account.trim()))
+            state.accounts.iter().any(|a| {
+                a.extra_usage
+                    && !a.login.disabled()
+                    && a.label().eq_ignore_ascii_case(k.account.trim())
+            })
         };
         let keys: Vec<&ApiKey> = state.keys.iter().filter(|k| k.free || paid_on(k)).collect();
-        let key = |k: &&ApiKey| Target::Key { id: k.id.clone(), name: k.name.clone(), key: k.key.clone() };
+        let key = |k: &&ApiKey| Target::Key {
+            id: k.id.clone(),
+            name: k.name.clone(),
+            key: k.key.clone(),
+        };
         let ready = |k: &&&ApiKey| k.cool_until <= now;
         route.targets.extend(plans.into_iter().map(plan));
-        route.targets.extend(keys.iter().filter(|k| k.free).filter(ready).map(key));
+        route
+            .targets
+            .extend(keys.iter().filter(|k| k.free).filter(ready).map(key));
         route.targets.extend(spent.into_iter().map(plan));
-        route.targets.extend(keys.iter().filter(|k| !k.free).filter(ready).map(key));
-        let plans_cooling =
-            state.accounts.iter().filter(|a| !a.login.disabled() && a.cool_until > now).map(|a| a.cool_until);
-        let keys_cooling = keys.iter().filter(|k| k.cool_until > now).map(|k| k.cool_until);
+        route
+            .targets
+            .extend(keys.iter().filter(|k| !k.free).filter(ready).map(key));
+        let plans_cooling = state
+            .accounts
+            .iter()
+            .filter(|a| !a.login.disabled() && a.cool_until > now)
+            .map(|a| a.cool_until);
+        let keys_cooling = keys
+            .iter()
+            .filter(|k| k.cool_until > now)
+            .map(|k| k.cool_until);
         route.free_at = plans_cooling.chain(keys_cooling).min();
         route
     }
@@ -273,7 +323,9 @@ impl App {
     /// Records that a session's request was served by `account`: a `start` line the first
     /// time, a move line with its cause when the account changes.
     pub fn seat(&self, inbound: &Inbound, account: &str, moved: Option<Cause>, now: i64) {
-        let Some(session) = &inbound.session else { return };
+        let Some(session) = &inbound.session else {
+            return;
+        };
         let mut state = self.state();
         let previous = state.seats.get(session).map(|s| s.account.clone());
         if previous.as_deref() != Some(account) {
@@ -290,7 +342,11 @@ impl App {
         }
         state.seats.insert(
             session.clone(),
-            Seat { account: account.into(), entrypoint: inbound.entrypoint.clone(), seen: now },
+            Seat {
+                account: account.into(),
+                entrypoint: inbound.entrypoint.clone(),
+                seen: now,
+            },
         );
         state.seats.retain(|_, s| now - s.seen <= SEAT_DAY);
         drop(state);
@@ -299,7 +355,9 @@ impl App {
 
     /// Reads an account's limits from Anthropic's `anthropic-ratelimit-unified-*` headers.
     pub fn observe(&self, account: &str, headers: &HeaderMap, now: i64) {
-        let Some(reading) = header_reading(headers, now) else { return };
+        let Some(reading) = header_reading(headers, now) else {
+            return;
+        };
         let mut state = self.state();
         if let Some(a) = state.account_mut(account) {
             a.observe(reading, now);
@@ -364,7 +422,9 @@ impl State {
                     .seats
                     .values()
                     .filter(|s| s.account == id && now - s.seen <= WORKING)
-                    .fold((0, 0.0), |(n, load), s| (n + 1, load + weight(&s.entrypoint, factor)));
+                    .fold((0, 0.0), |(n, load), s| {
+                        (n + 1, load + weight(&s.entrypoint, factor))
+                    });
                 View {
                     label: a.label(),
                     reading: a.settled(a.reading, now).0.live(now),
@@ -381,18 +441,37 @@ impl State {
 /// How much a request from `entrypoint` counts against an account: Agent SDK requests burn
 /// `factor` times what Claude Code's do.
 fn weight(entrypoint: &str, factor: f64) -> f64 {
-    if matches!(entrypoint, "sdk-cli" | "sdk-ts" | "sdk-py") { factor } else { 1.0 }
+    if matches!(entrypoint, "sdk-cli" | "sdk-ts" | "sdk-py") {
+        factor
+    } else {
+        1.0
+    }
 }
 
 /// The account's limits from a response's headers: utilization is a fraction, reset a unix time.
 pub fn header_reading(headers: &HeaderMap, now: i64) -> Option<Reading> {
     let window = |name: &str| {
-        let get = |field: &str| headers.get(format!("anthropic-ratelimit-unified-{name}-{field}"))?.to_str().ok();
-        let used: f64 = get("utilization")?.parse().ok().filter(|u: &f64| u.is_finite())?;
+        let get = |field: &str| {
+            headers
+                .get(format!("anthropic-ratelimit-unified-{name}-{field}"))?
+                .to_str()
+                .ok()
+        };
+        let used: f64 = get("utilization")?
+            .parse()
+            .ok()
+            .filter(|u: &f64| u.is_finite())?;
         let reset: i64 = get("reset").and_then(|r| r.parse().ok()).unwrap_or(0);
-        Some(Window { used: used * 100.0, resets_at: reset * 1000 })
+        Some(Window {
+            used: used * 100.0,
+            resets_at: reset * 1000,
+        })
     };
-    let reading = Reading { five_hour: window("5h"), week: window("7d"), at: now };
+    let reading = Reading {
+        five_hour: window("5h"),
+        week: window("7d"),
+        at: now,
+    };
     (reading.five_hour.is_some() || reading.week.is_some()).then_some(reading)
 }
 

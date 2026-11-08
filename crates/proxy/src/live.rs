@@ -21,9 +21,18 @@ struct Inner {
 fn frame(kind: &str, keys: &[String], values: &HashMap<String, String>) -> Bytes {
     let body: Vec<String> = keys
         .iter()
-        .map(|k| format!("{}:{}", Value::from(k.as_str()), values.get(k).map_or("null", String::as_str)))
+        .map(|k| {
+            format!(
+                "{}:{}",
+                Value::from(k.as_str()),
+                values.get(k).map_or("null", String::as_str)
+            )
+        })
         .collect();
-    Bytes::from(format!("data: {{\"type\":\"{kind}\",\"live\":{{{}}}}}\n\n", body.join(",")))
+    Bytes::from(format!(
+        "data: {{\"type\":\"{kind}\",\"live\":{{{}}}}}\n\n",
+        body.join(",")
+    ))
 }
 
 impl Stream {
@@ -46,12 +55,34 @@ impl Stream {
     /// place, so a client's order matches a fresh snapshot.
     pub fn publish(&self, entries: &[(String, Value)]) {
         let mut inner = self.inner();
-        let next: HashMap<String, String> = entries.iter().map(|(k, v)| (k.clone(), v.to_string())).collect();
-        let mut changed: Vec<String> =
-            entries.iter().filter(|(k, _)| inner.live.get(k) != next.get(k)).map(|(k, _)| k.clone()).collect();
-        changed.extend(inner.keys.iter().filter(|k| !next.contains_key(*k)).cloned());
-        let mut order: Vec<String> = inner.keys.iter().filter(|k| next.contains_key(*k)).cloned().collect();
-        order.extend(entries.iter().filter(|(k, _)| !inner.live.contains_key(k)).map(|(k, _)| k.clone()));
+        let next: HashMap<String, String> = entries
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect();
+        let mut changed: Vec<String> = entries
+            .iter()
+            .filter(|(k, _)| inner.live.get(k) != next.get(k))
+            .map(|(k, _)| k.clone())
+            .collect();
+        changed.extend(
+            inner
+                .keys
+                .iter()
+                .filter(|k| !next.contains_key(*k))
+                .cloned(),
+        );
+        let mut order: Vec<String> = inner
+            .keys
+            .iter()
+            .filter(|k| next.contains_key(*k))
+            .cloned()
+            .collect();
+        order.extend(
+            entries
+                .iter()
+                .filter(|(k, _)| !inner.live.contains_key(k))
+                .map(|(k, _)| k.clone()),
+        );
         inner.keys = order;
         let patch = frame("patch", &changed, &next);
         inner.live = next;
@@ -91,16 +122,28 @@ mod tests {
     #[test]
     fn sends_a_snapshot_then_only_what_changed() {
         let stream = Stream::default();
-        stream.publish(&[("a:1".into(), json!({"x": 1})), ("pool".into(), json!({"y": 1}))]);
+        stream.publish(&[
+            ("a:1".into(), json!({"x": 1})),
+            ("pool".into(), json!({"y": 1})),
+        ]);
         let mut rx = stream.subscribe();
         assert_eq!(
             text(&rx.try_recv().unwrap()),
             "data: {\"type\":\"snapshot\",\"live\":{\"a:1\":{\"x\":1},\"pool\":{\"y\":1}}}\n\n"
         );
-        stream.publish(&[("a:1".into(), json!({"x": 1})), ("pool".into(), json!({"y": 2}))]);
-        assert_eq!(text(&rx.try_recv().unwrap()), "data: {\"type\":\"patch\",\"live\":{\"pool\":{\"y\":2}}}\n\n");
+        stream.publish(&[
+            ("a:1".into(), json!({"x": 1})),
+            ("pool".into(), json!({"y": 2})),
+        ]);
+        assert_eq!(
+            text(&rx.try_recv().unwrap()),
+            "data: {\"type\":\"patch\",\"live\":{\"pool\":{\"y\":2}}}\n\n"
+        );
         stream.publish(&[("pool".into(), json!({"y": 2}))]);
-        assert_eq!(text(&rx.try_recv().unwrap()), "data: {\"type\":\"patch\",\"live\":{\"a:1\":null}}\n\n");
+        assert_eq!(
+            text(&rx.try_recv().unwrap()),
+            "data: {\"type\":\"patch\",\"live\":{\"a:1\":null}}\n\n"
+        );
         stream.publish(&[("pool".into(), json!({"y": 2}))]);
         assert!(rx.try_recv().is_err());
     }
@@ -111,7 +154,13 @@ mod tests {
         let mut rx = stream.subscribe();
         rx.try_recv().unwrap();
         stream.close();
-        assert!(matches!(rx.try_recv(), Err(mpsc::error::TryRecvError::Disconnected)));
-        assert!(matches!(stream.subscribe().try_recv(), Err(mpsc::error::TryRecvError::Disconnected)));
+        assert!(matches!(
+            rx.try_recv(),
+            Err(mpsc::error::TryRecvError::Disconnected)
+        ));
+        assert!(matches!(
+            stream.subscribe().try_recv(),
+            Err(mpsc::error::TryRecvError::Disconnected)
+        ));
     }
 }

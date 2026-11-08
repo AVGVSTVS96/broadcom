@@ -38,9 +38,20 @@ pub enum Verdict {
 }
 
 /// Which account-level errors a response carries, from its status and body.
-pub fn classify(target: &Target, status: StatusCode, headers: &HeaderMap, body: &[u8], now: i64) -> Verdict {
+pub fn classify(
+    target: &Target,
+    status: StatusCode,
+    headers: &HeaderMap,
+    body: &[u8],
+    now: i64,
+) -> Verdict {
     let text = String::from_utf8_lossy(body).to_lowercase();
-    let header = |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).unwrap_or("");
+    let header = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+    };
     let seconds = |name: &str| header(name).parse::<i64>().ok();
     match status.as_u16() {
         401 if matches!(target, Target::Plan { .. }) => Verdict::Renew,
@@ -52,7 +63,12 @@ pub fn classify(target: &Target, status: StatusCode, headers: &HeaderMap, body: 
             match target {
                 Target::Key { .. } => Verdict::Cool(after.max(now + 10 * SECOND)),
                 Target::Plan { .. } => match spent_window_reset(headers) {
-                    Some(reset) => Verdict::Cool(after.max(reset).max(now + 10 * SECOND).min(now + LONGEST_WINDOW)),
+                    Some(reset) => Verdict::Cool(
+                        after
+                            .max(reset)
+                            .max(now + 10 * SECOND)
+                            .min(now + LONGEST_WINDOW),
+                    ),
                     None => Verdict::Answer,
                 },
             }
@@ -70,16 +86,30 @@ const LONGEST_WINDOW: i64 = WEEK + HOUR;
 /// Anthropic sends it for Claude Code's startup quota probe, for a request that isn't Claude
 /// Code's, and when only a model's own weekly window (Fable) or overage ran out.
 pub fn spent_window_reset(headers: &HeaderMap) -> Option<i64> {
-    let header = |name: String| headers.get(name).and_then(|v| v.to_str().ok()).unwrap_or("").trim().to_lowercase();
+    let header = |name: String| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .trim()
+            .to_lowercase()
+    };
     let unified = header("anthropic-ratelimit-unified-status".into());
     ["5h", "7d"]
         .into_iter()
         .filter(|w| {
             let status = header(format!("anthropic-ratelimit-unified-{w}-status"));
-            let used = header(format!("anthropic-ratelimit-unified-{w}-utilization")).parse::<f64>().unwrap_or(0.0);
+            let used = header(format!("anthropic-ratelimit-unified-{w}-utilization"))
+                .parse::<f64>()
+                .unwrap_or(0.0);
             status == "rejected" || (status.is_empty() && unified == "rejected" && used >= 1.0)
         })
-        .map(|w| header(format!("anthropic-ratelimit-unified-{w}-reset")).parse::<i64>().unwrap_or(0) * SECOND)
+        .map(|w| {
+            header(format!("anthropic-ratelimit-unified-{w}-reset"))
+                .parse::<i64>()
+                .unwrap_or(0)
+                * SECOND
+        })
         .max()
 }
 
@@ -103,7 +133,12 @@ struct UserId {
 
 pub fn inbound(headers: &HeaderMap, body: &[u8]) -> Inbound {
     let peek: Peek = serde_json::from_slice(body).unwrap_or_default();
-    let header = |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).map(str::trim);
+    let header = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+    };
     let session = header("x-claude-code-session-id")
         .map(str::to_lowercase)
         .or_else(|| {
@@ -111,21 +146,39 @@ pub fn inbound(headers: &HeaderMap, body: &[u8]) -> Inbound {
             serde_json::from_str::<UserId>(&user).ok()?.session_id
         })
         .filter(|s| is_uuid(s));
-    Inbound { model: peek.model, session, entrypoint: entrypoint(header("user-agent").unwrap_or("")) }
+    Inbound {
+        model: peek.model,
+        session,
+        entrypoint: entrypoint(header("user-agent").unwrap_or("")),
+    }
 }
 
 /// The entrypoint in `claude-cli/<version> (external, <entrypoint>, …)`, or "".
 pub fn entrypoint(user_agent: &str) -> String {
-    let Some(rest) = user_agent.strip_prefix("claude-cli/") else { return String::new() };
-    let Some((_, inside)) = rest.split_once('(') else { return String::new() };
-    let Some(rest) = inside.trim_start().strip_prefix("external,") else { return String::new() };
-    rest.split([',', ')']).next().unwrap_or("").trim().to_lowercase()
+    let Some(rest) = user_agent.strip_prefix("claude-cli/") else {
+        return String::new();
+    };
+    let Some((_, inside)) = rest.split_once('(') else {
+        return String::new();
+    };
+    let Some(rest) = inside.trim_start().strip_prefix("external,") else {
+        return String::new();
+    };
+    rest.split([',', ')'])
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_lowercase()
 }
 
 fn is_uuid(s: &str) -> bool {
     s.len() == 36
         && s.char_indices().all(|(i, c)| {
-            if matches!(i, 8 | 13 | 18 | 23) { c == '-' } else { c.is_ascii_digit() || ('a'..='f').contains(&c) }
+            if matches!(i, 8 | 13 | 18 | 23) {
+                c == '-'
+            } else {
+                c.is_ascii_digit() || ('a'..='f').contains(&c)
+            }
         })
 }
 
@@ -147,8 +200,16 @@ const DROP_REQUEST: [&str; 13] = [
 ];
 
 /// Response headers that describe the upstream connection or an encoding already undone.
-const DROP_RESPONSE: [&str; 8] =
-    ["connection", "keep-alive", "transfer-encoding", "te", "trailer", "upgrade", "content-length", "content-encoding"];
+const DROP_RESPONSE: [&str; 8] = [
+    "connection",
+    "keep-alive",
+    "transfer-encoding",
+    "te",
+    "trailer",
+    "upgrade",
+    "content-length",
+    "content-encoding",
+];
 
 pub fn upstream_headers(headers: &HeaderMap, target: &Target) -> HeaderMap {
     let mut out = HeaderMap::with_capacity(headers.len() + 1);
@@ -165,14 +226,19 @@ pub fn upstream_headers(headers: &HeaderMap, target: &Target) -> HeaderMap {
             );
         }
         Target::Key { key, .. } => {
-            out.insert("x-api-key", HeaderValue::from_str(key).expect("key is a header value"));
+            out.insert(
+                "x-api-key",
+                HeaderValue::from_str(key).expect("key is a header value"),
+            );
             let betas: Vec<String> = out
                 .get_all("anthropic-beta")
                 .iter()
                 .filter_map(|v| v.to_str().ok())
                 .flat_map(|v| v.split(','))
                 .map(str::trim)
-                .filter(|b| !b.is_empty() && !b.starts_with("oauth-") && !b.starts_with("claude-code-"))
+                .filter(|b| {
+                    !b.is_empty() && !b.starts_with("oauth-") && !b.starts_with("claude-code-")
+                })
                 .map(String::from)
                 .collect();
             out.remove("anthropic-beta");
@@ -190,20 +256,36 @@ pub fn upstream_headers(headers: &HeaderMap, target: &Target) -> HeaderMap {
 fn client_headers(headers: &HeaderMap) -> HeaderMap {
     headers
         .iter()
-        .filter(|(name, _)| !DROP_RESPONSE.contains(&name.as_str()) && name.as_str() != "set-cookie")
+        .filter(|(name, _)| {
+            !DROP_RESPONSE.contains(&name.as_str()) && name.as_str() != "set-cookie"
+        })
         .map(|(n, v)| (n.clone(), v.clone()))
         .collect()
 }
 
 fn error(status: StatusCode, kind: &str, message: &str) -> Response {
-    (status, axum::Json(json!({"type": "error", "error": {"type": kind, "message": message}}))).into_response()
+    (
+        status,
+        axum::Json(json!({"type": "error", "error": {"type": kind, "message": message}})),
+    )
+        .into_response()
 }
 
-pub async fn messages(State(app): State<Arc<App>>, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
+pub async fn messages(
+    State(app): State<Arc<App>>,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     forward(&app, Method::POST, &uri, &headers, body, true).await
 }
 
-pub async fn count_tokens(State(app): State<Arc<App>>, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
+pub async fn count_tokens(
+    State(app): State<Arc<App>>,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     forward(&app, Method::POST, &uri, &headers, body, false).await
 }
 
@@ -213,29 +295,52 @@ pub async fn models(State(app): State<Arc<App>>, uri: Uri, headers: HeaderMap) -
 
 /// Sends the request out on each credential the route lists until one answers.
 /// `receipts` marks requests whose usage is recorded and whose session is seated.
-async fn forward(app: &App, method: Method, uri: &Uri, headers: &HeaderMap, body: Bytes, receipts: bool) -> Response {
+async fn forward(
+    app: &App,
+    method: Method,
+    uri: &Uri,
+    headers: &HeaderMap,
+    body: Bytes,
+    receipts: bool,
+) -> Response {
     if !app.client_allowed(headers) {
-        return error(StatusCode::UNAUTHORIZED, "authentication_error", "This proxy needs one of its client keys.");
+        return error(
+            StatusCode::UNAUTHORIZED,
+            "authentication_error",
+            "This proxy needs one of its client keys.",
+        );
     }
     let started = files::now_ms();
     let inbound = inbound(headers, &body);
     let route = app.route(&inbound, started);
     let path = uri.path_and_query().map_or(uri.path(), |p| p.as_str());
     let url = format!("{}{path}", app.ends.anthropic);
-    let log = Log { method: &method, path, inbound: &inbound, started };
+    let log = Log {
+        method: &method,
+        path,
+        inbound: &inbound,
+        started,
+    };
     let mut last = None;
     let route_free_at = route.free_at;
     for mut target in route.targets {
         let mut renewed = false;
         loop {
             let now = files::now_ms();
-            let request =
-                app.http.request(method.clone(), &url).headers(upstream_headers(headers, &target)).body(body.clone());
+            let request = app
+                .http
+                .request(method.clone(), &url)
+                .headers(upstream_headers(headers, &target))
+                .body(body.clone());
             let response = match request.send().await {
                 Ok(response) => response,
                 Err(err) => {
                     eprintln!("upstream {}: {err}", target.id());
-                    last = Some(error(StatusCode::BAD_GATEWAY, "api_error", "The proxy couldn't reach Anthropic."));
+                    last = Some(error(
+                        StatusCode::BAD_GATEWAY,
+                        "api_error",
+                        "The proxy couldn't reach Anthropic.",
+                    ));
                     break;
                 }
             };
@@ -244,7 +349,8 @@ async fn forward(app: &App, method: Method, uri: &Uri, headers: &HeaderMap, body
             if let Target::Plan { id, .. } = &target {
                 app.observe(id, &response_headers, now);
             }
-            let receipt = receipts.then(|| Receipt::new(&inbound, &target, status, &response_headers, now));
+            let receipt =
+                receipts.then(|| Receipt::new(&inbound, &target, status, &response_headers, now));
             if status.is_success() {
                 if let Target::Plan { id, .. } = &target
                     && receipts
@@ -252,8 +358,12 @@ async fn forward(app: &App, method: Method, uri: &Uri, headers: &HeaderMap, body
                     app.seat(&inbound, id, route.moved, now);
                 }
                 log.attempt(&target, status, &response_headers, b"");
-                let stream =
-                    Tap::new(response.bytes_stream(), receipt, app.state_dir().to_path_buf(), &response_headers);
+                let stream = Tap::new(
+                    response.bytes_stream(),
+                    receipt,
+                    app.state_dir().to_path_buf(),
+                    &response_headers,
+                );
                 let mut out = Response::new(Body::from_stream(stream));
                 *out.status_mut() = status;
                 *out.headers_mut() = client_headers(&response_headers);
@@ -273,7 +383,10 @@ async fn forward(app: &App, method: Method, uri: &Uri, headers: &HeaderMap, body
                 Verdict::Renew if !renewed => {
                     renewed = true;
                     if let Some(token) = crate::oauth::renew(app, target.id(), &target).await {
-                        target = Target::Plan { id: target.id().to_string(), token };
+                        target = Target::Plan {
+                            id: target.id().to_string(),
+                            token,
+                        };
                         continue;
                     }
                     app.cool(&target, now + 30 * MINUTE);
@@ -292,13 +405,18 @@ async fn forward(app: &App, method: Method, uri: &Uri, headers: &HeaderMap, body
             log.path, inbound.model, inbound.entrypoint
         );
         let message = match route_free_at {
-            Some(at) => format!("Every account in the pool is at a limit or out of credit until {}.", files::when(at)),
+            Some(at) => format!(
+                "Every account in the pool is at a limit or out of credit until {}.",
+                files::when(at)
+            ),
             None => "The pool has no account that can take this request.".into(),
         };
         let mut answer = error(StatusCode::TOO_MANY_REQUESTS, "rate_limit_error", &message);
         if let Some(at) = route_free_at {
             let seconds = ((at - files::now_ms()) / SECOND).max(1);
-            answer.headers_mut().insert("retry-after", HeaderValue::from(seconds));
+            answer
+                .headers_mut()
+                .insert("retry-after", HeaderValue::from(seconds));
         }
         answer
     })
@@ -322,7 +440,10 @@ impl Log<'_> {
         };
         let utilization = |window: &str| {
             let name = format!("anthropic-ratelimit-unified-{window}-utilization");
-            headers.get(name).and_then(|v| v.to_str().ok()).unwrap_or("-")
+            headers
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-")
         };
         let message = serde_json::from_slice::<Value>(error)
             .ok()
@@ -379,9 +500,20 @@ pub struct Receipt {
 }
 
 impl Receipt {
-    fn new(inbound: &Inbound, target: &Target, status: StatusCode, headers: &HeaderMap, now: i64) -> Self {
+    fn new(
+        inbound: &Inbound,
+        target: &Target,
+        status: StatusCode,
+        headers: &HeaderMap,
+        now: i64,
+    ) -> Self {
         let attempt = uuid::Uuid::new_v4().to_string();
-        let model = inbound.model.rsplit('/').next().unwrap_or_default().to_string();
+        let model = inbound
+            .model
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let request_id = ["request-id", "x-request-id"]
             .iter()
             .find_map(|n| headers.get(*n).and_then(|v| v.to_str().ok()))
@@ -400,9 +532,16 @@ impl Receipt {
             status: status.as_u16(),
             timestamp: files::utc(now),
             harness: "claude",
-            project: if inbound.entrypoint.is_empty() { "Proxy requests".into() } else { inbound.entrypoint.clone() },
+            project: if inbound.entrypoint.is_empty() {
+                "Proxy requests".into()
+            } else {
+                inbound.entrypoint.clone()
+            },
             repository: None,
-            session_id: inbound.session.clone().unwrap_or_else(|| format!("proxy:{attempt}")),
+            session_id: inbound
+                .session
+                .clone()
+                .unwrap_or_else(|| format!("proxy:{attempt}")),
             model,
             input_tokens: 0,
             output_tokens: 0,
@@ -420,23 +559,37 @@ impl Receipt {
 
     /// Takes the message id, model and usage from a JSON answer or one SSE event's data.
     fn read_body(&mut self, data: &[u8], event: bool) {
-        let Ok(Value::Object(doc)) = serde_json::from_slice::<Value>(data) else { return };
-        let message = if event { doc.get("message").and_then(Value::as_object).unwrap_or(&doc) } else { &doc };
+        let Ok(Value::Object(doc)) = serde_json::from_slice::<Value>(data) else {
+            return;
+        };
+        let message = if event {
+            doc.get("message")
+                .and_then(Value::as_object)
+                .unwrap_or(&doc)
+        } else {
+            &doc
+        };
         if let Some(id) = message.get("id").and_then(Value::as_str) {
             self.response_id = id.into();
         }
         if let Some(model) = message.get("model").and_then(Value::as_str) {
             self.model = model.into();
         }
-        if let (Some(Value::Object(usage)), Value::Object(held)) =
-            (message.get("usage").or_else(|| doc.get("usage")), &mut self.usage)
-        {
+        if let (Some(Value::Object(usage)), Value::Object(held)) = (
+            message.get("usage").or_else(|| doc.get("usage")),
+            &mut self.usage,
+        ) {
             held.extend(usage.clone());
         }
     }
 
     fn write(&mut self, dir: &std::path::Path) {
-        let n = |path: &str| self.usage.pointer(path).and_then(Value::as_i64).unwrap_or(0);
+        let n = |path: &str| {
+            self.usage
+                .pointer(path)
+                .and_then(Value::as_i64)
+                .unwrap_or(0)
+        };
         self.input_tokens = n("/input_tokens");
         self.output_tokens = n("/output_tokens");
         self.cache_read_tokens = n("/cache_read_input_tokens");
@@ -469,16 +622,31 @@ struct Tap<S> {
 const MAX_JSON_BODY: usize = 32 << 20;
 
 impl<S> Tap<S> {
-    fn new(inner: S, receipt: Option<Receipt>, dir: std::path::PathBuf, headers: &HeaderMap) -> Self {
+    fn new(
+        inner: S,
+        receipt: Option<Receipt>,
+        dir: std::path::PathBuf,
+        headers: &HeaderMap,
+    ) -> Self {
         let sse = headers
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .is_some_and(|t| t.starts_with("text/event-stream"));
-        Self { inner, receipt, dir, sse, buffer: Vec::new(), stopped: false, done: false }
+        Self {
+            inner,
+            receipt,
+            dir,
+            sse,
+            buffer: Vec::new(),
+            stopped: false,
+            done: false,
+        }
     }
 
     fn feed(&mut self, chunk: &[u8]) {
-        let Some(receipt) = self.receipt.as_mut() else { return };
+        let Some(receipt) = self.receipt.as_mut() else {
+            return;
+        };
         if !self.sse {
             if self.buffer.len() + chunk.len() <= MAX_JSON_BODY {
                 self.buffer.extend_from_slice(chunk);
@@ -503,7 +671,9 @@ impl<S> Tap<S> {
 
 impl<S> Drop for Tap<S> {
     fn drop(&mut self) {
-        let Some(mut receipt) = self.receipt.take() else { return };
+        let Some(mut receipt) = self.receipt.take() else {
+            return;
+        };
         if !self.sse {
             receipt.read_body(&self.buffer, false);
         }
@@ -537,17 +707,29 @@ mod tests {
     const NOW: i64 = 1_800_000_000_000;
 
     fn plan() -> Target {
-        Target::Plan { id: "a".into(), token: "t".into() }
+        Target::Plan {
+            id: "a".into(),
+            token: "t".into(),
+        }
     }
 
     fn key() -> Target {
-        Target::Key { id: "k".into(), name: "k".into(), key: "sk".into() }
+        Target::Key {
+            id: "k".into(),
+            name: "k".into(),
+            key: "sk".into(),
+        }
     }
 
     fn headers(pairs: &[(&str, &str)]) -> HeaderMap {
         pairs
             .iter()
-            .map(|(k, v)| (HeaderName::from_bytes(k.as_bytes()).unwrap(), HeaderValue::from_str(v).unwrap()))
+            .map(|(k, v)| {
+                (
+                    HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                    HeaderValue::from_str(v).unwrap(),
+                )
+            })
             .collect()
     }
 
@@ -568,7 +750,17 @@ mod tests {
             (&plan(), 500, b"", Verdict::Next),
         ];
         for (target, status, body, want) in cases {
-            assert_eq!(classify(target, StatusCode::from_u16(status).unwrap(), &none, body, NOW), want, "{status}");
+            assert_eq!(
+                classify(
+                    target,
+                    StatusCode::from_u16(status).unwrap(),
+                    &none,
+                    body,
+                    NOW
+                ),
+                want,
+                "{status}"
+            );
         }
     }
 
@@ -581,11 +773,17 @@ mod tests {
             ("anthropic-ratelimit-unified-5h-status", "rejected"),
             ("anthropic-ratelimit-unified-5h-reset", &reset.to_string()),
         ]);
-        assert_eq!(classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &h, b"", NOW), Verdict::Cool(reset * 1000));
+        assert_eq!(
+            classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &h, b"", NOW),
+            Verdict::Cool(reset * 1000)
+        );
         let week = headers(&[
             ("anthropic-ratelimit-unified-status", "rejected"),
             ("anthropic-ratelimit-unified-7d-utilization", "1.0"),
-            ("anthropic-ratelimit-unified-7d-reset", &(NOW / 1000 + 30 * 86_400).to_string()),
+            (
+                "anthropic-ratelimit-unified-7d-reset",
+                &(NOW / 1000 + 30 * 86_400).to_string(),
+            ),
         ]);
         let capped = Verdict::Cool(NOW + WEEK + HOUR);
         assert_eq!(
@@ -600,26 +798,57 @@ mod tests {
             ("anthropic-ratelimit-unified-7d_oi-status", "rejected"),
             ("anthropic-ratelimit-unified-reset", &reset.to_string()),
         ]);
-        assert_eq!(classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &fable_only, b"", NOW), Verdict::Answer);
+        assert_eq!(
+            classify(
+                &plan(),
+                StatusCode::TOO_MANY_REQUESTS,
+                &fable_only,
+                b"",
+                NOW
+            ),
+            Verdict::Answer
+        );
         let overage = headers(&[
             ("anthropic-ratelimit-unified-status", "rejected"),
-            ("anthropic-ratelimit-unified-representative-claim", "overage"),
+            (
+                "anthropic-ratelimit-unified-representative-claim",
+                "overage",
+            ),
             ("anthropic-ratelimit-unified-5h-utilization", "0.4"),
         ]);
-        assert_eq!(classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &overage, b"", NOW), Verdict::Answer);
-        let plain = headers(&[("retry-after", "3")]);
-        assert_eq!(classify(&key(), StatusCode::TOO_MANY_REQUESTS, &plain, b"", NOW), Verdict::Cool(NOW + 10_000));
-        let quota_probe = br#"{"type":"error","error":{"type":"rate_limit_error","message":"Error"}}"#;
         assert_eq!(
-            classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &HeaderMap::new(), quota_probe, NOW),
+            classify(&plan(), StatusCode::TOO_MANY_REQUESTS, &overage, b"", NOW),
+            Verdict::Answer
+        );
+        let plain = headers(&[("retry-after", "3")]);
+        assert_eq!(
+            classify(&key(), StatusCode::TOO_MANY_REQUESTS, &plain, b"", NOW),
+            Verdict::Cool(NOW + 10_000)
+        );
+        let quota_probe =
+            br#"{"type":"error","error":{"type":"rate_limit_error","message":"Error"}}"#;
+        assert_eq!(
+            classify(
+                &plan(),
+                StatusCode::TOO_MANY_REQUESTS,
+                &HeaderMap::new(),
+                quota_probe,
+                NOW
+            ),
             Verdict::Answer
         );
     }
 
     #[test]
     fn reads_the_entrypoint_from_the_user_agent() {
-        assert_eq!(entrypoint("claude-cli/2.1.318 (external, sdk-cli)"), "sdk-cli");
-        assert_eq!(entrypoint("claude-cli/2.1.318 (external, hex, agent-sdk/0.2)"), "hex");
+        assert_eq!(
+            entrypoint("claude-cli/2.1.318 (external, sdk-cli)"),
+            "sdk-cli"
+        );
+        assert_eq!(
+            entrypoint("claude-cli/2.1.318 (external, hex, agent-sdk/0.2)"),
+            "hex"
+        );
         assert_eq!(entrypoint("curl/8.0"), "");
     }
 
@@ -628,9 +857,19 @@ mod tests {
         let id = "51933568-42b8-4c8e-bc44-2bed00731a66";
         let h = headers(&[("x-claude-code-session-id", &id.to_uppercase())]);
         assert_eq!(inbound(&h, b"{}").session.as_deref(), Some(id));
-        let body = json!({"model": "m", "metadata": {"user_id": json!({"session_id": id}).to_string()}}).to_string();
-        assert_eq!(inbound(&HeaderMap::new(), body.as_bytes()).session.as_deref(), Some(id));
-        assert_eq!(inbound(&headers(&[("x-claude-code-session-id", "nope")]), b"{}").session, None);
+        let body =
+            json!({"model": "m", "metadata": {"user_id": json!({"session_id": id}).to_string()}})
+                .to_string();
+        assert_eq!(
+            inbound(&HeaderMap::new(), body.as_bytes())
+                .session
+                .as_deref(),
+            Some(id)
+        );
+        assert_eq!(
+            inbound(&headers(&[("x-claude-code-session-id", "nope")]), b"{}").session,
+            None
+        );
     }
 
     #[test]
@@ -638,14 +877,20 @@ mod tests {
         let client = headers(&[
             ("authorization", "Bearer client-token"),
             ("x-api-key", "proxy-key"),
-            ("anthropic-beta", "claude-code-20250219,oauth-2025-04-20,effort-2025-11-24"),
+            (
+                "anthropic-beta",
+                "claude-code-20250219,oauth-2025-04-20,effort-2025-11-24",
+            ),
             ("x-app", "cli"),
             ("content-length", "10"),
         ]);
         let out = upstream_headers(&client, &plan());
         assert_eq!(out["authorization"], "Bearer t");
         assert!(out.get("x-api-key").is_none());
-        assert_eq!(out["anthropic-beta"], "claude-code-20250219,oauth-2025-04-20,effort-2025-11-24");
+        assert_eq!(
+            out["anthropic-beta"],
+            "claude-code-20250219,oauth-2025-04-20,effort-2025-11-24"
+        );
         assert_eq!(out["x-app"], "cli");
 
         let out = upstream_headers(&client, &key());
@@ -669,7 +914,10 @@ mod tests {
         );
         let dir = tempfile::tempdir().unwrap();
         for split in [1, 7, 64, stream.len()] {
-            let inbound = Inbound { model: "claude-x".into(), ..Inbound::default() };
+            let inbound = Inbound {
+                model: "claude-x".into(),
+                ..Inbound::default()
+            };
             let receipt = Receipt::new(&inbound, &plan(), StatusCode::OK, &HeaderMap::new(), NOW);
             let sse = headers(&[("content-type", "text/event-stream; charset=utf-8")]);
             let mut tap = Tap::new((), Some(receipt), dir.path().to_path_buf(), &sse);
@@ -695,7 +943,13 @@ mod tests {
     #[test]
     fn a_json_answer_cut_off_midway_is_a_failed_receipt() {
         let dir = tempfile::tempdir().unwrap();
-        let receipt = Receipt::new(&Inbound::default(), &plan(), StatusCode::OK, &HeaderMap::new(), NOW);
+        let receipt = Receipt::new(
+            &Inbound::default(),
+            &plan(),
+            StatusCode::OK,
+            &HeaderMap::new(),
+            NOW,
+        );
         let json = headers(&[("content-type", "application/json")]);
         let mut tap = Tap::new((), Some(receipt), dir.path().to_path_buf(), &json);
         tap.feed(br#"{"id":"msg_1","usage":{"input_tok"#);

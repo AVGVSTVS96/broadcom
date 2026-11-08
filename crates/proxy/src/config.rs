@@ -70,7 +70,8 @@ impl Config {
     /// Reads the config at `path`; a missing file means every default.
     pub fn load(path: &Path) -> Result<(Self, String)> {
         let text = read_or_empty(path)?;
-        let mut config: Self = serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
+        let mut config: Self =
+            serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
         config.policy.validate().map_err(anyhow::Error::msg)?;
         for p in [
             &mut config.client_keys_file,
@@ -131,7 +132,8 @@ pub fn revision(bytes: &[u8]) -> String {
 }
 
 pub fn read_secret(path: &Path) -> Result<String> {
-    let text = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
     Ok(text.trim().to_string())
 }
 
@@ -144,8 +146,10 @@ pub fn expand_home(path: &Path) -> PathBuf {
 
 pub fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }

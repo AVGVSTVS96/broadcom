@@ -1,42 +1,32 @@
 [package]
 name = "broadcom-proxy"
 version = "0.1.0"
-edition = "2024"
-license = "MIT"
+edition.workspace = true
+license.workspace = true
 description = "One address for all your Claude subscriptions: a Claude account pool for Claude Code"
-repository = "https://github.com/AVGVSTVS96/broadcom-proxy"
+repository.workspace = true
 readme = "README.md"
 keywords = ["claude", "anthropic", "claude-code", "proxy", "pool"]
 categories = ["command-line-utilities", "web-programming::http-server"]
-include = ["src/**", "systemd/**", "config.example.json", "README.md", "DESIGN.md", "LICENSE"]
+include = ["src/**", "config.example.json", "README.md", "DESIGN.md", "LICENSE"]
 
 [dependencies]
-anyhow = "1"
-axum = "0.8"
+anyhow.workspace = true
+axum.workspace = true
 base64 = "0.22"
 bytes = "1"
 futures-util = "0.3"
 jiff = "0.2"
 rand = "0.9"
-reqwest = { version = "0.13", features = ["json", "stream", "form", "gzip", "brotli", "zstd"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.10"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "process", "fs"] }
+reqwest = { workspace = true, features = ["default-tls", "charset", "http2", "system-proxy", "json", "stream", "form", "gzip", "brotli", "zstd"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "process", "fs"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3"
 
-[lints.clippy]
-pedantic = { level = "warn", priority = -1 }
-cast_precision_loss = "allow"
-cast_possible_truncation = "allow"
-cast_sign_loss = "allow"
-cast_possible_wrap = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-must_use_candidate = "allow"
-doc_markdown = "allow"
-struct_excessive_bools = "allow"
-similar_names = "allow"
+[lints]
+workspace = true

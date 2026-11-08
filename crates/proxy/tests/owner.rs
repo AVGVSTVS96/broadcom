@@ -37,17 +37,34 @@ struct Upstream {
     device_polls: Mutex<u32>,
 }
 
-async fn upstream(State(up): State<Arc<Upstream>>, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
-    let bearer = headers.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("").trim_start_matches("Bearer ");
+async fn upstream(
+    State(up): State<Arc<Upstream>>,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let bearer = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .trim_start_matches("Bearer ");
     let json_body: Value = serde_json::from_slice(&body).unwrap_or_default();
     let text = String::from_utf8_lossy(&body).into_owned();
-    let form = |key: &str| text.split('&').find_map(|kv| kv.strip_prefix(&format!("{key}="))).unwrap_or("").to_string();
+    let form = |key: &str| {
+        text.split('&')
+            .find_map(|kv| kv.strip_prefix(&format!("{key}=")))
+            .unwrap_or("")
+            .to_string()
+    };
     let delay = *up.delay.lock().unwrap();
     let now = files::now_ms();
     let ok = |v: Value| axum::Json(v).into_response();
     match uri.path() {
         "/v1/oauth/token" if json_body["grant_type"] == "refresh_token" => {
-            let spent = json_body["refresh_token"].as_str().unwrap_or("").to_string();
+            let spent = json_body["refresh_token"]
+                .as_str()
+                .unwrap_or("")
+                .to_string();
             let n = {
                 let mut all = up.refreshes.lock().unwrap();
                 all.push(spent.clone());
@@ -55,21 +72,37 @@ async fn upstream(State(up): State<Arc<Upstream>>, uri: Uri, headers: HeaderMap,
             };
             tokio::time::sleep(delay).await;
             if spent == "dead" {
-                return (StatusCode::BAD_REQUEST, axum::Json(json!({"error": "invalid_grant"}))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(json!({"error": "invalid_grant"})),
+                )
+                    .into_response();
             }
-            ok(json!({"access_token": format!("fresh-{n}"), "refresh_token": format!("r-{n}"), "expires_in": 28800}))
+            ok(
+                json!({"access_token": format!("fresh-{n}"), "refresh_token": format!("r-{n}"), "expires_in": 28800}),
+            )
         }
         "/v1/oauth/token" => {
-            if json_body["code"] != "good-code" || json_body["code_verifier"].as_str().unwrap_or("").is_empty() {
-                return (StatusCode::BAD_REQUEST, axum::Json(json!({"error": "invalid_grant"}))).into_response();
+            if json_body["code"] != "good-code"
+                || json_body["code_verifier"].as_str().unwrap_or("").is_empty()
+            {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    axum::Json(json!({"error": "invalid_grant"})),
+                )
+                    .into_response();
             }
-            ok(json!({"access_token": "token-c", "refresh_token": "r-c", "expires_in": 28800,
-                      "account": {"uuid": "c", "email_address": "c@example.com"}, "organization": {"uuid": "org-c"}}))
+            ok(
+                json!({"access_token": "token-c", "refresh_token": "r-c", "expires_in": 28800,
+                      "account": {"uuid": "c", "email_address": "c@example.com"}, "organization": {"uuid": "org-c"}}),
+            )
         }
-        "/v1/messages" if bearer.starts_with("stale") => (StatusCode::UNAUTHORIZED, "{}").into_response(),
-        "/v1/messages" => {
-            ok(json!({"id": "msg_1", "usage": {"input_tokens": 1, "output_tokens": 1}, "served": bearer}))
+        "/v1/messages" if bearer.starts_with("stale") => {
+            (StatusCode::UNAUTHORIZED, "{}").into_response()
         }
+        "/v1/messages" => ok(
+            json!({"id": "msg_1", "usage": {"input_tokens": 1, "output_tokens": 1}, "served": bearer}),
+        ),
         "/api/oauth/usage" => {
             let spent = *up.reset_spent.lock().unwrap();
             let week_ends = files::utc(now + 3 * 24 * 3_600_000);
@@ -85,7 +118,10 @@ async fn upstream(State(up): State<Arc<Upstream>>, uri: Uri, headers: HeaderMap,
                       "cedar_ember": {"grants": if bearer == "token-a" { grants } else { json!([]) }}}))
         }
         path if path.ends_with("/reset_rate_limits") => {
-            up.claims.lock().unwrap().push(json_body["request_id"].as_str().unwrap_or("").into());
+            up.claims
+                .lock()
+                .unwrap()
+                .push(json_body["request_id"].as_str().unwrap_or("").into());
             tokio::time::sleep(delay).await;
             let (status, answer) = up.claim_answer.lock().unwrap().clone();
             if answer["result"] == "reset" {
@@ -146,7 +182,9 @@ fn login(dir: &Path, name: &str, token: &str, extra: &Value) -> PathBuf {
     let mut file = json!({"type": "claude", "access_token": token, "refresh_token": format!("r-{name}"),
                           "account_uuid": name, "organization_uuid": format!("org-{name}"),
                           "email": format!("{name}@example.com"), "expired": "2099-01-01T00:00:00Z"});
-    file.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+    file.as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
     write(&path, &file.to_string());
     path
 }
@@ -173,7 +211,14 @@ async fn owner(dir: tempfile::TempDir) -> Owner {
     let (config, revision) = Config::load(&at("config.json")).unwrap();
     let app = Arc::new(App::new(at("config.json"), config, revision, ends.clone()).unwrap());
     let proxy = serve(broadcom_proxy::router(app.clone())).await;
-    Owner { app, proxy, up, ends, dir, http: reqwest::Client::new() }
+    Owner {
+        app,
+        proxy,
+        up,
+        ends,
+        dir,
+        http: reqwest::Client::new(),
+    }
 }
 
 impl Owner {
@@ -194,17 +239,30 @@ impl Owner {
             .send()
             .await
             .unwrap();
-        (response.status().as_u16(), response.json().await.unwrap_or_default())
+        (
+            response.status().as_u16(),
+            response.json().await.unwrap_or_default(),
+        )
     }
 
-    async fn manage(&self, method: reqwest::Method, path: &str, body: Option<Value>) -> (u16, Value) {
-        let mut request =
-            self.http.request(method, format!("{}/v8/management{path}", self.proxy)).bearer_auth("admin-key");
+    async fn manage(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: Option<Value>,
+    ) -> (u16, Value) {
+        let mut request = self
+            .http
+            .request(method, format!("{}/v8/management{path}", self.proxy))
+            .bearer_auth("admin-key");
         if let Some(body) = body {
             request = request.json(&body);
         }
         let response = request.send().await.unwrap();
-        (response.status().as_u16(), response.json().await.unwrap_or_default())
+        (
+            response.status().as_u16(),
+            response.json().await.unwrap_or_default(),
+        )
     }
 }
 
@@ -225,7 +283,13 @@ async fn a_refused_token_is_refreshed_once_for_every_request_waiting_on_it() {
     assert_eq!(second.1["served"], "fresh-1");
     assert_eq!(*o.up.refreshes.lock().unwrap(), ["r-a"]);
     let file = read(&path);
-    assert_eq!((file["access_token"].as_str(), file["refresh_token"].as_str()), (Some("fresh-1"), Some("r-1")));
+    assert_eq!(
+        (
+            file["access_token"].as_str(),
+            file["refresh_token"].as_str()
+        ),
+        (Some("fresh-1"), Some("r-1"))
+    );
     assert_eq!(file["note"], "kept");
     assert_eq!(file["email"], "a@example.com");
 }
@@ -233,7 +297,12 @@ async fn a_refused_token_is_refreshed_once_for_every_request_waiting_on_it() {
 #[tokio::test]
 async fn a_refresh_lands_on_the_login_as_it_stands_and_never_brings_back_a_removed_one() {
     let dir = tempfile::tempdir().unwrap();
-    let kept = login(dir.path(), "a", "token-a", &json!({"expired": "2000-01-01T00:00:00Z", "note": "kept"}));
+    let kept = login(
+        dir.path(),
+        "a",
+        "token-a",
+        &json!({"expired": "2000-01-01T00:00:00Z", "note": "kept"}),
+    );
     let removed = login(dir.path(), "b", "token-b", &json!({}));
     let o = owner(dir).await;
     *o.up.delay.lock().unwrap() = Duration::from_millis(300);
@@ -244,7 +313,11 @@ async fn a_refresh_lands_on_the_login_as_it_stands_and_never_brings_back_a_remov
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
     let (status, _) = o
-        .manage(reqwest::Method::PATCH, "/credentials/status", Some(json!({"name": "claude-a.json", "disabled": true})))
+        .manage(
+            reqwest::Method::PATCH,
+            "/credentials/status",
+            Some(json!({"name": "claude-a.json", "disabled": true})),
+        )
         .await;
     assert_eq!(status, 200);
     refreshing.await.unwrap();
@@ -259,25 +332,61 @@ async fn a_refresh_lands_on_the_login_as_it_stands_and_never_brings_back_a_remov
         async move { oauth::refresh_if(&app, &path, |_| true).await.map(|_| ()) }
     });
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let (status, _) =
-        o.manage(reqwest::Method::DELETE, "/credentials", Some(json!({"names": ["claude-b.json"]}))).await;
+    let (status, _) = o
+        .manage(
+            reqwest::Method::DELETE,
+            "/credentials",
+            Some(json!({"names": ["claude-b.json"]})),
+        )
+        .await;
     assert_eq!(status, 200);
     assert!(refreshing.await.unwrap().is_err());
     assert!(!removed.exists());
-    assert!(o.app.state().accounts.iter().all(|a| a.login.path != removed));
+    assert!(
+        o.app
+            .state()
+            .accounts
+            .iter()
+            .all(|a| a.login.path != removed)
+    );
 }
 
 #[tokio::test]
-async fn a_dead_refresh_token_signs_the_account_out_and_a_signed_out_account_still_gets_refreshed() {
+async fn a_dead_refresh_token_signs_the_account_out_and_a_signed_out_account_still_gets_refreshed()
+{
     let dir = tempfile::tempdir().unwrap();
-    login(dir.path(), "a", "token-a", &json!({"refresh_token": "dead", "expired": "2000-01-01T00:00:00Z"}));
-    login(dir.path(), "b", "token-b", &json!({"expired": "2000-01-01T00:00:00Z"}));
+    login(
+        dir.path(),
+        "a",
+        "token-a",
+        &json!({"refresh_token": "dead", "expired": "2000-01-01T00:00:00Z"}),
+    );
+    login(
+        dir.path(),
+        "b",
+        "token-b",
+        &json!({"expired": "2000-01-01T00:00:00Z"}),
+    );
     let o = owner(dir).await;
-    o.app.state().accounts.iter_mut().find(|a| a.id() == "b").unwrap().needs_reauth = true;
+    o.app
+        .state()
+        .accounts
+        .iter_mut()
+        .find(|a| a.id() == "b")
+        .unwrap()
+        .needs_reauth = true;
 
     oauth::refresh_due(&o.app).await;
     let (_, list) = o.manage(reqwest::Method::GET, "/credentials", None).await;
-    let file = |name: &str| list["files"].as_array().unwrap().iter().find(|f| f["name"] == name).unwrap().clone();
+    let file = |name: &str| {
+        list["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["name"] == name)
+            .unwrap()
+            .clone()
+    };
     assert_eq!(file("claude-a.json")["requires_sign_in"], true);
     assert_eq!(file("claude-a.json")["status"], "error");
     assert!(file("claude-b.json").get("requires_sign_in").is_none());
@@ -295,7 +404,11 @@ async fn a_claim_goes_out_once_and_keeps_its_request_id_across_a_restart() {
     sampler::sample(&o.app).await;
     sampler::sample(&o.app).await;
     let sent = o.up.claims.lock().unwrap().clone();
-    assert_eq!(sent.len(), 1, "a claim Anthropic hasn't settled waits before going out again");
+    assert_eq!(
+        sent.len(),
+        1,
+        "a claim Anthropic hasn't settled waits before going out again"
+    );
     let saved: Value = read(&o.dir.path().join("state/reset-claims.json"));
     assert_eq!(saved["a"]["requestId"], sent[0].as_str());
 
@@ -304,8 +417,18 @@ async fn a_claim_goes_out_once_and_keeps_its_request_id_across_a_restart() {
     sampler::sample(&o.app).await;
     let sent = o.up.claims.lock().unwrap().clone();
     assert_eq!(sent.len(), 2);
-    assert_eq!(sent[0], sent[1], "the retry after a restart reuses the request id");
-    let a = o.app.state().accounts.iter().find(|a| a.id() == "a").map(|a| (a.claim.is_none(), a.reading.week)).unwrap();
+    assert_eq!(
+        sent[0], sent[1],
+        "the retry after a restart reuses the request id"
+    );
+    let a = o
+        .app
+        .state()
+        .accounts
+        .iter()
+        .find(|a| a.id() == "a")
+        .map(|a| (a.claim.is_none(), a.reading.week))
+        .unwrap();
     assert!(a.0);
     assert!(a.1.unwrap().used < f64::EPSILON);
 }
@@ -318,11 +441,15 @@ async fn the_dashboard_and_the_pool_spend_one_reset_between_them() {
     let o = owner(dir).await;
     *o.up.delay.lock().unwrap() = Duration::from_millis(200);
 
-    let ((status, answer), ()) =
-        tokio::join!(o.manage(reqwest::Method::POST, "/pool/resets/a/spend", None), sampler::sample(&o.app));
+    let ((status, answer), ()) = tokio::join!(
+        o.manage(reqwest::Method::POST, "/pool/resets/a/spend", None),
+        sampler::sample(&o.app)
+    );
     assert_eq!(status, 200);
     assert_eq!(o.up.claims.lock().unwrap().len(), 1, "{answer}");
-    let (_, again) = o.manage(reqwest::Method::POST, "/pool/resets/a/spend", None).await;
+    let (_, again) = o
+        .manage(reqwest::Method::POST, "/pool/resets/a/spend", None)
+        .await;
     assert_eq!(again["spent"], false);
     assert_eq!(o.up.claims.lock().unwrap().len(), 1);
 }
@@ -331,18 +458,34 @@ async fn the_dashboard_and_the_pool_spend_one_reset_between_them() {
 async fn a_claude_sign_in_from_another_device_writes_the_login_and_joins_the_pool() {
     let dir = tempfile::tempdir().unwrap();
     let o = owner(dir).await;
-    let (status, started) =
-        o.manage(reqwest::Method::GET, "/oauth/auth-url?provider=claude&browser=remote&is_webui=true", None).await;
+    let (status, started) = o
+        .manage(
+            reqwest::Method::GET,
+            "/oauth/auth-url?provider=claude&browser=remote&is_webui=true",
+            None,
+        )
+        .await;
     assert_eq!(status, 200);
     assert_eq!(started["flow"], "code");
     let state = started["state"].as_str().unwrap().to_string();
     let url = reqwest::Url::parse(started["url"].as_str().unwrap()).unwrap();
-    let query = |k: &str| url.query_pairs().find(|(key, _)| key == k).map(|(_, v)| v.into_owned());
+    let query = |k: &str| {
+        url.query_pairs()
+            .find(|(key, _)| key == k)
+            .map(|(_, v)| v.into_owned())
+    };
     assert_eq!(query("state").as_deref(), Some(state.as_str()));
     assert!(query("code_challenge").is_some());
 
-    let status_of =
-        async |o: &Owner| o.manage(reqwest::Method::GET, &format!("/oauth/status?state={state}"), None).await.1;
+    let status_of = async |o: &Owner| {
+        o.manage(
+            reqwest::Method::GET,
+            &format!("/oauth/status?state={state}"),
+            None,
+        )
+        .await
+        .1
+    };
     assert_eq!(status_of(&o).await, json!({"status": "wait"}));
     let (refused, body) = o
         .manage(
@@ -365,15 +508,47 @@ async fn a_claude_sign_in_from_another_device_writes_the_login_and_joins_the_poo
 
     let (_, list) = o.manage(reqwest::Method::GET, "/credentials", None).await;
     let file = &list["files"][0];
-    let mut keys: Vec<&str> = file.as_object().unwrap().keys().map(String::as_str).collect();
+    let mut keys: Vec<&str> = file
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     keys.sort_unstable();
-    assert_eq!(keys, ["auth_index", "disabled", "email", "name", "provider", "status"]);
-    assert_eq!((file["provider"].as_str(), file["email"].as_str()), (Some("claude"), Some("c@example.com")));
-    let saved = read(&o.dir.path().join("auths").join(file["name"].as_str().unwrap()));
-    assert_eq!((saved["access_token"].as_str(), saved["disabled"].as_bool()), (Some("token-c"), Some(false)));
+    assert_eq!(
+        keys,
+        [
+            "auth_index",
+            "disabled",
+            "email",
+            "name",
+            "provider",
+            "status"
+        ]
+    );
+    assert_eq!(
+        (file["provider"].as_str(), file["email"].as_str()),
+        (Some("claude"), Some("c@example.com"))
+    );
+    let saved = read(
+        &o.dir
+            .path()
+            .join("auths")
+            .join(file["name"].as_str().unwrap()),
+    );
+    assert_eq!(
+        (saved["access_token"].as_str(), saved["disabled"].as_bool()),
+        (Some("token-c"), Some(false))
+    );
     assert_eq!(o.send().await.1["served"], "token-c");
 
-    let (_, cancelled) = o.manage(reqwest::Method::DELETE, &format!("/oauth/session?state={state}"), None).await;
+    let (_, cancelled) = o
+        .manage(
+            reqwest::Method::DELETE,
+            &format!("/oauth/session?state={state}"),
+            None,
+        )
+        .await;
     assert_eq!(cancelled, json!({}));
     assert_eq!(status_of(&o).await["status"], "error");
 }
@@ -382,12 +557,24 @@ async fn a_claude_sign_in_from_another_device_writes_the_login_and_joins_the_poo
 async fn a_chatgpt_sign_in_with_a_device_code_writes_the_login() {
     let dir = tempfile::tempdir().unwrap();
     let o = owner(dir).await;
-    let (_, started) = o.manage(reqwest::Method::GET, "/oauth/auth-url?provider=codex", None).await;
-    assert_eq!((started["flow"].as_str(), started["user_code"].as_str()), (Some("device"), Some("ABCD")));
+    let (_, started) = o
+        .manage(reqwest::Method::GET, "/oauth/auth-url?provider=codex", None)
+        .await;
+    assert_eq!(
+        (started["flow"].as_str(), started["user_code"].as_str()),
+        (Some("device"), Some("ABCD"))
+    );
     let state = started["state"].as_str().unwrap();
     let mut status = Value::Null;
     for _ in 0..50 {
-        status = o.manage(reqwest::Method::GET, &format!("/oauth/status?state={state}"), None).await.1;
+        status = o
+            .manage(
+                reqwest::Method::GET,
+                &format!("/oauth/status?state={state}"),
+                None,
+            )
+            .await
+            .1;
         if status["status"] != "wait" {
             break;
         }
@@ -396,7 +583,18 @@ async fn a_chatgpt_sign_in_with_a_device_code_writes_the_login() {
     assert_eq!(status, json!({"status": "ok"}));
     let (_, list) = o.manage(reqwest::Method::GET, "/credentials", None).await;
     let file = &list["files"][0];
-    assert_eq!((file["provider"].as_str(), file["email"].as_str()), (Some("codex"), Some("d@example.com")));
-    let saved = read(&o.dir.path().join("auths").join(file["name"].as_str().unwrap()));
-    assert_eq!((saved["account_id"].as_str(), saved["access_token"].as_str()), (Some("acc-d"), Some("codex-token")));
+    assert_eq!(
+        (file["provider"].as_str(), file["email"].as_str()),
+        (Some("codex"), Some("d@example.com"))
+    );
+    let saved = read(
+        &o.dir
+            .path()
+            .join("auths")
+            .join(file["name"].as_str().unwrap()),
+    );
+    assert_eq!(
+        (saved["account_id"].as_str(), saved["access_token"].as_str()),
+        (Some("acc-d"), Some("codex-token"))
+    );
 }
