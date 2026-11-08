@@ -5,7 +5,7 @@ const encoder = new TextEncoder();
 
 export const changeStream = (
   signal: AbortSignal,
-  watch: (changed: () => void) => Promise<() => void>
+  watch: (changed: () => void) => Promise<() => void>,
 ) =>
   new Response(
     new ReadableStream<Uint8Array>({
@@ -43,5 +43,5 @@ export const changeStream = (
         "content-type": "text/event-stream",
         "x-accel-buffering": "no",
       },
-    }
+    },
   );

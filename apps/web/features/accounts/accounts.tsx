@@ -35,9 +35,7 @@ const headline = (logins: readonly Row[]) => {
     return `All ${plural(logins.length, "sign-in")} work`;
   }
 
-  return stuck.length === 1
-    ? first
-    : `${stuck.length} of ${logins.length} sign-ins need you`;
+  return stuck.length === 1 ? first : `${stuck.length} of ${logins.length} sign-ins need you`;
 };
 
 const backFirst = (rows: readonly Row[]) =>
@@ -45,7 +43,7 @@ const backFirst = (rows: readonly Row[]) =>
     .flatMap((row) =>
       row.state.is === "limited" && row.state.until !== null
         ? [{ name: row.name, until: row.state.until }]
-        : []
+        : [],
     )
     .toSorted((left, right) => left.until - right.until)[0];
 
@@ -60,9 +58,7 @@ const firstSignOut = (logins: readonly Row[], now: number) => {
     })
     .toSorted((left, right) => left.until - right.until);
 
-  return first === undefined
-    ? null
-    : `${first.name}'s sign-in ends ${when(first.until, now)}`;
+  return first === undefined ? null : `${first.name}'s sign-in ends ${when(first.until, now)}`;
 };
 
 const plansTitle = (plans: readonly Row[], now: number) => {
@@ -72,9 +68,7 @@ const plansTitle = (plans: readonly Row[], now: number) => {
     return `${first.name} is back first, ${when(first.until, now)}`;
   }
 
-  const open = plans.filter(
-    (row) => row.state.is === "next" || row.state.is === "open"
-  ).length;
+  const open = plans.filter((row) => row.state.is === "next" || row.state.is === "open").length;
 
   return open === plans.length
     ? "Every plan has room"
@@ -130,8 +124,7 @@ export const Accounts = ({
   const ending = firstSignOut(plans, now);
 
   const next =
-    plans.find((row) => row.state.is === "next") ??
-    plans.find((row) => row.state.is === "open");
+    plans.find((row) => row.state.is === "next") ?? plans.find((row) => row.state.is === "open");
 
   const name = (id: string | null) =>
     rows.find((row) => row.account?.id === id)?.name ?? "no account";

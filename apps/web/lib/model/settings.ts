@@ -145,16 +145,14 @@ export const changesOf = (before: Values, after: Values): Change[] =>
             path: field.path.join("/"),
             value: after[field.key],
           },
-        ]
+        ],
   );
 
 export const conflicts = (changes: readonly Change[], current: Values) =>
   fields.filter((field) =>
     changes.some(
-      (change) =>
-        change.path === field.path.join("/") &&
-        change.from !== current[field.key]
-    )
+      (change) => change.path === field.path.join("/") && change.from !== current[field.key],
+    ),
   );
 
 interface Patch {

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  EllipsisIcon,
-  PauseIcon,
-  PlayIcon,
-  RotateCwIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { EllipsisIcon, PauseIcon, PlayIcon, RotateCwIcon, Trash2Icon } from "lucide-react";
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
@@ -30,22 +24,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { hatchStyle } from "@/components/viz/hatch";
 import { fills, texts } from "@/components/viz/meter";
-import {
-  removeCredential,
-  renewCredential,
-  setDisabled,
-} from "@/features/accounts/actions";
+import { removeCredential, renewCredential, setDisabled } from "@/features/accounts/actions";
 import { SignIn } from "@/features/accounts/sign-in";
 import { endsSoon, needsYou } from "@/lib/model/accounts";
 import type { Login, Row, State } from "@/lib/model/accounts";
-import {
-  ago,
-  dollars,
-  percent,
-  plural,
-  utcDate,
-  when,
-} from "@/lib/model/format";
+import { ago, dollars, percent, plural, utcDate, when } from "@/lib/model/format";
 import { creditTone, windowTone } from "@/lib/model/tone";
 import type { Tone } from "@/lib/model/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
@@ -77,9 +60,7 @@ const labels = {
 } as const satisfies Record<State["is"], string>;
 
 const labelOf = (state: State) =>
-  state.is === "limited" && state.window === "session"
-    ? "Session limit hit"
-    : labels[state.is];
+  state.is === "limited" && state.window === "session" ? "Session limit hit" : labels[state.is];
 
 const Cell = ({
   label,
@@ -97,9 +78,7 @@ const Cell = ({
   <div className={cn("min-w-0 space-y-1.5", className)}>
     <div className="flex h-5 items-center justify-between gap-2 text-xs">
       <span className="truncate text-muted-foreground">{label}</span>
-      {value === undefined ? null : (
-        <span className="text-sm tabular-nums">{value}</span>
-      )}
+      {value === undefined ? null : <span className="text-sm tabular-nums">{value}</span>}
     </div>
     {children}
     {note === undefined ? null : (
@@ -108,25 +87,14 @@ const Cell = ({
   </div>
 );
 
-const Bar = ({
-  value,
-  tone,
-  locked = false,
-}: {
-  value: number;
-  tone: Tone;
-  locked?: boolean;
-}) => (
+const Bar = ({ value, tone, locked = false }: { value: number; tone: Tone; locked?: boolean }) => (
   <div
     className="h-1.5 overflow-hidden rounded-full bg-track"
     style={locked ? hatchStyle : undefined}
   >
     {locked ? null : (
       <div
-        className={cn(
-          "h-full rounded-full transition-[width] duration-500",
-          fills[tone]
-        )}
+        className={cn("h-full rounded-full transition-[width] duration-500", fills[tone])}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
       />
     )}
@@ -146,8 +114,8 @@ const Line = ({
   id: string;
   name: string;
   state: State;
-  plan?: string;
-  note?: string;
+  plan?: string | undefined;
+  note?: string | undefined;
   first: ReactNode;
   second: ReactNode;
   actions?: ReactNode;
@@ -159,9 +127,7 @@ const Line = ({
     <div className="col-span-2 min-w-0 sm:col-span-1">
       <div className="flex items-center gap-2">
         <span className={cn("size-2 shrink-0 rounded-full", dots[state.is])} />
-        <span className={cn("truncate", state.is === "next" && "text-brand")}>
-          {name}
-        </span>
+        <span className={cn("truncate", state.is === "next" && "text-brand")}>{name}</span>
         {plan === undefined || plan === "" ? null : (
           <span className="shrink-0 text-sm text-muted-foreground">{plan}</span>
         )}
@@ -172,21 +138,11 @@ const Line = ({
     </div>
     <div className="col-span-3 min-w-0 sm:col-span-1">{first}</div>
     <div className="col-span-3 min-w-0 sm:col-span-1">{second}</div>
-    <div className="col-start-3 row-start-1 -mt-1 flex justify-end sm:col-start-4">
-      {actions}
-    </div>
+    <div className="col-start-3 row-start-1 -mt-1 flex justify-end sm:col-start-4">{actions}</div>
   </div>
 );
 
-const Actions = ({
-  login,
-  name,
-  working,
-}: {
-  login: Login;
-  name: string;
-  working: number;
-}) => {
+const Actions = ({ login, name, working }: { login: Login; name: string; working: number }) => {
   const [pending, startTransition] = useTransition();
   const [removing, setRemoving] = useState(false);
 
@@ -215,18 +171,14 @@ const Actions = ({
             />
           }
         >
-          {pending ? (
-            <RotateCwIcon className="animate-spin" />
-          ) : (
-            <EllipsisIcon />
-          )}
+          {pending ? <RotateCwIcon className="animate-spin" /> : <EllipsisIcon />}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem
             onClick={() => {
               act(
                 async () => await setDisabled(login.name, !login.disabled),
-                login.disabled ? `${name} is enabled` : `${name} is disabled`
+                login.disabled ? `${name} is enabled` : `${name} is disabled`,
               );
             }}
           >
@@ -235,10 +187,7 @@ const Actions = ({
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => {
-              act(
-                async () => await renewCredential(login.name),
-                `${name}'s sign-in is refreshed`
-              );
+              act(async () => await renewCredential(login.name), `${name}'s sign-in is refreshed`);
             }}
           >
             <RotateCwIcon />
@@ -272,10 +221,7 @@ const Actions = ({
             <DialogClose
               render={<Button variant="destructive" />}
               onClick={() => {
-                act(
-                  async () => await removeCredential(login.name),
-                  `${name} is removed`
-                );
+                act(async () => await removeCredential(login.name), `${name} is removed`);
               }}
             >
               Remove
@@ -294,9 +240,7 @@ const planNote = (row: Row) => {
     return state.message;
   }
 
-  return account !== null && account.working > 0
-    ? `${account.working} active`
-    : undefined;
+  return account !== null && account.working > 0 ? `${account.working} active` : undefined;
 };
 
 const UsageWindow = ({
@@ -319,9 +263,7 @@ const UsageWindow = ({
     <Cell
       label={label}
       value={
-        <span className={tone === "ok" ? undefined : texts[tone]}>
-          {percent(window.used)}
-        </span>
+        <span className={tone === "ok" ? undefined : texts[tone]}>{percent(window.used)}</span>
       }
       note={
         window.resetsAt === null
@@ -378,26 +320,14 @@ export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
       note={planNote(row)}
       first={
         <div className="space-y-3">
-          <UsageWindow
-            label="5-hour used"
-            window={account?.fiveHour ?? null}
-            now={now}
-          />
-          <UsageWindow
-            label="Weekly used"
-            window={account?.week ?? null}
-            now={now}
-          />
+          <UsageWindow label="5-hour used" window={account?.fiveHour ?? null} now={now} />
+          <UsageWindow label="Weekly used" window={account?.week ?? null} now={now} />
         </div>
       }
       second={<SignedIn row={row} now={now} />}
       actions={
         login === null ? null : (
-          <Actions
-            login={login}
-            name={row.name}
-            working={account?.working ?? 0}
-          />
+          <Actions login={login} name={row.name} working={account?.working ?? 0} />
         )
       }
     />
@@ -429,10 +359,7 @@ export const CreditLine = ({ row, now }: { row: Row; now: number }) => {
           }
           note={`of ${dollars(credit.allowance)}`}
         >
-          <Bar
-            value={(credit.remaining / credit.allowance) * 100}
-            tone={tone}
-          />
+          <Bar value={(credit.remaining / credit.allowance) * 100} tone={tone} />
         </Cell>
       }
       second={

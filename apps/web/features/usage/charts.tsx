@@ -58,16 +58,9 @@ const Tip = ({
               key={layer.key}
               className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
             >
-              <span
-                className={cn(
-                  "size-2 rounded-[2px]",
-                  fillOf(layers, layer.key)
-                )}
-              />
+              <span className={cn("size-2 rounded-[2px]", fillOf(layers, layer.key))} />
               <span className="truncate">{layer.label}</span>
-              <span className="tabular-nums">
-                {format(unit, layer.values[at] ?? 0)}
-              </span>
+              <span className="tabular-nums">{format(unit, layer.values[at] ?? 0)}</span>
             </li>
           ))}
         </ul>
@@ -93,7 +86,7 @@ export const Stack = ({
   const count = ticks.length;
 
   const totals = ticks.map((_, index) =>
-    layers.reduce((sum, layer) => sum + (layer.values[index] ?? 0), 0)
+    layers.reduce((sum, layer) => sum + (layer.values[index] ?? 0), 0),
   );
 
   const y = scaleLinear()
@@ -145,10 +138,7 @@ export const Stack = ({
               {gap.to - gap.from >= 4 ? "No reading" : null}
             </span>
           ))}
-          <div
-            className="absolute inset-0 grid gap-x-[2px] sm:gap-x-1"
-            style={columns}
-          >
+          <div className="absolute inset-0 grid gap-x-[2px] sm:gap-x-1" style={columns}>
             {ticks.map((tick, index) => {
               const missing = readings?.[index] === "missing";
               const total = totals[index] ?? 0;
@@ -169,7 +159,7 @@ export const Stack = ({
                   }}
                   className={cn(
                     "relative flex h-full min-w-0 flex-col-reverse items-center gap-[2px] rounded-t-[4px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    hovered === index && "bg-muted/70"
+                    hovered === index && "bg-muted/70",
                   )}
                 >
                   {missing
@@ -182,7 +172,7 @@ export const Stack = ({
                             key={layer.key}
                             className={cn(
                               "w-full max-w-6 shrink-0 last:rounded-t-[4px]",
-                              fillOf(layers, layer.key)
+                              fillOf(layers, layer.key),
                             )}
                             style={{
                               height: `max(1px, calc(${(value / top) * 100}% - 2px))`,
@@ -203,7 +193,7 @@ export const Stack = ({
               className={cn(
                 "border-l border-border pl-1 text-[11px] whitespace-nowrap text-muted-foreground",
                 cell.to === count ? "overflow-visible" : "overflow-hidden",
-                cell.now !== null && "text-foreground"
+                cell.now !== null && "text-foreground",
               )}
               style={{ gridColumn: `${cell.from + 1} / ${cell.to + 1}` }}
             >
@@ -226,16 +216,8 @@ export const Stack = ({
   );
 };
 
-export const Parts = ({
-  layers,
-  label,
-}: {
-  layers: readonly Layer[];
-  label: string;
-}) => {
-  const sums = layers.map((layer) =>
-    layer.values.reduce((sum, value) => sum + value, 0)
-  );
+export const Parts = ({ layers, label }: { layers: readonly Layer[]; label: string }) => {
+  const sums = layers.map((layer) => layer.values.reduce((sum, value) => sum + value, 0));
 
   const whole = sums.reduce((sum, value) => sum + value, 0);
 

@@ -46,8 +46,7 @@ describe("parseCommits", () => {
       "",
     ].join("\n");
 
-    const plain =
-      "commit fedcba\nauthor Bo <b@x> 1700000100 +0000\n\n    fix: two\n";
+    const plain = "commit fedcba\nauthor Bo <b@x> 1700000100 +0000\n\n    fix: two\n";
 
     expect(parseCommits(`${signed}\0${plain}`)).toEqual([
       {
@@ -84,17 +83,15 @@ test("parseChanges pairs line counts with statuses, binaries counting zero", () 
 });
 
 test("countLines counts a last line without a newline", () => {
-  expect([countLines(""), countLines("a\n"), countLines("a\nb")]).toEqual([
-    0, 1, 2,
-  ]);
+  expect([countLines(""), countLines("a\n"), countLines("a\nb")]).toEqual([0, 1, 2]);
 });
 
 test("newFilePatch writes an untracked file as git would add it", () => {
   expect(newFilePatch("x.txt", "one\ntwo\n")).toBe(
-    "diff --git a/x.txt b/x.txt\nnew file mode 100644\n--- /dev/null\n+++ b/x.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n"
+    "diff --git a/x.txt b/x.txt\nnew file mode 100644\n--- /dev/null\n+++ b/x.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n",
   );
   expect(newFilePatch("y", "solo")).toBe(
-    "diff --git a/y b/y\nnew file mode 100644\n--- /dev/null\n+++ b/y\n@@ -0,0 +1 @@\n+solo\n\\ No newline at end of file\n"
+    "diff --git a/y b/y\nnew file mode 100644\n--- /dev/null\n+++ b/y\n@@ -0,0 +1 @@\n+solo\n\\ No newline at end of file\n",
   );
 });
 
@@ -153,7 +150,7 @@ test("dayGroups names today and yesterday by the local clock", () => {
       commitAt(new Date(2026, 10, 4, 23)),
       commitAt(new Date(2026, 10, 1, 12)),
     ],
-    now
+    now,
   );
 
   expect(groups.map((group) => [group.day, group.commits.length])).toEqual([

@@ -2,11 +2,7 @@
 
 import { parsePatchFiles } from "@pierre/diffs";
 import type { CodeViewItem, FileDiffMetadata } from "@pierre/diffs";
-import type {
-  CodeViewReactOptions,
-  FileDiffOptions,
-  FileOptions,
-} from "@pierre/diffs/react";
+import type { CodeViewReactOptions, FileDiffOptions, FileOptions } from "@pierre/diffs/react";
 import { useSyncExternalStore } from "react";
 
 export type DiffStyle = "unified" | "split";
@@ -34,11 +30,7 @@ const choose = (next: DiffStyle) => {
 };
 
 export const useDiffStyle = () => {
-  const style = useSyncExternalStore(
-    subscribe,
-    readStyle,
-    (): DiffStyle => "unified"
-  );
+  const style = useSyncExternalStore(subscribe, readStyle, (): DiffStyle => "unified");
 
   return [style, choose] as const;
 };
@@ -56,9 +48,7 @@ export const fileOptions: FileOptions<undefined, undefined> = {
   overflow: "wrap",
 };
 
-export const diffOptions = (
-  style: DiffStyle
-): FileDiffOptions<undefined, undefined> => ({
+export const diffOptions = (style: DiffStyle): FileDiffOptions<undefined, undefined> => ({
   ...shared,
   diffStyle: style,
   disableFileHeader: true,
@@ -66,9 +56,7 @@ export const diffOptions = (
   overflow: style === "split" ? "scroll" : "wrap",
 });
 
-export const reviewOptions = (
-  style: DiffStyle
-): CodeViewReactOptions<undefined, undefined> => ({
+export const reviewOptions = (style: DiffStyle): CodeViewReactOptions<undefined, undefined> => ({
   ...shared,
   diffStyle: style,
   hunkSeparators: "line-info",

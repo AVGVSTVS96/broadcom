@@ -13,19 +13,13 @@ export const LimitWindow = Schema.Struct({
 
 export type LimitWindow = typeof LimitWindow.Type;
 
-export const Standing = Schema.Literals([
-  "next",
-  "open",
-  "tight",
-  "limited",
-  "signed-out",
-]);
+export const Standing = Schema.Literals(["next", "open", "tight", "limited", "signed-out"]);
 
 export type Standing = typeof Standing.Type;
 
 export const Account = Schema.Struct({
   atLimit: Schema.NullOr(
-    Schema.Struct({ available: Schema.Boolean, nextAt: Schema.NullOr(Millis) })
+    Schema.Struct({ available: Schema.Boolean, nextAt: Schema.NullOr(Millis) }),
   ),
   cloud: Schema.NullOr(
     Schema.Struct({
@@ -34,7 +28,7 @@ export const Account = Schema.Struct({
       remaining: NullableNumber,
       sampledAt: Millis,
       used: NullableNumber,
-    })
+    }),
   ),
   fiveHour: LimitWindow,
   heldResets: Schema.Array(
@@ -42,7 +36,7 @@ export const Account = Schema.Struct({
       expiresAt: Schema.NullOr(Millis),
       kind: Schema.String,
       left: Schema.Number,
-    })
+    }),
   ),
   id: Schema.String,
   idle: Schema.Number,
@@ -125,14 +119,7 @@ export const Credits = Schema.Struct({ api: Schema.Array(Grant) });
 
 export type Credits = typeof Credits.Type;
 
-const moveCauses = [
-  "limit",
-  "over",
-  "early",
-  "restart",
-  "start",
-  "other",
-] as const;
+const moveCauses = ["limit", "over", "early", "restart", "start", "other"] as const;
 
 export const MoveCause = Schema.String.pipe(
   Schema.decodeTo(
@@ -140,8 +127,8 @@ export const MoveCause = Schema.String.pipe(
     SchemaTransformation.transform<(typeof moveCauses)[number], string>({
       decode: (cause) => moveCauses.find((known) => known === cause) ?? "other",
       encode: (cause) => cause,
-    })
-  )
+    }),
+  ),
 );
 
 export type MoveCause = typeof MoveCause.Type;
@@ -156,14 +143,14 @@ export const History = Schema.Struct({
       account: Schema.String,
       kind: WindowKind,
       points: Schema.Array(Schema.Tuple([Millis, Schema.Number])),
-    })
+    }),
   ),
   hosts: Schema.Array(
     Schema.Struct({
       host: Schema.String,
       seats: Schema.Number,
       seenAt: Schema.NullOr(Millis),
-    })
+    }),
   ),
   moves: Schema.Array(
     Schema.Struct({
@@ -173,7 +160,7 @@ export const History = Schema.Struct({
       label: Schema.NullOr(Schema.String),
       session: Schema.String,
       to: Schema.String,
-    })
+    }),
   ),
 });
 
@@ -226,9 +213,7 @@ export const Done = Schema.Struct({});
 export const LimitUsage = Schema.Struct({
   buckets: Schema.Array(Schema.Struct({ at: Millis, size: Schema.String })),
   coverage: Schema.Struct({ limitsSince: Schema.NullOr(Millis) }),
-  rows: Schema.Array(
-    Schema.Struct({ key: Schema.String, series: Schema.Array(Schema.Number) })
-  ),
+  rows: Schema.Array(Schema.Struct({ key: Schema.String, series: Schema.Array(Schema.Number) })),
 });
 
 export type LimitUsage = typeof LimitUsage.Type;
@@ -265,7 +250,7 @@ export const UsageRow = Schema.Struct({
       account: Schema.String,
       fiveHour: NullableNumber,
       week: NullableNumber,
-    })
+    }),
   ),
   detail: Schema.String,
   entrypoint: Schema.String,
@@ -309,8 +294,8 @@ export const UsageView = Schema.Struct({
         count: Schema.Number,
         id: Schema.String,
         label: Schema.String,
-      })
-    )
+      }),
+    ),
   ),
   period: Schema.Struct({
     from: Millis,
@@ -320,9 +305,7 @@ export const UsageView = Schema.Struct({
   previous: Schema.NullOr(UsageTotals),
   rowCount: Schema.Number,
   rows: Schema.Array(UsageRow),
-  series: Schema.Array(
-    Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Number) })
-  ),
+  series: Schema.Array(Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Number) })),
   sources: Schema.Struct({ proxySince: Schema.NullOr(Millis) }),
   totals: UsageTotals,
 });
@@ -336,23 +319,19 @@ export const Config = Schema.Struct({
     Schema.Struct({
       "allow-remote": Maybe(Schema.Boolean),
       "disable-auto-update-panel": Maybe(Schema.Boolean),
-    })
+    }),
   ),
   oauth: Maybe(Schema.Struct({ "auth-dir": Maybe(Schema.String) })),
-  requests: Maybe(
-    Schema.Struct({ "passthrough-headers": Maybe(Schema.Boolean) })
-  ),
+  requests: Maybe(Schema.Struct({ "passthrough-headers": Maybe(Schema.Boolean) })),
   routing: Maybe(
     Schema.Struct({
       "force-model-prefix": Maybe(Schema.Boolean),
       pool: Maybe(Schema.Struct({ "reset-command": Maybe(Schema.String) })),
       "session-affinity": Maybe(Schema.Boolean),
       strategy: Maybe(Schema.String),
-    })
+    }),
   ),
-  server: Maybe(
-    Schema.Struct({ host: Maybe(Schema.String), port: Maybe(Schema.Number) })
-  ),
+  server: Maybe(Schema.Struct({ host: Maybe(Schema.String), port: Maybe(Schema.Number) })),
   usage: Maybe(
     Schema.Struct({
       "device-label": Maybe(Schema.String),
@@ -364,12 +343,12 @@ export const Config = Schema.Struct({
             name: Schema.String,
             providers: Maybe(Schema.Array(Schema.String)),
             since: Maybe(Schema.String),
-          })
-        )
+          }),
+        ),
       ),
       "state-dir": Maybe(Schema.String),
       timezone: Maybe(Schema.String),
-    })
+    }),
   ),
 });
 

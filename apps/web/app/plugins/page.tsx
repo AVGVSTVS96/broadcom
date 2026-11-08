@@ -21,8 +21,7 @@ const Rows = ({ children }: { children: ReactNode }) => (
   <ul className="divide-y rounded-2xl border">{children}</ul>
 );
 
-const count = (value: number, word: string) =>
-  `${value} ${word}${value === 1 ? "" : "s"}`;
+const count = (value: number, word: string) => `${value} ${word}${value === 1 ? "" : "s"}`;
 
 const PluginsPage = async () => {
   await connection();
@@ -59,10 +58,7 @@ const PluginsPage = async () => {
         >
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {setup.plugins.map((plugin) => (
-              <PluginCard
-                key={`${plugin.id}:${String(plugin.enabled)}`}
-                plugin={plugin}
-              />
+              <PluginCard key={`${plugin.id}:${String(plugin.enabled)}`} plugin={plugin} />
             ))}
           </ul>
         </Section>
@@ -81,7 +77,7 @@ const PluginsPage = async () => {
                 <span
                   className={cn(
                     "size-2 shrink-0 rounded-full",
-                    server.enabled ? "bg-ok" : "bg-faint"
+                    server.enabled ? "bg-ok" : "bg-faint",
                   )}
                 />
                 <span className="font-medium">{server.name}</span>
@@ -89,9 +85,7 @@ const PluginsPage = async () => {
                 <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground max-sm:basis-full">
                   {server.where}
                 </span>
-                <span className="text-xs text-faint">
-                  {server.enabled ? server.kind : "off"}
-                </span>
+                <span className="text-xs text-faint">{server.enabled ? server.kind : "off"}</span>
               </li>
             ))}
           </Rows>
@@ -150,9 +144,7 @@ const PluginsPage = async () => {
                 >
                   <span className="font-medium">{mod.name}</span>
                   {mod.version !== null && (
-                    <span className="font-mono text-xs text-faint">
-                      {mod.version}
-                    </span>
+                    <span className="font-mono text-xs text-faint">{mod.version}</span>
                   )}
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">
                     {mod.description}

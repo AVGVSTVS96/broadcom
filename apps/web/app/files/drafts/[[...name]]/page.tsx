@@ -16,8 +16,7 @@ import type { Draft } from "@/lib/git/repos";
 export const metadata: Metadata = { title: "Drafts" };
 
 const liveText = async (draft: Draft) => {
-  const ws =
-    draft.target === null ? null : await findWorkspace(draft.target.ws);
+  const ws = draft.target === null ? null : await findWorkspace(draft.target.ws);
 
   if (ws === null || draft.target === null) {
     return null;
@@ -62,15 +61,12 @@ const DraftShown = async ({ draft }: { draft: Draft }) => {
   );
 };
 
-const DraftsPage = async ({
-  params,
-}: PageProps<"/files/drafts/[[...name]]">) => {
+const DraftsPage = async ({ params }: PageProps<"/files/drafts/[[...name]]">) => {
   const { name = [] } = await params;
   const [repos, drafts] = await Promise.all([listPlaces(), listDrafts()]);
   const wanted = decodeURIComponent(name.join("/"));
 
-  const draft =
-    drafts.find((each) => each.name === wanted) ?? drafts.at(0) ?? null;
+  const draft = drafts.find((each) => each.name === wanted) ?? drafts.at(0) ?? null;
 
   return (
     <Bench>
@@ -98,9 +94,7 @@ const DraftsPage = async ({
         </Side>
         <div className="flex min-w-0 flex-1 flex-col">
           {draft === null ? (
-            <p className="m-auto p-6 text-sm text-muted-foreground">
-              No drafts.
-            </p>
+            <p className="m-auto p-6 text-sm text-muted-foreground">No drafts.</p>
           ) : (
             <DraftShown draft={draft} />
           )}

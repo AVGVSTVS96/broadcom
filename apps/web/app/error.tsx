@@ -3,13 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/viz/section";
 
-const PageError = ({
-  error,
-  retry,
-}: {
-  error: Error & { digest?: string };
-  retry: () => void;
-}) => (
+const PageError = ({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) => (
   <Section
     title="This page didn't load"
     detail={
@@ -21,9 +15,7 @@ const PageError = ({
     <div className="flex flex-wrap items-center gap-3">
       <Button onClick={retry}>Try again</Button>
       {error.digest === undefined ? null : (
-        <span className="font-mono text-xs text-muted-foreground">
-          {error.digest}
-        </span>
+        <span className="font-mono text-xs text-muted-foreground">{error.digest}</span>
       )}
     </div>
   </Section>

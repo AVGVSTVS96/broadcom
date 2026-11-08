@@ -12,14 +12,7 @@ export const HatchPattern = () => (
       patternUnits="userSpaceOnUse"
     >
       <rect width="6" height="6" className="fill-bad/15" />
-      <line
-        x1="0"
-        y1="0"
-        x2="0"
-        y2="6"
-        className="stroke-bad"
-        strokeWidth="2.5"
-      />
+      <line x1="0" y1="0" x2="0" y2="6" className="stroke-bad" strokeWidth="2.5" />
     </pattern>
     <pattern
       id={forecastHatchId}
@@ -28,14 +21,7 @@ export const HatchPattern = () => (
       patternTransform="rotate(45)"
       patternUnits="userSpaceOnUse"
     >
-      <line
-        x1="0"
-        y1="0"
-        x2="0"
-        y2="6"
-        className="stroke-bad/55"
-        strokeWidth="1.5"
-      />
+      <line x1="0" y1="0" x2="0" y2="6" className="stroke-bad/55" strokeWidth="1.5" />
     </pattern>
   </defs>
 );

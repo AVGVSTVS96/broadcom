@@ -29,8 +29,7 @@ const lockStyle = (mark: Mark) => {
   return mark === "forecast" ? forecastHatchStyle : undefined;
 };
 
-const height = (value: number, top: number) =>
-  `${Math.max(3, (value / top) * 100)}%`;
+const height = (value: number, top: number) => `${Math.max(3, (value / top) * 100)}%`;
 
 const Bar = ({ day, top }: { day: WeekDay; top: number }) => (
   <span
@@ -41,38 +40,27 @@ const Bar = ({ day, top }: { day: WeekDay; top: number }) => (
       <span
         className={cn(
           "rounded-t-[3px] border border-dashed border-muted-foreground/60",
-          day.used !== null && day.used > 0 && "border-b-0"
+          day.used !== null && day.used > 0 && "border-b-0",
         )}
         style={{ height: height(day.forecast, top) }}
       />
     ) : null}
     {day.used === null || (day.used === 0 && day.forecast > 0) ? null : (
       <span
-        className={cn(
-          "bg-foreground/40",
-          day.forecast > 0 ? "" : "rounded-t-[3px]"
-        )}
+        className={cn("bg-foreground/40", day.forecast > 0 ? "" : "rounded-t-[3px]")}
         style={{ height: height(day.used, top) }}
       />
     )}
   </span>
 );
 
-const Cell = ({
-  week,
-  base,
-  top,
-}: {
-  week: Week;
-  base: number | null;
-  top: number;
-}) => (
+const Cell = ({ week, base, top }: { week: Week; base: number | null; top: number }) => (
   <div className="min-w-0 space-y-1.5">
     <span
       className={cn(
         "inline-block rounded-md px-1.5 py-0.5 text-xs tabular-nums",
         week.part ? "border text-muted-foreground" : "bg-muted",
-        week.current && "border border-dashed bg-transparent"
+        week.current && "border border-dashed bg-transparent",
       )}
     >
       {ratioLabel(week, base)}
@@ -92,16 +80,12 @@ const Cell = ({
           key={day.from}
           className={cn(
             "relative grid flex-1 place-items-center rounded-[2px]",
-            day.lock === null && "bg-track"
+            day.lock === null && "bg-track",
           )}
           style={lockStyle(day.lock)}
         >
           {day.out === null ? null : (
-            <Dot
-              tone="bad"
-              hollow={day.out === "forecast"}
-              className="absolute size-2 text-bad"
-            />
+            <Dot tone="bad" hollow={day.out === "forecast"} className="absolute size-2 text-bad" />
           )}
         </span>
       ))}
@@ -156,7 +140,7 @@ export const WeeksView = ({
         withHistory(own, points, now),
         since,
         now,
-        outlookOf(plan.pace, points, plan.account.since, now)
+        outlookOf(plan.pace, points, plan.account.since, now),
       ),
     };
   });
@@ -165,14 +149,10 @@ export const WeeksView = ({
 
   const ranOut = rows.filter(
     ({ weeks }) =>
-      weeks.weeks
-        .at(-1)
-        ?.days.some((day) => day.out === "real" || day.lock === "real") === true
+      weeks.weeks.at(-1)?.days.some((day) => day.out === "real" || day.lock === "real") === true,
   ).length;
 
-  const baseWeek = header?.weeks.weeks.find(
-    (week) => !week.part && !week.current
-  );
+  const baseWeek = header?.weeks.weeks.find((week) => !week.part && !week.current);
 
   const [exact] = plans
     .flatMap((plan) => history[plan.id]?.[0]?.[0] ?? [])
@@ -182,9 +162,7 @@ export const WeeksView = ({
     <Section
       title={`${ranOut} of ${plans.length} plans ran out this week`}
       detail={[
-        baseWeek === undefined
-          ? null
-          : `Against the week of ${date(baseWeek.from)}.`,
+        baseWeek === undefined ? null : `Against the week of ${date(baseWeek.from)}.`,
         exact === undefined
           ? null
           : `Days before ${date(addDays(startOfDay(exact), 1))} are estimates.`,
@@ -195,10 +173,7 @@ export const WeeksView = ({
       <div className="space-y-1">
         <div className="grid gap-3 pb-1 text-xs text-muted-foreground sm:grid-cols-[9rem_minmax(0,1fr)_10rem]">
           <span className="max-sm:hidden" />
-          <div
-            className="grid gap-3"
-            style={columns(header?.weeks.weeks.length ?? 1)}
-          >
+          <div className="grid gap-3" style={columns(header?.weeks.weeks.length ?? 1)}>
             {header?.weeks.weeks.map((week) => (
               <span key={week.from} className="min-w-0 truncate">
                 {week.current ? "This week" : date(week.from)}
@@ -212,8 +187,8 @@ export const WeeksView = ({
           const top = Math.max(
             evenPerDay * 2,
             ...weeks.weeks.flatMap((week) =>
-              week.days.map((day) => (day.used ?? 0) + day.forecast)
-            )
+              week.days.map((day) => (day.used ?? 0) + day.forecast),
+            ),
           );
 
           const result = plan.pace === null ? null : outcome(plan.pace, now);
@@ -226,23 +201,15 @@ export const WeeksView = ({
               <div className="truncate text-sm">{plan.name}</div>
               <div className="grid gap-3" style={columns(weeks.weeks.length)}>
                 {weeks.weeks.map((week) => (
-                  <Cell
-                    key={week.from}
-                    week={week}
-                    base={weeks.base}
-                    top={top}
-                  />
+                  <Cell key={week.from} week={week} base={weeks.base} top={top} />
                 ))}
               </div>
               <div className="text-sm">
                 {result === null ? null : (
-                  <div className={cn(result.bad && "text-bad")}>
-                    {result.text}
-                  </div>
+                  <div className={cn(result.bad && "text-bad")}>{result.text}</div>
                 )}
                 <div className="text-muted-foreground">
-                  ~{Math.round(weeks.weeks.at(-1)?.expected ?? 0)} points this
-                  week
+                  ~{Math.round(weeks.weeks.at(-1)?.expected ?? 0)} points this week
                 </div>
               </div>
             </div>

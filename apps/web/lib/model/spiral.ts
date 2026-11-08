@@ -1,12 +1,5 @@
 import { addDays } from "@/lib/model/calendar";
-import {
-  HOUR,
-  drops,
-  isLocked,
-  lockedSpans,
-  usedBetween,
-  valueAt,
-} from "@/lib/model/history";
+import { HOUR, drops, isLocked, lockedSpans, usedBetween, valueAt } from "@/lib/model/history";
 import type { Point, Points } from "@/lib/model/history";
 import type { Pace } from "@/lib/model/pace";
 import { outlookOf, weeksOf, withHistory } from "@/lib/model/weeks";
@@ -51,9 +44,7 @@ const hourOfDay = (at: number) => new Date(at).getHours();
 
 const clip = (spans: readonly Span[], from: number, to: number): Span[] =>
   spans.flatMap(([start, end]) =>
-    start < to && end > from
-      ? [[Math.max(start, from), Math.min(end, to)] as const]
-      : []
+    start < to && end > from ? [[Math.max(start, from), Math.min(end, to)] as const] : [],
   );
 
 const hoursOf = (from: number, to: number) => {
@@ -70,7 +61,7 @@ const cellsOf = (
   days: readonly WeekDay[],
   points: Points,
   exactFrom: number | null,
-  now: number
+  now: number,
 ): Cell[] =>
   days.flatMap((day): Cell[] => {
     const end = Math.min(addDays(day.from, 1), now);
@@ -86,18 +77,11 @@ const cellsOf = (
     return hoursOf(day.from, end).map((from) => ({
       from,
       to: Math.min(from + HOUR, end),
-      used:
-        from < exactFrom
-          ? null
-          : usedBetween(points, from, Math.min(from + HOUR, end)),
+      used: from < exactFrom ? null : usedBetween(points, from, Math.min(from + HOUR, end)),
     }));
   });
 
-const usualOf = (
-  cells: readonly Cell[],
-  locks: readonly Span[],
-  exactFrom: number | null
-) => {
+const usualOf = (cells: readonly Cell[], locks: readonly Span[], exactFrom: number | null) => {
   const seen = Array.from({ length: 24 }, () => ({ total: 0, used: 0 }));
 
   for (const cell of cells) {
@@ -121,9 +105,7 @@ const usualOf = (
     }
   }
 
-  return seen.map(
-    ({ total, used }) => total >= usualDays && used / total >= usualShare
-  );
+  return seen.map(({ total, used }) => total >= usualDays && used / total >= usualShare);
 };
 
 const lineOf = (points: Points, from: number, to: number): Points => {
@@ -153,18 +135,12 @@ export const spiralOf = ({
   const exactFrom = first === undefined ? null : first - (first % HOUR);
   const cutoff = pace?.cutoff ?? 100;
 
-  const locks = lockedSpans(
-    points,
-    cutoff,
-    pace?.locked === true ? pace.resetsAt : now
-  );
+  const locks = lockedSpans(points, cutoff, pace?.locked === true ? pace.resetsAt : now);
 
   const [opening] = points;
   const lockedAtStart = opening !== undefined && opening[1] >= cutoff;
 
-  const runOuts = locks
-    .map(([from]) => from)
-    .filter((at) => !(lockedAtStart && at === opening[0]));
+  const runOuts = locks.map(([from]) => from).filter((at) => !(lockedAtStart && at === opening[0]));
 
   const resets = [
     ...drops(points),
@@ -175,7 +151,7 @@ export const spiralOf = ({
     withHistory(daily, points, now),
     since,
     now,
-    outlookOf(pace, points, accountSince, now)
+    outlookOf(pace, points, accountSince, now),
   );
 
   const all = weeks.map((week): Turn => {
@@ -198,7 +174,7 @@ export const spiralOf = ({
   });
 
   const opened = all.findIndex(
-    (turn) => turn.current || turn.cells.some((cell) => cell.used !== null)
+    (turn) => turn.current || turn.cells.some((cell) => cell.used !== null),
   );
 
   const turns = all.slice(Math.max(0, opened));
@@ -216,15 +192,12 @@ export const spiralOf = ({
     usual: usualOf(
       turns.flatMap((turn) => turn.cells),
       locks,
-      exactFrom
+      exactFrom,
     ),
   };
 };
 
-export const lockedHours = (
-  spans: readonly Span[],
-  usual: readonly boolean[]
-) => {
+export const lockedHours = (spans: readonly Span[], usual: readonly boolean[]) => {
   let all = 0;
   let inUsual = 0;
 
@@ -233,15 +206,14 @@ export const lockedHours = (
       const part = Math.min(HOUR, to - at);
 
       all += part;
-      inUsual += usual[hourOfDay(at)] ? part : 0;
+      inUsual += usual[hourOfDay(at)] === true ? part : 0;
     }
   }
 
   return { all, usual: Math.round(inUsual / HOUR) };
 };
 
-export const usualPerWeek = (usual: readonly boolean[]) =>
-  usual.filter(Boolean).length * 7;
+export const usualPerWeek = (usual: readonly boolean[]) => usual.filter(Boolean).length * 7;
 
 export const locksIn = (turn: Turn, ahead: Span | null): Span[] => [
   ...turn.locks,
@@ -249,27 +221,19 @@ export const locksIn = (turn: Turn, ahead: Span | null): Span[] => [
 ];
 
 export const locksFrom = (spiral: Spiral, turn: Turn): Span[] =>
-  [
-    ...spiral.locks,
-    ...(turn.current && spiral.ahead !== null ? [spiral.ahead] : []),
-  ].filter(([from]) => from >= turn.from && from < turn.to);
+  [...spiral.locks, ...(turn.current && spiral.ahead !== null ? [spiral.ahead] : [])].filter(
+    ([from]) => from >= turn.from && from < turn.to,
+  );
 
 export const shiftOf = (turns: readonly Turn[], index: number) => {
   const turn = turns[index];
 
-  const before = turns
-    .slice(0, index)
-    .findLast((earlier) => earlier.ranOut !== null);
+  const before = turns.slice(0, index).findLast((earlier) => earlier.ranOut !== null);
 
   const mine = turn?.ranOut ?? null;
   const theirs = before?.ranOut ?? null;
 
-  if (
-    turn === undefined ||
-    before === undefined ||
-    mine === null ||
-    theirs === null
-  ) {
+  if (turn === undefined || before === undefined || mine === null || theirs === null) {
     return null;
   }
 

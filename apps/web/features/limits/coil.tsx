@@ -47,8 +47,7 @@ const ringsOf = (turns: readonly Turn[]): Rings => {
   };
 };
 
-const fraction = (turn: Turn, at: number) =>
-  (at - turn.from) / (turn.to - turn.from);
+const fraction = (turn: Turn, at: number) => (at - turn.from) / (turn.to - turn.from);
 
 const radius = (rings: Rings, index: number, part: number) =>
   rings.first + rings.band / 2 + (index + part) * rings.pitch;
@@ -65,8 +64,7 @@ const polar = (r: number, part: number): XY => {
 const at = (rings: Rings, index: number, part: number, offset = 0) =>
   polar(radius(rings, index, part) + offset, part);
 
-const pathOf = (points: readonly XY[]) =>
-  `M${points.map(([x, y]) => `${x},${y}`).join("L")}Z`;
+const pathOf = (points: readonly XY[]) => `M${points.map(([x, y]) => `${x},${y}`).join("L")}Z`;
 
 const sweep = (from: number, to: number) => {
   const steps = Math.max(1, Math.ceil((to - from) * 168));
@@ -78,13 +76,7 @@ const sweep = (from: number, to: number) => {
   });
 };
 
-const bandPath = (
-  rings: Rings,
-  index: number,
-  from: number,
-  to: number,
-  grow = 0
-) => {
+const bandPath = (rings: Rings, index: number, from: number, to: number, grow = 0) => {
   const parts = sweep(from, to);
   const half = rings.band / 2 + grow;
 
@@ -97,9 +89,7 @@ const bandPath = (
 const spanPath = (rings: Rings, index: number, [from, to]: Span) => {
   const turn = rings.turns[index];
 
-  return turn === undefined
-    ? ""
-    : bandPath(rings, index, fraction(turn, from), fraction(turn, to));
+  return turn === undefined ? "" : bandPath(rings, index, fraction(turn, from), fraction(turn, to));
 };
 
 const tick = (rings: Rings, index: number, part: number, reach: number) => {
@@ -130,8 +120,7 @@ const emptyRuns = (cells: readonly Cell[]) => {
   return runs;
 };
 
-const perHour = (cell: Cell) =>
-  (cell.used ?? 0) / Math.max(1, (cell.to - cell.from) / HOUR);
+const perHour = (cell: Cell) => (cell.used ?? 0) / Math.max(1, (cell.to - cell.from) / HOUR);
 
 const hourRuns = (usual: readonly boolean[]) => {
   const runs: [number, number][] = [];
@@ -174,9 +163,7 @@ const locate = (rings: Rings, x: number, y: number): Focus | null => {
   const part = (((angle / turnAngle) % 1) + 1) % 1;
   const r = Math.hypot(dx, dy);
 
-  const index = Math.round(
-    (r - rings.first - rings.band / 2) / rings.pitch - part
-  );
+  const index = Math.round((r - rings.first - rings.band / 2) / rings.pitch - part);
 
   const turn = rings.turns[index];
 
@@ -187,29 +174,19 @@ const locate = (rings: Rings, x: number, y: number): Focus | null => {
   const timeAt = turn.from + part * (turn.to - turn.from);
 
   return {
-    cell:
-      turn.cells.find((cell) => timeAt >= cell.from && timeAt < cell.to) ??
-      null,
+    cell: turn.cells.find((cell) => timeAt >= cell.from && timeAt < cell.to) ?? null,
     turn: index,
   };
 };
 
-const Usual = ({
-  rings,
-  turn,
-  usual,
-}: {
-  rings: Rings;
-  turn: Turn;
-  usual: readonly boolean[];
-}) =>
+const Usual = ({ rings, turn, usual }: { rings: Rings; turn: Turn; usual: readonly boolean[] }) =>
   hourRuns(usual).flatMap(([from, to]) =>
     Array.from({ length: 7 }, (_, day) => {
       const dayStart = addDays(turn.from, day);
 
       const parts = sweep(
         fraction(turn, dayStart + from * HOUR),
-        fraction(turn, dayStart + to * HOUR)
+        fraction(turn, dayStart + to * HOUR),
       );
 
       return (
@@ -218,10 +195,8 @@ const Usual = ({
           d={parts
             .map((part, step) => {
               const [x, y] = polar(
-                radius(rings, rings.turns.length - 1, part) +
-                  rings.band / 2 +
-                  6,
-                part
+                radius(rings, rings.turns.length - 1, part) + rings.band / 2 + 6,
+                part,
               );
 
               return `${step === 0 ? "M" : "L"}${x},${y}`;
@@ -232,7 +207,7 @@ const Usual = ({
           strokeLinecap="round"
         />
       );
-    })
+    }),
   );
 
 const percent = ([x, y]: XY) => ({
@@ -309,11 +284,7 @@ const Ring = ({ rings, index }: { rings: Rings; index: number }) => {
         />
       ))}
       {turn.locks.map((span) => (
-        <path
-          key={span[0]}
-          d={spanPath(rings, index, span)}
-          fill={`url(#${hatchId})`}
-        />
+        <path key={span[0]} d={spanPath(rings, index, span)} fill={`url(#${hatchId})`} />
       ))}
       {turn.resets.map((reset) => (
         <line
@@ -328,15 +299,7 @@ const Ring = ({ rings, index }: { rings: Rings; index: number }) => {
   );
 };
 
-const Ahead = ({
-  rings,
-  ahead,
-  now,
-}: {
-  rings: Rings;
-  ahead: Span | null;
-  now: number;
-}) => {
+const Ahead = ({ rings, ahead, now }: { rings: Rings; ahead: Span | null; now: number }) => {
   const last = rings.turns.length - 1;
   const current = rings.turns[last];
 
@@ -374,16 +337,14 @@ const Ahead = ({
 
 const RunOuts = ({ rings, ahead }: { rings: Rings; ahead: Span | null }) => {
   const dots = rings.turns.flatMap((turn, index) =>
-    turn.runOuts.map((out) => at(rings, index, fraction(turn, out)))
+    turn.runOuts.map((out) => at(rings, index, fraction(turn, out))),
   );
 
   const index = ahead === null ? -1 : turnOf(rings, ahead[0]);
   const turn = rings.turns[index];
 
   const projected =
-    ahead === null || turn === undefined
-      ? null
-      : at(rings, index, fraction(turn, ahead[0]));
+    ahead === null || turn === undefined ? null : at(rings, index, fraction(turn, ahead[0]));
 
   const trail = [...dots, ...(projected === null ? [] : [projected])];
 
@@ -391,9 +352,7 @@ const RunOuts = ({ rings, ahead }: { rings: Rings; ahead: Span | null }) => {
     <g className="pointer-events-none">
       {dots.length > 1 ? (
         <path
-          d={dots
-            .map(([x, y], step) => `${step === 0 ? "M" : "L"}${x},${y}`)
-            .join("")}
+          d={dots.map(([x, y], step) => `${step === 0 ? "M" : "L"}${x},${y}`).join("")}
           className="fill-none stroke-bad"
           strokeWidth={1.5}
         />
@@ -456,7 +415,7 @@ const WeekButtons = ({
           "absolute -translate-y-1/2 rounded-[4px] border bg-card px-1 text-[10px] leading-3.5 whitespace-nowrap sm:text-[11px] sm:leading-4",
           index === selected
             ? "border-foreground/70 text-foreground"
-            : "border-transparent text-muted-foreground hover:text-foreground"
+            : "border-transparent text-muted-foreground hover:text-foreground",
         )}
         style={{
           left: `${((x + 2) / size) * 100}%`,
@@ -492,7 +451,7 @@ export const Coil = ({
     return locate(
       rings,
       ((event.clientX - box.left) / box.width) * size,
-      ((event.clientY - box.top) / box.height) * size
+      ((event.clientY - box.top) / box.height) * size,
     );
   };
 
@@ -519,9 +478,7 @@ export const Coil = ({
         }}
       >
         <HatchPattern />
-        {current === undefined ? null : (
-          <Usual rings={rings} turn={current} usual={spiral.usual} />
-        )}
+        {current === undefined ? null : <Usual rings={rings} turn={current} usual={spiral.usual} />}
         {spiral.turns.map((turn, index) => (
           <Ring key={turn.from} rings={rings} index={index} />
         ))}

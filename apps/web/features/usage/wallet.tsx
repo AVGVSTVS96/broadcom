@@ -14,18 +14,14 @@ const fills = [
   { bg: "bg-chart-4", svg: "fill-chart-4" },
 ] as const;
 
-const fillOf = (index: number) =>
-  fills[Math.min(index, fills.length - 1)] ?? fills[0];
+const fillOf = (index: number) => fills[Math.min(index, fills.length - 1)] ?? fills[0];
 
-const percent = (share: number) =>
-  share < 0.005 ? "<1%" : `${Math.round(share * 100)}%`;
+const percent = (share: number) => (share < 0.005 ? "<1%" : `${Math.round(share * 100)}%`);
 
 const priceOf = (source: Source) => source.plan ?? source.credit;
 
 const multiple = (source: Source) =>
-  source.plan === null || source.plan <= 0
-    ? null
-    : times(source.ran / source.plan);
+  source.plan === null || source.plan <= 0 ? null : times(source.ran / source.plan);
 
 const Tile = ({
   className,
@@ -50,7 +46,7 @@ const Tiles = ({ wallet }: { wallet: Wallet }) => {
     <div
       className={cn(
         "grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border",
-        credit === null ? "sm:grid-cols-2" : "sm:grid-cols-3"
+        credit === null ? "sm:grid-cols-2" : "sm:grid-cols-3",
       )}
     >
       <Tile
@@ -68,9 +64,7 @@ const Tiles = ({ wallet }: { wallet: Wallet }) => {
         <Tile
           label="API credit"
           value={
-            <span
-              className={cn(credit.left < credit.granted * 0.05 && "text-bad")}
-            >
+            <span className={cn(credit.left < credit.granted * 0.05 && "text-bad")}>
               {dollars(credit.left)}
             </span>
           }
@@ -97,16 +91,9 @@ const Donut = ({ wallet }: { wallet: Wallet }) => {
 
   return (
     <figure className="relative mx-auto aspect-square w-full max-w-48 lg:max-w-56">
-      <svg
-        viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`}
-        className="size-full"
-      >
+      <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} className="size-full">
         {slices.map((slice, index) => (
-          <path
-            key={slice.data.key}
-            d={ring(slice) ?? ""}
-            className={fillOf(index).svg}
-          >
+          <path key={slice.data.key} d={ring(slice) ?? ""} className={fillOf(index).svg}>
             <title>{`${slice.data.name}: ${dollars(slice.data.ran)}, ${percent(slice.data.share)}`}</title>
           </path>
         ))}
@@ -115,23 +102,13 @@ const Donut = ({ wallet }: { wallet: Wallet }) => {
         <span className="text-3xl font-light tracking-tight tabular-nums">
           {dollars(wallet.ran)}
         </span>
-        <span className="text-xs text-muted-foreground">
-          on {dollars(wallet.monthly)} a month
-        </span>
+        <span className="text-xs text-muted-foreground">on {dollars(wallet.monthly)} a month</span>
       </figcaption>
     </figure>
   );
 };
 
-const Bar = ({
-  source,
-  fill,
-  scale,
-}: {
-  source: Source;
-  fill: string;
-  scale: number;
-}) => {
+const Bar = ({ source, fill, scale }: { source: Source; fill: string; scale: number }) => {
   const price = priceOf(source);
   const width = (value: number) => `${(value / scale) * 100}%`;
 
@@ -146,9 +123,7 @@ const Bar = ({
               title={`${part.label}: ${dollars(part.value)}`}
               className={cn(
                 "h-full min-w-0.5 rounded-full",
-                part.key === "none"
-                  ? "border border-dashed border-muted-foreground/60"
-                  : fill
+                part.key === "none" ? "border border-dashed border-muted-foreground/60" : fill,
               )}
               style={{ flexGrow: part.value }}
             />
@@ -177,15 +152,7 @@ const Parts = ({ parts }: { parts: readonly Part[] }) =>
 
 const columns = "lg:grid-cols-[9rem_minmax(0,1fr)_4.5rem_5rem_3.5rem]";
 
-const Line = ({
-  source,
-  index,
-  scale,
-}: {
-  source: Source;
-  index: number;
-  scale: number;
-}) => {
+const Line = ({ source, index, scale }: { source: Source; index: number; scale: number }) => {
   const fill = fillOf(index).bg;
   const price = priceOf(source);
   const ratio = multiple(source);
@@ -194,24 +161,17 @@ const Line = ({
     <li
       className={cn(
         "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-t py-3.5",
-        columns
+        columns,
       )}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            className={cn("size-2 shrink-0 rounded-full", fill)}
-          />
+          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", fill)} />
           <span className="truncate">{source.name}</span>
         </div>
-        <div className="truncate pl-4 text-xs text-muted-foreground">
-          {source.detail}
-        </div>
+        <div className="truncate pl-4 text-xs text-muted-foreground">{source.detail}</div>
       </div>
-      <span className="text-right tabular-nums lg:hidden">
-        {dollars(source.ran)}
-      </span>
+      <span className="text-right tabular-nums lg:hidden">{dollars(source.ran)}</span>
       <div className="col-span-2 space-y-1.5 lg:col-span-1">
         <Bar source={source} fill={fill} scale={scale} />
         <Parts parts={source.parts} />
@@ -229,12 +189,8 @@ const Line = ({
       <span className="hidden text-right tabular-nums lg:block">
         {price === null ? "–" : dollars(price)}
       </span>
-      <span className="hidden text-right tabular-nums lg:block">
-        {dollars(source.ran)}
-      </span>
-      <span className="hidden text-right tabular-nums lg:block">
-        {ratio ?? "–"}
-      </span>
+      <span className="hidden text-right tabular-nums lg:block">{dollars(source.ran)}</span>
+      <span className="hidden text-right tabular-nums lg:block">{ratio ?? "–"}</span>
     </li>
   );
 };
@@ -242,19 +198,12 @@ const Line = ({
 const Table = ({ wallet }: { wallet: Wallet }) => {
   const scale = Math.max(
     1,
-    ...wallet.sources.map((source) =>
-      Math.max(source.ran, priceOf(source) ?? 0)
-    )
+    ...wallet.sources.map((source) => Math.max(source.ran, priceOf(source) ?? 0)),
   );
 
   return (
     <div className="min-w-0">
-      <div
-        className={cn(
-          "hidden gap-x-4 pb-2 text-xs text-muted-foreground lg:grid",
-          columns
-        )}
-      >
+      <div className={cn("hidden gap-x-4 pb-2 text-xs text-muted-foreground lg:grid", columns)}>
         <span>Source</span>
         <span />
         <span className="text-right">Price</span>
@@ -272,9 +221,7 @@ const Table = ({ wallet }: { wallet: Wallet }) => {
 
 const footnote = (wallet: Wallet) =>
   [
-    wallet.sources.some((source) =>
-      source.parts.some((part) => part.key === "none")
-    )
+    wallet.sources.some((source) => source.parts.some((part) => part.key === "none"))
       ? "Dashed: Claude work logged without a sign-in"
       : null,
     wallet.unpriced.length === 0
@@ -309,9 +256,7 @@ export const WalletView = ({ wallet }: { wallet: Wallet }) => {
             <Donut wallet={wallet} />
             <Table wallet={wallet} />
           </div>
-          <p className="mt-5 border-t pt-4 text-xs text-muted-foreground">
-            {footnote(wallet)}
-          </p>
+          <p className="mt-5 border-t pt-4 text-xs text-muted-foreground">{footnote(wallet)}</p>
         </Section>
       )}
     </>

@@ -18,13 +18,7 @@ import { findWorkspace } from "@/lib/git/repos";
 import type { Workspace } from "@/lib/git/repos";
 import { countLines, folderEntries } from "@/lib/model/files";
 
-const overviews = [
-  "README.md",
-  "readme.md",
-  "AGENTS.md",
-  "CLAUDE.md",
-  "README",
-];
+const overviews = ["README.md", "readme.md", "AGENTS.md", "CLAUDE.md", "README"];
 
 type Mode = "preview" | "source" | "diff";
 
@@ -39,9 +33,7 @@ export const generateMetadata = async ({
 };
 
 const Note = ({ children }: { children: ReactNode }) => (
-  <p className="m-auto p-6 text-center text-sm text-muted-foreground">
-    {children}
-  </p>
+  <p className="m-auto p-6 text-center text-sm text-muted-foreground">{children}</p>
 );
 
 const Content = ({
@@ -59,24 +51,15 @@ const Content = ({
     return mode === "preview" ? (
       <Markdown ws={ws.id} file={file} text={body.text} />
     ) : (
-      <FileView
-        name={file}
-        text={body.text}
-        original={body.original}
-        diff={mode === "diff"}
-      />
+      <FileView name={file} text={body.text} original={body.original} diff={mode === "diff"} />
     );
   }
 
   if (body.kind === "binary" && pictureType(file) !== null) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-[repeating-conic-gradient(var(--muted)_0_25%,transparent_0_50%)] bg-size-[16px_16px] p-6">
-        {/* oxlint-disable-next-line nextjs/no-img-element */}
-        <img
-          src={filesHref.raw(ws.id, file)}
-          alt={file}
-          className="max-h-full max-w-full"
-        />
+        {/* oxlint-disable-next-line nextjs/no-img-element -- a raw file from the repo, which next/image would re-encode */}
+        <img src={filesHref.raw(ws.id, file)} alt={file} className="max-h-full max-w-full" />
       </div>
     );
   }
@@ -120,9 +103,7 @@ const Folder = ({
             >
               <FolderIcon className="size-4 text-muted-foreground" />
               <span>{name}</span>
-              <span className="ml-auto text-xs text-faint tabular-nums">
-                {count}
-              </span>
+              <span className="ml-auto text-xs text-faint tabular-nums">{count}</span>
             </Link>
           </li>
         ))}
@@ -156,10 +137,7 @@ const FileShown = async ({
   const last = await lastCommit(ws, file);
   const markdown = /\.(?:md|mdx|markdown)$/iu.test(file);
 
-  const changed =
-    body.kind === "text" &&
-    body.original !== null &&
-    body.original !== body.text;
+  const changed = body.kind === "text" && body.original !== null && body.original !== body.text;
 
   const modes: Mode[] = [
     ...(markdown ? (["preview"] as const) : []),
@@ -167,8 +145,7 @@ const FileShown = async ({
     ...(changed ? (["diff"] as const) : []),
   ];
 
-  const shown: Mode =
-    modes.find((each) => each === mode) ?? (markdown ? "preview" : "source");
+  const shown: Mode = modes.find((each) => each === mode) ?? (markdown ? "preview" : "source");
 
   const labels: Record<Mode, string> = {
     diff: "Diff",
@@ -192,8 +169,7 @@ const FileShown = async ({
           </Link>
         )}
         <span className="ml-auto shrink-0 text-faint tabular-nums max-lg:hidden">
-          {body.kind === "text" &&
-            `${countLines(body.text).toLocaleString("en-US")} lines · `}
+          {body.kind === "text" && `${countLines(body.text).toLocaleString("en-US")} lines · `}
           {"size" in body && bytes(body.size)}
         </span>
         <Tools>
@@ -206,7 +182,7 @@ const FileShown = async ({
                   href={filesHref.code(
                     ws.id,
                     file,
-                    each === (markdown ? "preview" : "source") ? "" : each
+                    each === (markdown ? "preview" : "source") ? "" : each,
                   )}
                   current={each === shown}
                 >
@@ -223,10 +199,7 @@ const FileShown = async ({
   );
 };
 
-const CodePage = async ({
-  params,
-  searchParams,
-}: PageProps<"/files/[ws]/code/[[...path]]">) => {
+const CodePage = async ({ params, searchParams }: PageProps<"/files/[ws]/code/[[...path]]">) => {
   const { ws: id, path = [] } = await params;
   const ws = await findWorkspace(decodeURIComponent(id));
 
@@ -237,10 +210,7 @@ const CodePage = async ({
   const asked = path.map((part) => decodeURIComponent(part)).join("/");
   const paths = await listFiles(ws);
 
-  const file =
-    asked === ""
-      ? (overviews.find((name) => paths.includes(name)) ?? "")
-      : asked;
+  const file = asked === "" ? (overviews.find((name) => paths.includes(name)) ?? "") : asked;
 
   if (file === "") {
     return <Folder ws={ws} paths={paths} folder="" />;
@@ -254,14 +224,7 @@ const CodePage = async ({
 
   const { mode } = await searchParams;
 
-  return (
-    <FileShown
-      ws={ws}
-      file={file}
-      body={body}
-      mode={[mode ?? ""].flat()[0] ?? ""}
-    />
-  );
+  return <FileShown ws={ws} file={file} body={body} mode={[mode ?? ""].flat()[0] ?? ""} />;
 };
 
 export default CodePage;

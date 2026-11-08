@@ -14,8 +14,8 @@ export const attempt = async <A>(effect: Effect.Effect<A, ProxyError, Proxy>) =>
       Effect.match({
         onFailure: (error): Outcome<A> => ({ ok: false, reason: error.reason }),
         onSuccess: (value): Outcome<A> => ({ ok: true, value }),
-      })
-    )
+      }),
+    ),
   );
 
 export const attemptCached = async <A>(path: string, read: () => Promise<A>) =>
@@ -27,5 +27,5 @@ export const attemptCached = async <A>(path: string, read: () => Promise<A>) =>
           reason: "no usable answer from the proxy",
         }),
       try: read,
-    })
+    }),
   );

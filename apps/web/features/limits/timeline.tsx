@@ -52,14 +52,11 @@ const Row = ({
   const { ended, current, next } = windows(pace.resetsAt, points);
   const tone = windowTone(account.week, pace);
 
-  const locks = lockedSpans(
-    points,
-    pace.cutoff,
-    pace.locked ? pace.resetsAt : now
-  ).filter(([, to]) => to > current.from);
+  const locks = lockedSpans(points, pace.cutoff, pace.locked ? pace.resetsAt : now).filter(
+    ([, to]) => to > current.from,
+  );
 
-  const ahead =
-    pace.runsOut === null ? null : ([pace.runsOut, pace.resetsAt] as const);
+  const ahead = pace.runsOut === null ? null : ([pace.runsOut, pace.resetsAt] as const);
 
   const spent = (account.resetsSpent ?? []).filter((at) => x(at) > 0);
 
@@ -81,42 +78,27 @@ const Row = ({
           <Band
             x0={x(ended.from)}
             x1={x(ended.to) - 0.3}
-            className={cn(
-              bar,
-              "@container bg-muted px-2 text-xs leading-10 text-muted-foreground"
-            )}
+            className={cn(bar, "@container bg-muted px-2 text-xs leading-10 text-muted-foreground")}
           >
             <span className="block truncate">
-              <span className="max-sm:hidden @max-[7.5rem]:hidden">
-                Ended {date(ended.to)} ·{" "}
-              </span>
+              <span className="max-sm:hidden @max-[7.5rem]:hidden">Ended {date(ended.to)} · </span>
               {percent(ended.used)}
             </span>
           </Band>
         )}
-        <Band
-          x0={x(current.from)}
-          x1={x(current.to)}
-          className={cn(bar, "border", tones[tone])}
-        >
+        <Band x0={x(current.from)} x1={x(current.to)} className={cn(bar, "border", tones[tone])}>
           {locks.map(([from, to]) => (
             <Band
               key={from}
               x0={((from - current.from) / (current.to - current.from)) * 100}
-              x1={
-                ((Math.min(to, current.to) - current.from) /
-                  (current.to - current.from)) *
-                100
-              }
+              x1={((Math.min(to, current.to) - current.from) / (current.to - current.from)) * 100}
               className="top-0 opacity-60"
               style={hatchStyle}
             />
           ))}
           {ahead === null ? null : (
             <Band
-              x0={
-                ((ahead[0] - current.from) / (current.to - current.from)) * 100
-              }
+              x0={((ahead[0] - current.from) / (current.to - current.from)) * 100}
               x1={100}
               className="top-0 rounded-r-lg"
               style={forecastHatchStyle}
@@ -124,9 +106,7 @@ const Row = ({
           )}
           <span className="relative z-10 block px-1 pt-1 text-xs">
             <span className="inline-block max-w-full truncate rounded-[4px] bg-card/85 px-1 align-top">
-              <span className="max-sm:hidden">
-                {percent(pace.used)} used ·{" "}
-              </span>
+              <span className="max-sm:hidden">{percent(pace.used)} used · </span>
               {pace.locked ? "Back " : ""}
               {when(pace.resetsAt, now)}
             </span>
@@ -143,7 +123,7 @@ const Row = ({
           x1={x(next.to)}
           className={cn(
             bar,
-            "@container border border-dashed px-2 text-xs leading-10 text-muted-foreground"
+            "@container border border-dashed px-2 text-xs leading-10 text-muted-foreground",
           )}
         >
           <span className="block truncate max-sm:hidden">Next</span>
@@ -157,7 +137,7 @@ const Row = ({
             >
               <Dot tone="bad" className="size-2" />
             </span>
-          )
+          ),
         )}
         {spent.map((at) => (
           <span
@@ -183,18 +163,13 @@ export const TimelineView = ({
   const from = addDays(startOfDay(now), -pastDays);
   const to = addDays(from, spanDays);
 
-  const x = (at: number) =>
-    Math.min(100, Math.max(0, ((at - from) / (to - from)) * 100));
+  const x = (at: number) => Math.min(100, Math.max(0, ((at - from) / (to - from)) * 100));
 
-  const days = Array.from({ length: spanDays }, (_, index) =>
-    addDays(from, index)
-  );
+  const days = Array.from({ length: spanDays }, (_, index) => addDays(from, index));
 
   const locked = plans.filter((plan) => plan.pace?.locked === true);
 
-  const [first] = locked.toSorted(
-    (a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0)
-  );
+  const [first] = locked.toSorted((a, b) => (a.pace?.resetsAt ?? 0) - (b.pace?.resetsAt ?? 0));
 
   const today = startOfDay(now);
 
@@ -215,9 +190,7 @@ export const TimelineView = ({
               key={day}
               className={cn(
                 "min-w-0 rounded-md py-1",
-                day === today
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground"
+                day === today ? "bg-muted text-foreground" : "text-muted-foreground",
               )}
             >
               <div className="max-sm:hidden">{weekday(day)}</div>
@@ -231,19 +204,10 @@ export const TimelineView = ({
       </div>
       <div className="relative pt-6">
         {plans.map((plan) => (
-          <Row
-            key={plan.id}
-            plan={plan}
-            points={history[plan.id] ?? []}
-            x={x}
-            now={now}
-          />
+          <Row key={plan.id} plan={plan} points={history[plan.id] ?? []} x={x} now={now} />
         ))}
         <div className="pointer-events-none absolute inset-y-0 right-0 left-0 sm:left-[calc(13rem+1rem)]">
-          <span
-            className="absolute inset-y-0 w-px bg-foreground"
-            style={{ left: `${x(now)}%` }}
-          />
+          <span className="absolute inset-y-0 w-px bg-foreground" style={{ left: `${x(now)}%` }} />
           <span
             className="absolute top-0 -translate-x-1/2 rounded-full bg-foreground px-2 py-0.5 text-xs text-background"
             style={{ left: `${x(now)}%` }}

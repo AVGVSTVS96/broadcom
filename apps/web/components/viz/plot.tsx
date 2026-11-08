@@ -7,7 +7,7 @@ export type XY = readonly [x: number, y: number];
 
 const pathOf = line<XY>(
   (point) => point[0],
-  (point) => point[1]
+  (point) => point[1],
 );
 
 export const Plot = ({
@@ -58,17 +58,8 @@ export const Path = ({
   />
 );
 
-export const Area = ({
-  points,
-  className,
-}: {
-  points: readonly XY[];
-  className?: string;
-}) => (
-  <path
-    d={`${pathOf(points) ?? ""}Z`}
-    className={cn("fill-current", className)}
-  />
+export const Area = ({ points, className }: { points: readonly XY[]; className?: string }) => (
+  <path d={`${pathOf(points) ?? ""}Z`} className={cn("fill-current", className)} />
 );
 
 export const At = ({
@@ -144,7 +135,7 @@ export const Dot = ({
     className={cn(
       "block size-2.5 rounded-full ring-2 ring-card",
       hollow ? "border-2 border-current bg-card" : dotTones[tone],
-      className
+      className,
     )}
   />
 );
@@ -165,27 +156,19 @@ const traced = (lines: readonly (readonly XY[])[]) =>
         return [point];
       }
 
-      const steps = Math.ceil(
-        Math.hypot(point[0] - before[0], point[1] - before[1])
-      );
+      const steps = Math.ceil(Math.hypot(point[0] - before[0], point[1] - before[1]));
 
       return Array.from({ length: steps }, (_, step): XY => {
         const t = (step + 1) / steps;
 
-        return [
-          before[0] + (point[0] - before[0]) * t,
-          before[1] + (point[1] - before[1]) * t,
-        ];
+        return [before[0] + (point[0] - before[0]) * t, before[1] + (point[1] - before[1]) * t];
       });
-    })
+    }),
   );
 
 const pad = 1.5;
 
-export const freeSpot = (
-  spots: readonly Box[],
-  lines: readonly (readonly XY[])[]
-) => {
+export const freeSpot = (spots: readonly Box[], lines: readonly (readonly XY[])[]) => {
   const marks = traced(lines);
 
   return (
@@ -195,8 +178,8 @@ export const freeSpot = (
           x < spot.left - pad ||
           x > spot.left + spot.width + pad ||
           y < spot.top - pad ||
-          y > spot.top + spot.height + pad
-      )
+          y > spot.top + spot.height + pad,
+      ),
     ) ?? spots[0]
   );
 };

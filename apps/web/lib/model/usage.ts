@@ -8,20 +8,14 @@ export const units = ["tokens", "api", "plan", "fiveHour", "week"] as const;
 
 export type Unit = (typeof units)[number];
 
-export const groupings = [
-  "agent",
-  "session",
-  "project",
-  "model",
-  "account",
-] as const;
+export const groupings = ["agent", "session", "project", "model", "account"] as const;
 
 export type Grouping = (typeof groupings)[number];
 
 export const oneOf = <T extends string>(
   options: readonly T[],
   value: string | null | undefined,
-  fallback: T
+  fallback: T,
 ): T => options.find((option) => option === value) ?? fallback;
 
 export type Values = Readonly<Record<Unit, number | null>>;
@@ -29,8 +23,7 @@ export type Values = Readonly<Record<Unit, number | null>>;
 export const isLimit = (unit: Unit) => unit === "fiveHour" || unit === "week";
 
 export const valuesOf = (amount: UsageAmount, points: UsagePoints): Values => {
-  const reading = (value: number | null) =>
-    value === 0 && amount.apiUsd > 0 ? null : value;
+  const reading = (value: number | null) => (value === 0 && amount.apiUsd > 0 ? null : value);
 
   return {
     api: amount.apiUsd,
@@ -104,9 +97,7 @@ const brief = (value: number) => {
     return compact.format(value);
   }
 
-  return value >= 10 || value === 0
-    ? String(Math.round(value))
-    : value.toFixed(1);
+  return value >= 10 || value === 0 ? String(Math.round(value)) : value.toFixed(1);
 };
 
 export const formatShort = (unit: Unit, value: number) => {
@@ -140,9 +131,7 @@ const partsIn = (zone: string) => {
   });
 
   return (at: number) => {
-    const read = Object.fromEntries(
-      parts.formatToParts(at).map((part) => [part.type, part.value])
-    );
+    const read = Object.fromEntries(parts.formatToParts(at).map((part) => [part.type, part.value]));
 
     return {
       date: `${read.year} ${read.month} ${read.day}`,
@@ -174,7 +163,7 @@ export const cellsOf = (
   buckets: readonly { readonly at: number }[],
   size: BucketSize,
   zone: string,
-  now: number
+  now: number,
 ): readonly Cell[] => {
   const read = partsIn(zone);
 
@@ -229,13 +218,8 @@ export const cellsOf = (
   });
 };
 
-export const sumCells = (
-  series: readonly number[],
-  cells: readonly Cell[]
-): readonly number[] =>
-  cells.map((cell) =>
-    series.slice(cell.from, cell.to).reduce((sum, value) => sum + value, 0)
-  );
+export const sumCells = (series: readonly number[], cells: readonly Cell[]): readonly number[] =>
+  cells.map((cell) => series.slice(cell.from, cell.to).reduce((sum, value) => sum + value, 0));
 
 export const sumSeries = (lists: readonly (readonly number[])[]) => {
   const total: number[] = [];
@@ -257,15 +241,12 @@ export interface Layer {
 
 export const rest = "rest";
 
-export const stackOf = (
-  named: readonly Layer[],
-  total: readonly number[]
-): readonly Layer[] => {
+export const stackOf = (named: readonly Layer[], total: readonly number[]): readonly Layer[] => {
   const others = total.map((value, index) =>
     Math.max(
       0,
-      named.reduce((left, layer) => left - (layer.values[index] ?? 0), value)
-    )
+      named.reduce((left, layer) => left - (layer.values[index] ?? 0), value),
+    ),
   );
 
   return others.some((value) => value > 1e-9)
@@ -277,7 +258,7 @@ export type Reading = "read" | "missing" | null;
 
 export const readingsOf = (
   scored: readonly number[],
-  spend: readonly number[]
+  spend: readonly number[],
 ): readonly Reading[] =>
   spend.map((paid, index) => {
     if ((scored[index] ?? 0) > 0) {
@@ -340,7 +321,7 @@ export const coverageOf = (
   buckets: readonly { readonly at: number }[],
   size: BucketSize,
   cells: readonly Cell[],
-  zone: string
+  zone: string,
 ): Coverage => {
   const slots =
     size === "4h"
@@ -389,9 +370,7 @@ export const bucketLabel = (at: number, size: BucketSize, zone: string) => {
   }
 
   return new Intl.DateTimeFormat("en-US", {
-    ...(size === "1d"
-      ? { day: "numeric", month: "short" }
-      : { hour: "numeric" }),
+    ...(size === "1d" ? { day: "numeric", month: "short" } : { hour: "numeric" }),
     timeZone: zone,
     weekday: "short",
   }).format(at);
@@ -404,7 +383,7 @@ const placeOf = (project: string) =>
     .replace(/^\/(?:home|Users)\/[^/]+/u, "~");
 
 export const labelsOf = (
-  rows: readonly { readonly key: string; readonly label: string }[]
+  rows: readonly { readonly key: string; readonly label: string }[],
 ): ReadonlyMap<string, string> => {
   const named = rows.map((row) => ({
     key: row.key,
@@ -423,7 +402,7 @@ export const labelsOf = (
       (counts.get(row.label) ?? 0) > 1 && row.key.startsWith("p:")
         ? placeOf(row.key.slice(2))
         : row.label,
-    ])
+    ]),
   );
 };
 
@@ -432,7 +411,7 @@ export const totalOf = (
     readonly values: Values;
     readonly sessions: number;
     readonly series: readonly number[];
-  }[]
+  }[],
 ) => {
   const sum = (unit: Unit) => {
     let total: number | null = null;

@@ -12,21 +12,14 @@ export interface Windows {
   readonly next: Span;
 }
 
-export const windows = (
-  resetsAt: number,
-  points: Points,
-  length = WEEK
-): Windows => {
+export const windows = (resetsAt: number, points: Points, length = WEEK): Windows => {
   const start = resetsAt - length;
   const before = points.filter(([at]) => at < start);
   const endedUsed = before.length === 0 ? null : valueAt(points, start - 1);
 
   return {
     current: { from: start, to: resetsAt },
-    ended:
-      endedUsed === null
-        ? null
-        : { from: start - length, to: start, used: endedUsed },
+    ended: endedUsed === null ? null : { from: start - length, to: start, used: endedUsed },
     next: { from: resetsAt, to: resetsAt + length },
   };
 };

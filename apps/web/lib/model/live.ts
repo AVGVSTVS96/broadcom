@@ -59,10 +59,7 @@ const group = (groups: Map<string, Handoff>, move: Move) => {
     cause: move.cause,
     count: (found?.count ?? 0) + 1,
     from: move.from,
-    labels:
-      move.label === null || labels.includes(move.label)
-        ? labels
-        : [...labels, move.label],
+    labels: move.label === null || labels.includes(move.label) ? labels : [...labels, move.label],
     to: move.to,
   });
 };
@@ -91,12 +88,10 @@ const bounceOf = (moves: readonly Move[], now: number): Bounce | null => {
     moves
       .filter((move) => move.cause !== "start" && now - move.at <= span)
       .toSorted((a, b) => a.at - b.at),
-    (move) => move.session
+    (move) => move.session,
   );
 
-  const [burst] = [...bySession.values()]
-    .map(burstOf)
-    .toSorted((a, b) => b.length - a.length);
+  const [burst] = [...bySession.values()].map(burstOf).toSorted((a, b) => b.length - a.length);
 
   const last = burst?.at(-1);
 
@@ -107,11 +102,7 @@ const bounceOf = (moves: readonly Move[], now: number): Bounce | null => {
   return {
     at: last.at,
     between: [
-      ...new Set(
-        burst.flatMap((move) =>
-          move.from === null ? [move.to] : [move.from, move.to]
-        )
-      ),
+      ...new Set(burst.flatMap((move) => (move.from === null ? [move.to] : [move.from, move.to]))),
     ],
     count: burst.length,
     label: last.label,
@@ -121,10 +112,7 @@ const bounceOf = (moves: readonly Move[], now: number): Bounce | null => {
 export const handoffs = (moves: readonly Move[], now: number): Handoffs => {
   const from = Math.floor((now - span) / hour) * hour + hour;
 
-  const lanes = new Map<
-    string,
-    { started: number[]; arrived: number[]; left: number[] }
-  >();
+  const lanes = new Map<string, { started: number[]; arrived: number[]; left: number[] }>();
 
   const groups = new Map<string, Handoff>();
   const moved: Partial<Record<MoveCause, number>> = {};
@@ -162,10 +150,7 @@ export const handoffs = (moves: readonly Move[], now: number): Handoffs => {
     moved[move.cause] = (moved[move.cause] ?? 0) + 1;
     into.arrived[slot] = (into.arrived[slot] ?? 0) + 1;
 
-    if (
-      move.from !== null &&
-      (move.cause === "limit" || move.cause === "over")
-    ) {
+    if (move.from !== null && (move.cause === "limit" || move.cause === "over")) {
       const out = lane(move.from);
 
       out.left[slot] = (out.left[slot] ?? 0) + 1;
@@ -222,8 +207,6 @@ export const waiting = (sessions: readonly LiveSession[]) =>
       session.account !== null &&
       !sessions.some(
         (newer) =>
-          newer.row === session.row &&
-          newer.label === session.label &&
-          newer.since > session.since
-      )
+          newer.row === session.row && newer.label === session.label && newer.since > session.since,
+      ),
   );

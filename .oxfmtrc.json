@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "sortImports": true,
+  "sortTailwindcss": {
+    "functions": ["clsx", "cn", "cva"],
+    "stylesheet": "./apps/web/app/globals.css"
+  },
+  "ignorePatterns": [
+    "apps/web/components/ui/**",
+    "crates/**",
+    "Cargo.toml",
+    "tools/oxlint/anti-slop-effect/**",
+    "target/**"
+  ]
+}

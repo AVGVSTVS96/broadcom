@@ -4,18 +4,9 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Section } from "@/components/viz/section";
-import {
-  ConnectButton,
-  DeployButton,
-  SourceFiles,
-} from "@/features/executor/parts";
+import { ConnectButton, DeployButton, SourceFiles } from "@/features/executor/parts";
 import { executorUrl, readOverview, readSource } from "@/lib/executor/api";
-import {
-  needs,
-  releasesBehind,
-  sameSource,
-  shortRelease,
-} from "@/lib/model/executor";
+import { needs, releasesBehind, sameSource, shortRelease } from "@/lib/model/executor";
 import type { ExecutorApp, Health } from "@/lib/model/executor";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +26,7 @@ const Dot = ({ health }: { health: Health }) => (
       "size-2 shrink-0 rounded-full",
       health === "healthy" && "bg-ok",
       health === "unchecked" && "bg-faint",
-      (health === "failing" || health === "missing") && "bg-bad"
+      (health === "failing" || health === "missing") && "bg-bad",
     )}
   />
 );
@@ -45,11 +36,9 @@ const day = new Intl.DateTimeFormat("en-US", {
   month: "short",
 });
 
-const onDay = (at: string | null) =>
-  at === null ? null : day.format(new Date(at));
+const onDay = (at: string | null) => (at === null ? null : day.format(new Date(at)));
 
-const plural = (value: number, word: string) =>
-  `${value} ${word}${value === 1 ? "" : "s"}`;
+const plural = (value: number, word: string) => `${value} ${word}${value === 1 ? "" : "s"}`;
 
 const OpenExecutor = () => (
   <a
@@ -63,13 +52,7 @@ const OpenExecutor = () => (
   </a>
 );
 
-const Meta = ({
-  app,
-  framework,
-}: {
-  app: ExecutorApp;
-  framework: string | null;
-}) => {
+const Meta = ({ app, framework }: { app: ExecutorApp; framework: string | null }) => {
   const behind = releasesBehind(app, framework);
   const deployed = onDay(app.deployedAt);
 
@@ -110,7 +93,7 @@ const AppRow = ({
           href={`/executor/${app.slug}`}
           className={cn(
             "truncate underline-offset-4 hover:underline",
-            current && "underline decoration-foreground/30"
+            current && "underline decoration-foreground/30",
           )}
         >
           {app.name}
@@ -118,20 +101,13 @@ const AppRow = ({
       ) : (
         <span className="truncate">{app.name}</span>
       )}
-      {!app.running && (
-        <span className="text-xs text-muted-foreground">Not deployed</span>
-      )}
+      {!app.running && <span className="text-xs text-muted-foreground">Not deployed</span>}
     </div>
     <ul className="min-w-0 space-y-1.5 text-sm">
       {needs(app).map((need) => (
-        <li
-          key={`${need.requirement}:${need.label}`}
-          className="flex min-w-0 items-center gap-2"
-        >
+        <li key={`${need.requirement}:${need.label}`} className="flex min-w-0 items-center gap-2">
           <Dot health={need.health} />
-          <span className="min-w-0 truncate">
-            {need.label ?? need.requirement}
-          </span>
+          <span className="min-w-0 truncate">{need.label ?? need.requirement}</span>
           {need.health !== "healthy" && (
             <span className="shrink-0 text-xs text-muted-foreground">
               {healthWords.get(need.health)}
@@ -139,11 +115,7 @@ const AppRow = ({
           )}
           {(need.health === "missing" || need.health === "failing") && (
             <span className="ml-auto sm:ml-2">
-              <ConnectButton
-                slug={app.slug}
-                requirement={need.requirement}
-                another={false}
-              />
+              <ConnectButton slug={app.slug} requirement={need.requirement} another={false} />
             </span>
           )}
         </li>
@@ -157,11 +129,7 @@ const AppRow = ({
 );
 
 const Failed = ({ reason }: { reason: string }) => (
-  <Section
-    title="Executor didn't answer"
-    detail={reason}
-    actions={<OpenExecutor />}
-  >
+  <Section title="Executor didn't answer" detail={reason} actions={<OpenExecutor />}>
     {null}
   </Section>
 );
@@ -185,11 +153,7 @@ const Source = async ({ app }: { app: ExecutorApp }) => {
           : `${app.name}: ${differ} of ${files.length} files differ from what runs`
       }
       detail={`Your copy in executor-apps/${app.slug}, against the version Executor runs.`}
-      actions={
-        differ > 0 && (
-          <DeployButton slug={app.slug} name={app.name} differ={differ} />
-        )
-      }
+      actions={differ > 0 && <DeployButton slug={app.slug} name={app.name} differ={differ} />}
     >
       <SourceFiles slug={app.slug} files={files} />
     </Section>
@@ -210,9 +174,7 @@ const ExecutorPage = async ({ params }: PageProps<"/executor/[[...slug]]">) => {
   const local = apps.filter((each) => each.local);
   const app = local.find((each) => each.slug === slug.at(0)) ?? local.at(0);
 
-  const unhealthy = apps
-    .flatMap(needs)
-    .filter((need) => need.health !== "healthy");
+  const unhealthy = apps.flatMap(needs).filter((need) => need.health !== "healthy");
 
   const behind = apps.filter((each) => releasesBehind(each, framework) > 0);
 

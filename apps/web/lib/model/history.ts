@@ -16,7 +16,7 @@ export const compact = (points: Points): Points =>
       index === 0 ||
       index === points.length - 1 ||
       point[1] !== points[index - 1]?.[1] ||
-      point[1] !== points[index + 1]?.[1]
+      point[1] !== points[index + 1]?.[1],
   );
 
 export const valueAt = (points: Points, at: number) => {
@@ -107,7 +107,5 @@ export const lockedSpans = (points: Points, cutoff: number, end: number) => {
   return spans;
 };
 
-export const isLocked = (
-  spans: readonly (readonly [number, number])[],
-  at: number
-) => spans.some(([from, to]) => at >= from && at < to);
+export const isLocked = (spans: readonly (readonly [number, number])[], at: number) =>
+  spans.some(([from, to]) => at >= from && at < to);

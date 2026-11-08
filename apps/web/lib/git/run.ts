@@ -1,6 +1,7 @@
 import "server-only";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { buffer } from "node:stream/consumers";
 
 const env = {
   ...process.env,
@@ -16,23 +17,15 @@ export const gitBytes = async (cwd: string, ...args: string[]) => {
   });
 
   const closed = once(child, "close");
-  const chunks: Uint8Array[] = [];
-
-  for await (const chunk of child.stdout) {
-    // SAFETY: a piped stdout without an encoding yields Buffers.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    chunks.push(chunk as Buffer);
-  }
+  const data = await buffer(child.stdout);
 
   await closed;
 
   if (child.exitCode !== 0) {
-    throw new Error(
-      `git ${args.join(" ")} exited with ${String(child.exitCode)}`
-    );
+    throw new Error(`git ${args.join(" ")} exited with ${String(child.exitCode)}`);
   }
 
-  return Buffer.concat(chunks);
+  return data;
 };
 
 export const git = async (cwd: string, ...args: string[]) => {

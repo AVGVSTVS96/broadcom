@@ -29,9 +29,7 @@ export const PluginCard = ({ plugin }: { plugin: ClaudePlugin }) => {
       data-on={enabled}
     >
       <div className="flex items-center gap-3">
-        <span className="min-w-0 flex-1 truncate font-medium">
-          {plugin.name}
-        </span>
+        <span className="min-w-0 flex-1 truncate font-medium">{plugin.name}</span>
         <Switch
           checked={enabled}
           disabled={pending}
@@ -50,14 +48,10 @@ export const PluginCard = ({ plugin }: { plugin: ClaudePlugin }) => {
           }}
         />
       </div>
-      <p className="line-clamp-3 text-sm text-muted-foreground">
-        {plugin.description}
-      </p>
+      <p className="line-clamp-3 text-sm text-muted-foreground">{plugin.description}</p>
       {failed !== "" && <p className="text-sm text-bad">{failed}</p>}
       <p className="mt-auto flex gap-2 text-xs text-faint">
-        {plugin.version !== null && (
-          <span className="font-mono">{plugin.version}</span>
-        )}
+        {plugin.version !== null && <span className="font-mono">{plugin.version}</span>}
         <span className="truncate">{plugin.market}</span>
       </p>
     </li>
@@ -75,7 +69,7 @@ export const Skills = ({ skills }: { skills: readonly Skill[] }) => {
     (skill) =>
       needle === "" ||
       skill.name.toLowerCase().includes(needle) ||
-      skill.description.toLowerCase().includes(needle)
+      skill.description.toLowerCase().includes(needle),
   );
 
   const shown = all || needle !== "" ? found : found.slice(0, shownAtFirst);
@@ -94,14 +88,9 @@ export const Skills = ({ skills }: { skills: readonly Skill[] }) => {
       />
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((skill) => (
-          <li
-            key={`${skill.scope}:${skill.name}`}
-            className="rounded-2xl bg-muted/60 p-4"
-          >
+          <li key={`${skill.scope}:${skill.name}`} className="rounded-2xl bg-muted/60 p-4">
             <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate font-medium">
-                {skill.name}
-              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">{skill.name}</span>
               {skill.scope === "hex" && (
                 <span className="rounded-full bg-card px-2 py-0.5 text-xs text-muted-foreground">
                   hex
@@ -109,16 +98,12 @@ export const Skills = ({ skills }: { skills: readonly Skill[] }) => {
               )}
               <SourceLink source={skill.source} />
             </div>
-            <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
-              {skill.description}
-            </p>
+            <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{skill.description}</p>
           </li>
         ))}
       </ul>
       {shown.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          No skill matches “{query}”.
-        </p>
+        <p className="text-sm text-muted-foreground">No skill matches “{query}”.</p>
       )}
       {needle === "" && found.length > shownAtFirst && (
         <button

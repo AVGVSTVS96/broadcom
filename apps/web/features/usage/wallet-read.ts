@@ -11,14 +11,12 @@ const spendBy = (by: "account" | "harness") =>
   Effect.gen(function* () {
     return yield* (yield* Proxy).get(
       `/deck/usage?range=30d&by=${by}&measure=api&limit=100`,
-      UsageView
+      UsageView,
     );
   });
 
 const spent = (view: UsageView, prefix: string) =>
-  Object.fromEntries(
-    view.rows.map((row) => [row.key.slice(prefix.length), row.amount.apiUsd])
-  );
+  Object.fromEntries(view.rows.map((row) => [row.key.slice(prefix.length), row.amount.apiUsd]));
 
 export const readWallet = async () => {
   const live = await readLive();
@@ -35,8 +33,8 @@ export const readWallet = async () => {
         }),
         harness: spendBy("harness"),
       },
-      { concurrency: "unbounded" }
-    )
+      { concurrency: "unbounded" },
+    ),
   );
 
   const names = namesOf(accounts.facets.account ?? [], credits.api);

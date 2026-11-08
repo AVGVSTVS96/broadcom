@@ -6,11 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Section } from "@/components/viz/section";
 import { previewPolicy, savePolicy } from "@/features/accounts/actions";
-import type {
-  Pool,
-  Policy as PolicyType,
-  PolicyResult,
-} from "@/lib/proxy/schema";
+import type { Pool, Policy as PolicyType, PolicyResult } from "@/lib/proxy/schema";
 
 const fields = [
   { key: "sessionCutoff", label: "Session cutoff", max: 100, unit: "%" },
@@ -31,16 +27,10 @@ const valid = (policy: PolicyType) =>
     (field) =>
       Number.isInteger(policy[field.key]) &&
       policy[field.key] >= 1 &&
-      policy[field.key] <= field.max
+      policy[field.key] <= field.max,
   );
 
-export const Policy = ({
-  pool,
-  name,
-}: {
-  pool: Pool;
-  name: (id: string | null) => string;
-}) => {
+export const Policy = ({ pool, name }: { pool: Pool; name: (id: string | null) => string }) => {
   const [draft, setDraft] = useState<PolicyType | null>(null);
   const [preview, setPreview] = useState<PolicyResult | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -76,9 +66,7 @@ export const Policy = ({
       if (!result.ok) {
         setNotice(result.reason);
       } else if (result.value.conflict) {
-        setNotice(
-          "The policy changed somewhere else. Check it and preview again."
-        );
+        setNotice("The policy changed somewhere else. Check it and preview again.");
       } else {
         setDraft(null);
         setNotice("Saved");
@@ -118,25 +106,15 @@ export const Policy = ({
                   });
                 }}
               />
-              <span className="text-sm text-muted-foreground">
-                {field.unit}
-              </span>
+              <span className="text-sm text-muted-foreground">{field.unit}</span>
             </span>
           </label>
         ))}
         <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={!dirty || !valid(values) || pending}
-          >
+          <Button type="submit" variant="secondary" disabled={!dirty || !valid(values) || pending}>
             Preview
           </Button>
-          <Button
-            type="button"
-            disabled={!dirty || !previewed || pending}
-            onClick={save}
-          >
+          <Button type="button" disabled={!dirty || !previewed || pending} onClick={save}>
             Save
           </Button>
           {dirty ? (
@@ -153,9 +131,7 @@ export const Policy = ({
             </Button>
           ) : null}
           {dirty && !valid(values) ? (
-            <span className="text-sm text-bad">
-              Cutoffs run 1–100%, sessions 1–500.
-            </span>
+            <span className="text-sm text-bad">Cutoffs run 1–100%, sessions 1–500.</span>
           ) : null}
           {notice === null ? null : (
             <output className="text-sm text-muted-foreground">{notice}</output>

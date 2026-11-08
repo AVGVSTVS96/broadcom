@@ -67,8 +67,7 @@ export interface Wallet {
   readonly sources: readonly Source[];
 }
 
-const sum = (values: readonly number[]) =>
-  values.reduce((total, value) => total + value, 0);
+const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0);
 
 const counted = (names: readonly string[]) => {
   const counts = new Map<string, number>();
@@ -77,13 +76,10 @@ const counted = (names: readonly string[]) => {
     counts.set(name, (counts.get(name) ?? 0) + 1);
   }
 
-  return [...counts].map(([name, count]) =>
-    count === 1 ? name : `${count} × ${name}`
-  );
+  return [...counts].map(([name, count]) => (count === 1 ? name : `${count} × ${name}`));
 };
 
-const byValue = (a: { value: number }, b: { value: number }) =>
-  b.value - a.value;
+const byValue = (a: { value: number }, b: { value: number }) => b.value - a.value;
 
 export const walletOf = (input: WalletInput): Wallet => {
   const spent = (id: string) => input.byAccount[id] ?? 0;
@@ -122,10 +118,7 @@ export const walletOf = (input: WalletInput): Wallet => {
             name: "Claude",
             parts:
               unrecorded > 0.005
-                ? [
-                    ...seatParts,
-                    { key: "none", label: "No account", value: unrecorded },
-                  ]
+                ? [...seatParts, { key: "none", label: "No account", value: unrecorded }]
                 : seatParts,
             plan: priced.length === 0 ? null : claudePlan,
             ran: claudeRan,
@@ -135,9 +128,7 @@ export const walletOf = (input: WalletInput): Wallet => {
 
   const configured: Source[] = input.plans.map((plan) => {
     const ran = sum(
-      plan.providers.map(
-        (provider) => input.byHarness[harnessOf.get(provider) ?? ""] ?? 0
-      )
+      plan.providers.map((provider) => input.byHarness[harnessOf.get(provider) ?? ""] ?? 0),
     );
 
     return {

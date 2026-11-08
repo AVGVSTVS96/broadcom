@@ -28,9 +28,7 @@ export const fields = (out: string) => out.split("\0").filter(Boolean);
 const splitField = (line: string): [string, string] => {
   const space = line.indexOf(" ");
 
-  return space === -1
-    ? [line, ""]
-    : [line.slice(0, space), line.slice(space + 1)];
+  return space === -1 ? [line, ""] : [line.slice(0, space), line.slice(space + 1)];
 };
 
 export const parseWorktrees = (porcelain: string): Worktree[] =>
@@ -64,8 +62,7 @@ export const parseCommit = (record: string): Commit | null => {
       const close = value.lastIndexOf("> ");
 
       author = open === -1 ? value : value.slice(0, open);
-      at =
-        close === -1 ? 0 : Number(value.slice(close + 2).split(" ")[0]) * 1000;
+      at = close === -1 ? 0 : Number(value.slice(close + 2).split(" ")[0]) * 1000;
     } else if (key === "gpgsig" || key === "gpgsig-sha256") {
       signed = true;
     }
@@ -106,10 +103,7 @@ export const parseChanges = (numstat: string, nameStatus: string): Change[] => {
   const names = fields(nameStatus);
 
   for (let index = 0; index + 1 < names.length; index += 2) {
-    statuses.set(
-      names[index + 1] ?? "",
-      statusNames.get(names[index] ?? "") ?? "modified"
-    );
+    statuses.set(names[index + 1] ?? "", statusNames.get(names[index] ?? "") ?? "modified");
   }
 
   return fields(numstat).flatMap((line) => {
@@ -128,8 +122,7 @@ export const parseChanges = (numstat: string, nameStatus: string): Change[] => {
   });
 };
 
-export const isBinary = (data: Uint8Array) =>
-  data.subarray(0, 8000).includes(0);
+export const isBinary = (data: Uint8Array) => data.subarray(0, 8000).includes(0);
 
 export const countLines = (text: string) =>
   text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
@@ -149,14 +142,10 @@ export const newFilePatch = (path: string, text: string) => {
 };
 
 export const splitPatch = (patch: string) =>
-  patch
-    .split(/^(?=diff --git )/mu)
-    .filter((file) => file.startsWith("diff --git "));
+  patch.split(/^(?=diff --git )/mu).filter((file) => file.startsWith("diff --git "));
 
 export const patchPath = (file: string) => {
-  const named =
-    /^\+\+\+ b\/(?<path>.*)$/mu.exec(file) ??
-    /^--- a\/(?<path>.*)$/mu.exec(file);
+  const named = /^\+\+\+ b\/(?<path>.*)$/mu.exec(file) ?? /^--- a\/(?<path>.*)$/mu.exec(file);
 
   const header = file.slice(0, file.indexOf("\n"));
 
@@ -250,10 +239,7 @@ export const dayGroups = (commits: readonly Commit[], now: Date) => {
       day: "numeric",
       month: "short",
       weekday: "short",
-      year:
-        new Date(at).getFullYear() === now.getFullYear()
-          ? undefined
-          : "numeric",
+      year: new Date(at).getFullYear() === now.getFullYear() ? undefined : "numeric",
     });
   };
 

@@ -65,13 +65,10 @@ export const outlookOf = (
   pace: Pace | null,
   points: Points,
   since: number | null,
-  now: number
+  now: number,
 ): Outlook => ({
   cutoff: pace?.cutoff ?? 100,
-  locks:
-    pace === null
-      ? []
-      : lockedSpans(points, pace.cutoff, pace.locked ? pace.resetsAt : now),
+  locks: pace === null ? [] : lockedSpans(points, pace.cutoff, pace.locked ? pace.resetsAt : now),
   rate: pace?.rate ?? 0,
   resetsAt: pace?.resetsAt ?? null,
   room: pace === null || pace.locked ? 0 : Math.max(0, pace.cutoff - pace.used),
@@ -129,15 +126,13 @@ export const weeksOf = (
   daily: Daily,
   since: number,
   now: number,
-  outlook: Outlook
+  outlook: Outlook,
 ): AccountWeeks => {
   const first = startOfDay(Math.max(since, outlook.since ?? since));
   const today = startOfDay(now);
   const forecast = forecaster(outlook);
 
-  const used = new Map(
-    daily.days.map(([at, value]) => [startOfDay(at), value])
-  );
+  const used = new Map(daily.days.map(([at, value]) => [startOfDay(at), value]));
 
   const weeks = weekStarts(since, now).map((from): Week => {
     const days = Array.from({ length: daysInWeek }, (_, index): WeekDay => {
@@ -150,9 +145,7 @@ export const weeksOf = (
         : { lockedUntil: null, ranOut: null, spent: 0 };
 
       const forecastOut =
-        outlookDay.ranOut !== null &&
-        outlookDay.ranOut >= day &&
-        outlookDay.ranOut < next;
+        outlookDay.ranOut !== null && outlookDay.ranOut >= day && outlookDay.ranOut < next;
 
       const forecastLock =
         outlookDay.ranOut !== null &&
@@ -161,9 +154,7 @@ export const weeksOf = (
 
       const realLock = overlaps(outlook.locks, day, next);
 
-      const realOut = outlook.locks.some(
-        ([start]) => start >= day && start < next
-      );
+      const realOut = outlook.locks.some(([start]) => start >= day && start < next);
 
       return {
         forecast: outlookDay.spent,
@@ -186,18 +177,12 @@ export const weeksOf = (
     };
   });
 
-  const base = weeks.find(
-    (week) => !week.part && !week.current && week.total >= meaningfulBase
-  );
+  const base = weeks.find((week) => !week.part && !week.current && week.total >= meaningfulBase);
 
   return { base: base?.total ?? null, id: daily.id, weeks };
 };
 
-export const withHistory = (
-  daily: Daily,
-  points: Points,
-  now: number
-): Daily => {
+export const withHistory = (daily: Daily, points: Points, now: number): Daily => {
   const [first] = points;
 
   if (first === undefined) {
@@ -206,11 +191,7 @@ export const withHistory = (
 
   const exact: (readonly [number, number])[] = [];
 
-  for (
-    let day = addDays(startOfDay(first[0]), 1);
-    day <= now;
-    day = addDays(day, 1)
-  ) {
+  for (let day = addDays(startOfDay(first[0]), 1); day <= now; day = addDays(day, 1)) {
     exact.push([day, usedBetween(points, day, addDays(day, 1))]);
   }
 

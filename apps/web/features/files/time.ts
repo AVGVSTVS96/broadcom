@@ -15,14 +15,9 @@ const relative = new Intl.RelativeTimeFormat("en", {
 export const ago = (at: number, now = Date.now()) => {
   const elapsed = now - at;
 
-  const [unit, size] = units.find(([, ms]) => elapsed >= ms) ?? [
-    "minute",
-    60_000,
-  ];
+  const [unit, size] = units.find(([, ms]) => elapsed >= ms) ?? ["minute", 60_000];
 
-  return elapsed < 60_000
-    ? "now"
-    : relative.format(-Math.floor(elapsed / size), unit);
+  return elapsed < 60_000 ? "now" : relative.format(-Math.floor(elapsed / size), unit);
 };
 
 const clock = new Intl.DateTimeFormat("en-US", {

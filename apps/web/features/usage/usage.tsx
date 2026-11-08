@@ -57,9 +57,7 @@ const useLiveRows = () => {
 };
 
 const stateOf = (states: ReadonlyMap<string, SessionState>, key: string) =>
-  states.get(key) ??
-  states.get(`session:${key.slice(key.lastIndexOf(":") + 1)}`) ??
-  null;
+  states.get(key) ?? states.get(`session:${key.slice(key.lastIndexOf(":") + 1)}`) ?? null;
 
 const percent = (part: number, whole: number) =>
   whole > 0 ? `${Math.round((part / whole) * 100).toLocaleString("en")}%` : "–";
@@ -161,9 +159,7 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
         <Search />
         {presets.map(([name, patch]) => {
           const pressed =
-            patch.q === null
-              ? params.get("w.app") === patch["w.app"]
-              : params.get("q") === patch.q;
+            patch.q === null ? params.get("w.app") === patch["w.app"] : params.get("q") === patch.q;
 
           return (
             <Chip
@@ -173,7 +169,7 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
                 go(
                   pressed
                     ? { q: null, rows: null, sel: null, "w.app": null }
-                    : { ...patch, rows: null, sel: null }
+                    : { ...patch, rows: null, sel: null },
                 );
               }}
             >
@@ -193,17 +189,13 @@ const Toolbar = ({ usage }: { usage: Usage }) => {
           </Chip>
         )}
         {usage.filters
-          .filter(
-            (filter) => !(filter.dimension === "app" && filter.id === "actions")
-          )
+          .filter((filter) => !(filter.dimension === "app" && filter.id === "actions"))
           .map((filter) => (
             <Chip
               key={`${filter.dimension}:${filter.id}`}
               pressed
               onClick={() => {
-                const left = query.where[filter.dimension]?.filter(
-                  (id) => id !== filter.id
-                );
+                const left = query.where[filter.dimension]?.filter((id) => id !== filter.id);
 
                 go({
                   sel: null,
@@ -229,13 +221,10 @@ const amountOf = (unit: Unit, value: number | null) => {
 
   const kind = unit === "week" ? "weekly" : "5-hour";
 
-  return value >= 100
-    ? text.replace("limits", `${kind} limits`)
-    : `${text} of a ${kind} limit`;
+  return value >= 100 ? text.replace("limits", `${kind} limits`) : `${text} of a ${kind} limit`;
 };
 
-const readingWords = (unit: Unit) =>
-  unit === "fiveHour" ? "5-hour readings" : "Weekly readings";
+const readingWords = (unit: Unit) => (unit === "fiveHour" ? "5-hour readings" : "Weekly readings");
 
 const verdictOf = (usage: Usage) => {
   const { unit, q, range } = usage.query;
@@ -272,20 +261,17 @@ const evidenceOf = (usage: Usage) => {
     q === ""
       ? `${usage.total.sessions.toLocaleString("en")} sessions; the top ${five.length} ${groupPlural(by)} took ${percent(
           five.reduce((sum, row) => sum + (row.values[unit] ?? 0), 0),
-          total
+          total,
         )}.`
       : `${usage.rowCount.toLocaleString("en")} ${groupPlural(by)} match.`;
 
   if (coverage === null || coverage.read.length === coverage.active) {
-    return unit === "fiveHour" &&
-      agentSdk.fiveHour !== null &&
-      agentSdk.share >= 0.05
+    return unit === "fiveHour" && agentSdk.fiveHour !== null && agentSdk.share >= 0.05
       ? `${lead} The Agent SDK counts ${agentSdk.factor}× here, so its ${Math.round(agentSdk.share * 100)}% of spend took ${Math.round(agentSdk.fiveHour * 100)}% of points.`
       : lead;
   }
 
-  const read =
-    coverage.read.length === 0 ? "none" : `${listOf(coverage.read)} only`;
+  const read = coverage.read.length === 0 ? "none" : `${listOf(coverage.read)} only`;
 
   return coverage.share < 0.5
     ? `Readings on ${read}; the ${dollars(coverage.missing)} spent on the rest has none.`
@@ -299,18 +285,13 @@ const tileNote = (usage: Usage, unit: Unit) => {
     const before = total.previous?.api;
     const value = total.values.api;
 
-    return value === null ||
-      before === null ||
-      before === undefined ||
-      before <= 0
+    return value === null || before === null || before === undefined || before <= 0
       ? null
       : `${value >= before ? "+" : "−"}${percent(Math.abs(value - before), before)} on ${previousWords[query.range]}`;
   }
 
   if (unit === "tokens") {
-    return total.cacheHit === null
-      ? null
-      : `${Math.round(total.cacheHit * 100)}% cache reads`;
+    return total.cacheHit === null ? null : `${Math.round(total.cacheHit * 100)}% cache reads`;
   }
 
   if (unit === "plan") {
@@ -327,9 +308,7 @@ const TileValue = ({ unit, value }: { unit: Unit; value: number | null }) => {
 
   return (
     <div className="flex items-baseline gap-1 truncate">
-      <span className="text-3xl tracking-tight tabular-nums sm:text-4xl">
-        {number}
-      </span>
+      <span className="text-3xl tracking-tight tabular-nums sm:text-4xl">{number}</span>
       <span className="text-sm text-muted-foreground">{rest.join(" ")}</span>
     </div>
   );
@@ -352,7 +331,7 @@ const Tiles = ({ usage }: { usage: Usage }) => {
           }}
           className={cn(
             "group min-w-0 space-y-1.5 bg-card p-4 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-pressed:bg-muted sm:p-5",
-            index === 0 && "col-span-2 sm:col-span-1"
+            index === 0 && "col-span-2 sm:col-span-1",
           )}
         >
           <div className="flex items-center gap-2 text-sm text-muted-foreground group-aria-pressed:text-foreground">
@@ -363,9 +342,7 @@ const Tiles = ({ usage }: { usage: Usage }) => {
             {name}
           </div>
           <TileValue unit={unit} value={usage.total.values[unit]} />
-          <div className="min-h-4 text-xs text-muted-foreground">
-            {tileNote(usage, unit)}
-          </div>
+          <div className="min-h-4 text-xs text-muted-foreground">{tileNote(usage, unit)}</div>
         </button>
       ))}
     </fieldset>
@@ -380,15 +357,10 @@ const Activity = ({ usage }: { usage: Usage }) => {
     <div className="min-w-0 space-y-4">
       <h3 className="text-sm">
         {unitName(unit)}
-        <span className="text-muted-foreground">
-          {" "}
-          per {bucketWords[usage.size]}
-        </span>
+        <span className="text-muted-foreground"> per {bucketWords[usage.size]}</span>
       </h3>
       <Stack
-        layers={
-          usage.selected === null ? usage.layers : usage.layers.slice(0, 1)
-        }
+        layers={usage.selected === null ? usage.layers : usage.layers.slice(0, 1)}
         cells={usage.cells}
         ticks={usage.ticks}
         readings={usage.readings}
@@ -416,9 +388,7 @@ const Values = ({ usage, row }: { usage: Usage; row: Row }) => (
       .map(([option, name]) => (
         <div key={option} className="min-w-0">
           <dt className="text-xs text-muted-foreground">{name}</dt>
-          <dd className="text-lg tracking-tight">
-            {format(option, row.values[option])}
-          </dd>
+          <dd className="text-lg tracking-tight">{format(option, row.values[option])}</dd>
         </div>
       ))}
   </dl>
@@ -433,14 +403,10 @@ const Limits = ({ row }: { row: Selected }) =>
       </h4>
       <ul className="space-y-1.5 text-sm">
         {row.accounts.map((account) => (
-          <li
-            key={account.name}
-            className="flex items-baseline justify-between gap-3"
-          >
+          <li key={account.name} className="flex items-baseline justify-between gap-3">
             <span className="truncate">{account.name}</span>
             <span className="shrink-0 text-muted-foreground tabular-nums">
-              {format("week", account.week)} ·{" "}
-              {format("fiveHour", account.fiveHour)}
+              {format("week", account.week)} · {format("fiveHour", account.fiveHour)}
             </span>
           </li>
         ))}
@@ -461,10 +427,7 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Selected }) => {
     <div className="space-y-2">
       <h4 className="text-sm">
         Sessions
-        <span className="text-muted-foreground">
-          {" "}
-          · {drill.count.toLocaleString("en")}
-        </span>
+        <span className="text-muted-foreground"> · {drill.count.toLocaleString("en")}</span>
       </h4>
       <ul className="space-y-1.5 text-sm">
         {drill.rows.map((session) => (
@@ -473,9 +436,7 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Selected }) => {
             className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-3"
           >
             <span className="truncate">{session.label}</span>
-            <span className="tabular-nums">
-              {format(unit, session.values[unit])}
-            </span>
+            <span className="tabular-nums">{format(unit, session.values[unit])}</span>
             <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
               {when(session.lastActiveAt, usage.now)}
             </span>
@@ -520,9 +481,7 @@ const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => (
     <Values usage={usage} row={row} />
     {row.agentSdk < 0.05 ? null : (
       <p className="text-sm text-pretty">
-        <span className="text-over">
-          {Math.round(row.agentSdk * 100)}% on the Agent SDK.
-        </span>{" "}
+        <span className="text-over">{Math.round(row.agentSdk * 100)}% on the Agent SDK.</span>{" "}
         <span className="text-muted-foreground">
           5-hour limits count it {usage.agentSdk.factor}×.
         </span>
@@ -574,15 +533,10 @@ const Line = ({
       }}
       className="-mx-2 grid grid-cols-[1.25rem_minmax(0,1fr)_auto_2.5rem] items-center gap-x-3 gap-y-1 rounded-lg px-2 py-1.5 text-sm transition-colors outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring aria-[current]:bg-muted lg:grid-cols-[1.25rem_minmax(0,16rem)_minmax(0,1fr)_minmax(6rem,14rem)_5.5rem_2.5rem]"
     >
-      <span className="text-right text-xs text-muted-foreground tabular-nums">
-        {rank}
-      </span>
+      <span className="text-right text-xs text-muted-foreground tabular-nums">{rank}</span>
       <span className="flex min-w-0 items-center gap-1.5">
         {fill === null ? null : (
-          <span
-            aria-hidden
-            className={cn("size-2 shrink-0 rounded-[2px]", fill)}
-          />
+          <span aria-hidden className={cn("size-2 shrink-0 rounded-[2px]", fill)} />
         )}
         <span className="truncate">{row.label}</span>
         {state === null ? null : (
@@ -597,9 +551,7 @@ const Line = ({
       <span className="hidden truncate text-xs text-muted-foreground lg:block">
         {[
           row.detail,
-          row.sessions > 1
-            ? `${row.sessions.toLocaleString("en")} sessions`
-            : null,
+          row.sessions > 1 ? `${row.sessions.toLocaleString("en")} sessions` : null,
           when(row.lastActiveAt, usage.now),
         ]
           .filter((part) => part !== null && part !== "")
@@ -608,7 +560,7 @@ const Line = ({
       <span
         className={cn(
           "col-start-2 row-start-2 h-0.5 rounded-full lg:col-start-4 lg:row-start-1 lg:h-1",
-          value === null ? "border-t border-dotted border-faint" : "bg-track"
+          value === null ? "border-t border-dotted border-faint" : "bg-track",
         )}
       >
         {value === null || top <= 0 ? null : (
@@ -629,9 +581,7 @@ const Line = ({
 const Breakdown = ({ usage }: { usage: Usage }) => {
   const { unit } = usage.query;
 
-  const sums = usage.layers.map((layer) =>
-    layer.values.reduce((sum, value) => sum + value, 0)
-  );
+  const sums = usage.layers.map((layer) => layer.values.reduce((sum, value) => sum + value, 0));
 
   const whole = sums.reduce((sum, value) => sum + value, 0);
 
@@ -649,23 +599,15 @@ const Breakdown = ({ usage }: { usage: Usage }) => {
                 <span className="flex min-w-0 items-center gap-2">
                   <span
                     aria-hidden
-                    className={cn(
-                      "size-2 shrink-0 rounded-[2px]",
-                      fillOf(usage.layers, layer.key)
-                    )}
+                    className={cn("size-2 shrink-0 rounded-[2px]", fillOf(usage.layers, layer.key))}
                   />
                   <span className="truncate">{layer.label}</span>
                 </span>
-                <span className="shrink-0 tabular-nums">
-                  {format(unit, sum)}
-                </span>
+                <span className="shrink-0 tabular-nums">{format(unit, sum)}</span>
               </div>
               <div className="h-1 rounded-full bg-track">
                 <div
-                  className={cn(
-                    "h-full rounded-full",
-                    fillOf(usage.layers, layer.key)
-                  )}
+                  className={cn("h-full rounded-full", fillOf(usage.layers, layer.key))}
                   style={{
                     width: `${whole > 0 ? (sum / whole) * 100 : 0}%`,
                   }}
@@ -691,8 +633,7 @@ const Ranking = ({ usage }: { usage: Usage }) => {
   const { selected } = usage;
   const pinned = selected?.pinned === true;
 
-  const shown =
-    pinned && selected !== null ? [selected, ...usage.rows] : usage.rows;
+  const shown = pinned && selected !== null ? [selected, ...usage.rows] : usage.rows;
 
   const top = Math.max(0, ...shown.map((row) => row.values[unit] ?? 0));
 
@@ -708,10 +649,7 @@ const Ranking = ({ usage }: { usage: Usage }) => {
       </div>
       <ul>
         {shown.map((row, index) => (
-          <li
-            key={row.key}
-            className={cn(pinned && index === 0 && "mb-2 border-b pb-2")}
-          >
+          <li key={row.key} className={cn(pinned && index === 0 && "mb-2 border-b pb-2")}>
             <Line
               usage={usage}
               row={row}
@@ -750,9 +688,7 @@ const Body = ({ usage }: { usage: Usage }) => (
       <div className="space-y-6">
         <Tiles usage={usage} />
         {usage.rows.length === 0 && usage.selected === null ? (
-          <p className="py-10 text-center text-muted-foreground">
-            Nothing matches.
-          </p>
+          <p className="py-10 text-center text-muted-foreground">Nothing matches.</p>
         ) : (
           <>
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-10">

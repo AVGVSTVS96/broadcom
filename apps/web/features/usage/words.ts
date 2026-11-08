@@ -30,8 +30,7 @@ export const unitNames = [
   ["week", "Weekly"],
 ] as const satisfies readonly (readonly [Unit, string])[];
 
-export const unitName = (unit: Unit) =>
-  unitNames.find(([option]) => option === unit)?.[1] ?? unit;
+export const unitName = (unit: Unit) => unitNames.find(([option]) => option === unit)?.[1] ?? unit;
 
 export const groupNames = [
   ["agent", "Agents"],
@@ -41,8 +40,7 @@ export const groupNames = [
   ["account", "Accounts"],
 ] as const satisfies readonly (readonly [Grouping, string])[];
 
-export const groupName = (by: Grouping) =>
-  groupNames.find(([option]) => option === by)?.[1] ?? by;
+export const groupName = (by: Grouping) => groupNames.find(([option]) => option === by)?.[1] ?? by;
 
 export const groupPlural = (by: Grouping) => groupName(by).toLowerCase();
 

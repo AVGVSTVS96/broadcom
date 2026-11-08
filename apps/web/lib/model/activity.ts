@@ -37,7 +37,7 @@ const hoursInDay = 24;
 
 export const activityPlans = (
   plans: readonly PoolPlan[],
-  history: Readonly<Record<string, Points>>
+  history: Readonly<Record<string, Points>>,
 ): Plan[] =>
   plans.map((plan) => ({
     cutoff: plan.account.week.cutoff,
@@ -86,7 +86,7 @@ export const activity = (plans: readonly Plan[], now: number, days = 7) => {
       from: dayStart,
       hours,
       locked: locks.filter(({ spans }) =>
-        spans.some(([start, end]) => start < dayEnd && end > dayStart)
+        spans.some(([start, end]) => start < dayEnd && end > dayStart),
       ).length,
     };
   });
@@ -94,15 +94,13 @@ export const activity = (plans: readonly Plan[], now: number, days = 7) => {
 
 export const busiest = (days: readonly Day[]) => {
   const byHour = Array.from({ length: hoursInDay }, (_, hour) =>
-    days.reduce((sum, day) => sum + (day.hours[hour]?.used ?? 0), 0)
+    days.reduce((sum, day) => sum + (day.hours[hour]?.used ?? 0), 0),
   );
 
   let best = { start: 0, used: -1 };
 
   for (let start = 0; start <= hoursInDay - busySpan; start += 1) {
-    const used = byHour
-      .slice(start, start + busySpan)
-      .reduce((sum, value) => sum + value, 0);
+    const used = byHour.slice(start, start + busySpan).reduce((sum, value) => sum + value, 0);
 
     if (used > best.used) {
       best = { start, used };

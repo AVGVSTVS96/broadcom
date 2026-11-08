@@ -16,10 +16,7 @@ const shorten = (labels: readonly string[]) => {
   for (const label of labels) {
     const short = localPart(label);
 
-    owners.set(
-      short,
-      (owners.get(short) ?? new Set()).add(label.toLowerCase())
-    );
+    owners.set(short, (owners.get(short) ?? new Set()).add(label.toLowerCase()));
   }
 
   return labels.map((label) => {
@@ -31,14 +28,12 @@ const shorten = (labels: readonly string[]) => {
 
 export const namesOf = (
   accounts: readonly Labeled[],
-  keys: readonly KeyOwner[]
+  keys: readonly KeyOwner[],
 ): Readonly<Record<string, string>> => {
   const logins = accounts.filter((entry) => entry.label !== "");
   const short = shorten(logins.map((entry) => entry.label));
 
-  const named = new Map(
-    logins.map((entry, index) => [entry.id, short[index] ?? entry.label])
-  );
+  const named = new Map(logins.map((entry, index) => [entry.id, short[index] ?? entry.label]));
 
   for (const key of keys) {
     const owner = named.get(key.account);
@@ -53,7 +48,5 @@ export const namesOf = (
   return Object.fromEntries(named);
 };
 
-export const nameOf = (
-  names: Readonly<Record<string, string>>,
-  id: string | null
-) => (id === null ? "No account" : (names[id] ?? `API key ${id.slice(-6)}`));
+export const nameOf = (names: Readonly<Record<string, string>>, id: string | null) =>
+  id === null ? "No account" : (names[id] ?? `API key ${id.slice(-6)}`);

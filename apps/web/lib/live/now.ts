@@ -32,5 +32,5 @@ export const useNow = (rendered: number) =>
   useSyncExternalStore(
     subscribe,
     () => Math.max(now, rendered),
-    () => rendered
+    () => rendered,
   );

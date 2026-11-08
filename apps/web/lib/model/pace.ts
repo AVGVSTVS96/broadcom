@@ -1,13 +1,5 @@
 import { percent, times, when } from "@/lib/model/format";
-import {
-  DAY,
-  HOUR,
-  WEEK,
-  firstReaching,
-  lastDrop,
-  since,
-  valueAt,
-} from "@/lib/model/history";
+import { DAY, HOUR, WEEK, firstReaching, lastDrop, since, valueAt } from "@/lib/model/history";
 import type { Point, Points } from "@/lib/model/history";
 import type { LimitWindow } from "@/lib/proxy/schema";
 
@@ -66,9 +58,7 @@ const between = (line: Points, at: number) => {
     return valueAt(line, at) ?? 0;
   }
 
-  return (
-    left[1] + ((right[1] - left[1]) * (at - left[0])) / (right[0] - left[0])
-  );
+  return left[1] + ((right[1] - left[1]) * (at - left[0])) / (right[0] - left[0]);
 };
 
 const rises = (line: Points, from: number, latest: Point): Points => {
@@ -85,16 +75,14 @@ const rises = (line: Points, from: number, latest: Point): Points => {
   const last = found.at(-1)?.[0] ?? from;
   const gap = (latest[0] - from) / found.length;
 
-  return latest[0] - last > 2 * gap
-    ? [...found, [latest[0], Math.max(high, latest[1])]]
-    : found;
+  return latest[0] - last > 2 * gap ? [...found, [latest[0], Math.max(high, latest[1])]] : found;
 };
 
 export const windowPace = (
   window: LimitWindow,
   points: Points,
   now: number,
-  length = WEEK
+  length = WEEK,
 ): Pace | null => {
   const { used, resetsAt, cutoff } = window;
 
@@ -121,8 +109,7 @@ export const windowPace = (
           [Math.max(start + minimumSpan, latest), used],
         ]);
 
-  const runsOut =
-    locked || trend.rate === 0 ? null : Math.max(latest, trend.reach(cutoff));
+  const runsOut = locked || trend.rate === 0 ? null : Math.max(latest, trend.reach(cutoff));
 
   return {
     atReset: locked ? used : Math.min(100, Math.max(used, trend.at(resetsAt))),
@@ -132,10 +119,7 @@ export const windowPace = (
     locked,
     pace: locked || even === 0 ? null : used / even,
     ranOut,
-    rate:
-      ranOut === null
-        ? trend.rate
-        : cutoff / Math.max(minimumSpan, ranOut - start),
+    rate: ranOut === null ? trend.rate : cutoff / Math.max(minimumSpan, ranOut - start),
     resetsAt,
     restarted: start > nominal,
     runsOut: runsOut === null || runsOut >= resetsAt ? null : runsOut,

@@ -13,13 +13,7 @@ const copy = async (text: string, setCopied: (copied: boolean) => void) => {
   }, 1500);
 };
 
-export const CopyButton = ({
-  text,
-  label,
-}: {
-  text: string;
-  label: string;
-}) => {
+export const CopyButton = ({ text, label }: { text: string; label: string }) => {
   const [copied, setCopied] = useState(false);
 
   return (

@@ -25,8 +25,8 @@ const Changes = Schema.Array(
         path: Schema.Literal(field.path.join("/")),
         value,
       });
-    })
-  )
+    }),
+  ),
 );
 
 const decodeChanges = Schema.decodeUnknownSync(Changes);
@@ -47,7 +47,7 @@ export const saveSettings = async (input: readonly Change[]) => {
       yield* proxy.send("PATCH", "/config", patchOf(changes), Saved);
 
       return [];
-    })
+    }),
   );
 
   refresh();

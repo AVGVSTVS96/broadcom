@@ -13,15 +13,7 @@ import type { Tone } from "@/lib/model/tone";
 import type { LimitWindow } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
-const Bar = ({
-  value,
-  tone,
-  locked = false,
-}: {
-  value: number;
-  tone: Tone;
-  locked?: boolean;
-}) => (
+const Bar = ({ value, tone, locked = false }: { value: number; tone: Tone; locked?: boolean }) => (
   <div
     className="h-1.5 overflow-hidden rounded-full bg-track"
     style={locked ? hatchStyle : undefined}
@@ -51,12 +43,7 @@ const Cell = ({
   <div className="min-w-0 space-y-1.5">
     <div className="flex items-baseline justify-between gap-2 text-xs">
       <span className="truncate text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "text-sm tabular-nums",
-          tone === "ok" ? "text-foreground" : texts[tone]
-        )}
-      >
+      <span className={cn("text-sm tabular-nums", tone === "ok" ? "text-foreground" : texts[tone])}>
         {value}
       </span>
     </div>
@@ -65,8 +52,7 @@ const Cell = ({
   </div>
 );
 
-const used = (window: LimitWindow) =>
-  window.used === null ? "–" : percent(window.used);
+const used = (window: LimitWindow) => (window.used === null ? "–" : percent(window.used));
 
 const Session = ({ plan, now }: { plan: Plan; now: number }) => {
   const window = plan.account.fiveHour;
@@ -77,11 +63,7 @@ const Session = ({ plan, now }: { plan: Plan; now: number }) => {
       label="Session"
       value={used(window)}
       tone={tone}
-      note={
-        window.resetsAt === null
-          ? "No reading"
-          : `in ${duration(window.resetsAt - now)}`
-      }
+      note={window.resetsAt === null ? "No reading" : `in ${duration(window.resetsAt - now)}`}
     >
       <Bar value={window.used ?? 0} tone={tone} />
     </Cell>
@@ -111,11 +93,7 @@ const Weekly = ({ plan, now }: { plan: Plan; now: number }) => {
 
   return (
     <Cell label="Weekly" value={used(window)} tone={tone} note={note()}>
-      <Bar
-        value={window.used ?? 0}
-        tone={tone}
-        locked={pace?.locked === true}
-      />
+      <Bar value={window.used ?? 0} tone={tone} locked={pace?.locked === true} />
     </Cell>
   );
 };
@@ -167,12 +145,8 @@ export const PlanRows = ({
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2 truncate">
-            {plan.id === next ? (
-              <span className="size-2 shrink-0 rounded-full bg-brand" />
-            ) : null}
-            <span className={cn("truncate", plan.id === next && "text-brand")}>
-              {plan.name}
-            </span>
+            {plan.id === next ? <span className="size-2 shrink-0 rounded-full bg-brand" /> : null}
+            <span className={cn("truncate", plan.id === next && "text-brand")}>{plan.name}</span>
           </div>
           <div className="truncate text-sm text-muted-foreground">
             {[plan.account.plan || "API key", ...facts(plan, now)].join(" · ")}
