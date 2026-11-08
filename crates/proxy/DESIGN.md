@@ -1,6 +1,6 @@
 # broadcom-proxy
 
-A Claude account pool. Agents send Claude API requests to one address; the proxy picks the account with the most room, forwards the request untouched apart from the credential, and records what happened. A dashboard ([BROADCOM](https://github.com/AVGVSTVS96/broadcom)) and a usage service ([broadcom-usage](https://github.com/AVGVSTVS96/broadcom-usage)) can read what it records.
+A Claude account pool. Agents send Claude API requests to one address; the proxy picks the account with the most room, forwards the request untouched apart from the credential, and records what happened. A dashboard ([BROADCOM](../../apps/web)) and a usage service ([broadcom-usage](../usage)), both in this repo, can read what it records.
 
 ```
 agents ──/v1──▶ broadcom-proxy ──▶ api.anthropic.com
