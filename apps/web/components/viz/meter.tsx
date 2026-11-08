@@ -26,10 +26,7 @@ export const Meter = ({
 }) => (
   <div className={cn("h-2 overflow-hidden rounded-full bg-track", className)}>
     <div
-      className={cn(
-        "h-full rounded-full transition-[width] duration-500",
-        fills[tone]
-      )}
+      className={cn("h-full rounded-full transition-[width] duration-500", fills[tone])}
       style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
     />
   </div>
@@ -53,10 +50,7 @@ export const Ticks = ({
         <span
           aria-hidden
           key={index}
-          className={cn(
-            "w-full rounded-[1px]",
-            index < lit ? fills[tone] : "bg-track"
-          )}
+          className={cn("w-full rounded-[1px]", index < lit ? fills[tone] : "bg-track")}
         />
       ))}
     </div>

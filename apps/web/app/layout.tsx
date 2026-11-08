@@ -35,10 +35,7 @@ const RootLayout = ({ children }: { children: ReactNode }) => (
   <html lang="en" className={`${mono.variable} antialiased`}>
     <body className="min-h-dvh">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 pt-5 sm:px-6">
-        <Link
-          href="/"
-          className="hit flex items-center gap-2.5 font-medium tracking-tight"
-        >
+        <Link href="/" className="hit flex items-center gap-2.5 font-medium tracking-tight">
           <Mark />
           BROADCOM
         </Link>

@@ -28,9 +28,7 @@ const usagePaths = ["/deck/usage", "/deck/sessions", "/deck/credits"];
 const sourceOf = (at: string): Source =>
   usagePaths.some((prefix) => at.startsWith(prefix)) ? "usage" : "proxy";
 
-const keyFile =
-  process.env.BROADCOM_KEY_FILE ??
-  path.join(homedir(), ".config/cliproxyapi/key");
+const keyFile = process.env.BROADCOM_KEY_FILE ?? path.join(homedir(), ".config/cliproxyapi/key");
 
 export class ProxyError extends Data.TaggedError("ProxyError")<{
   readonly path: string;
@@ -44,21 +42,19 @@ export class Proxy extends Context.Service<
   {
     readonly get: <S extends Decodable>(
       path: string,
-      schema: S
+      schema: S,
     ) => Effect.Effect<S["Type"], ProxyError>;
     readonly send: <S extends Decodable>(
       method: "POST" | "PUT" | "PATCH" | "DELETE",
       path: string,
       body: Schema.Json,
-      schema: S
+      schema: S,
     ) => Effect.Effect<S["Type"], ProxyError>;
     readonly events: (source: Source) => Stream.Stream<string, ProxyError>;
   }
 >()("Proxy") {}
 
-const decodeRefusal = Schema.decodeUnknownOption(
-  Schema.Struct({ error: Schema.String })
-);
+const decodeRefusal = Schema.decodeUnknownOption(Schema.Struct({ error: Schema.String }));
 
 const refusal = (at: string, status: number, body: Schema.Json) =>
   new ProxyError({
@@ -73,17 +69,15 @@ export const ProxyLive = Layer.effect(
   Proxy,
   Effect.gen(function* () {
     const key = yield* Effect.sync(() =>
-      readFileSync(/*turbopackIgnore: true*/ keyFile, "utf-8").trim()
+      readFileSync(/*turbopackIgnore: true*/ keyFile, "utf-8").trim(),
     );
 
     const http = yield* HttpClient.HttpClient;
 
     const clientFor = (base: string) =>
       http.pipe(
-        HttpClient.mapRequest(
-          HttpClientRequest.prependUrl(`${base}/v8/management`)
-        ),
-        HttpClient.mapRequest(HttpClientRequest.bearerToken(key))
+        HttpClient.mapRequest(HttpClientRequest.prependUrl(`${base}/v8/management`)),
+        HttpClient.mapRequest(HttpClientRequest.bearerToken(key)),
       );
 
     const clients = {
@@ -94,28 +88,24 @@ export const ProxyLive = Layer.effect(
     const decode = <S extends Decodable>(
       at: string,
       schema: S,
-      request: HttpClientRequest.HttpClientRequest
+      request: HttpClientRequest.HttpClientRequest,
     ) =>
       clients[sourceOf(at)].execute(request).pipe(
-        Effect.mapError(
-          (cause) => new ProxyError({ path: at, reason: cause.message })
-        ),
+        Effect.mapError((cause) => new ProxyError({ path: at, reason: cause.message })),
         Effect.flatMap((response) =>
           response.json.pipe(
             Effect.orElseSucceed(() => null),
             Effect.filterOrFail(
               () => response.status < 400,
-              (body) => refusal(at, response.status, body)
-            )
-          )
+              (body) => refusal(at, response.status, body),
+            ),
+          ),
         ),
         Effect.flatMap((body) =>
           Schema.decodeUnknownEffect(schema)(body).pipe(
-            Effect.mapError(
-              (cause) => new ProxyError({ path: at, reason: cause.message })
-            )
-          )
-        )
+            Effect.mapError((cause) => new ProxyError({ path: at, reason: cause.message })),
+          ),
+        ),
       );
 
     return {
@@ -128,31 +118,25 @@ export const ProxyLive = Layer.effect(
             Stream.decodeText,
             Stream.pipeThroughChannel(Sse.decode()),
             Stream.filterMap((event) =>
-              Predicate.isTagged(event, "Event")
-                ? Result.succeed(event.data)
-                : Result.failVoid
+              Predicate.isTagged(event, "Event") ? Result.succeed(event.data) : Result.failVoid,
             ),
             Stream.mapError(
               (cause) =>
                 new ProxyError({
                   path: "/deck/events",
-                  reason: Predicate.isTagged(cause, "Retry")
-                    ? "retry"
-                    : cause.message,
-                })
-            )
+                  reason: Predicate.isTagged(cause, "Retry") ? "retry" : cause.message,
+                }),
+            ),
           ),
       get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
       send: (method, at, body, schema) =>
         decode(
           at,
           schema,
-          HttpClientRequest.make(method)(at).pipe(
-            HttpClientRequest.bodyJsonUnsafe(body)
-          )
+          HttpClientRequest.make(method)(at).pipe(HttpClientRequest.bodyJsonUnsafe(body)),
         ),
     };
-  })
+  }),
 ).pipe(Layer.provide(FetchHttpClient.layer));
 
 export const runtime = ManagedRuntime.make(ProxyLive);

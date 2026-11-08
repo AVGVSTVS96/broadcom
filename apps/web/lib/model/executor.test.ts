@@ -19,17 +19,13 @@ const app = (over: Partial<ExecutorApp>): ExecutorApp => ({
 
 describe("releasesBehind", () => {
   test("counts releases between the pin and the host", () => {
-    expect(
-      releasesBehind(app({ pinned: "0.0.1-beta.70" }), "0.0.1-beta.120")
-    ).toBe(50);
+    expect(releasesBehind(app({ pinned: "0.0.1-beta.70" }), "0.0.1-beta.120")).toBe(50);
   });
 
   test("is zero when either side is unknown or they match", () => {
     expect(releasesBehind(app({ pinned: null }), "0.0.1-beta.120")).toBe(0);
     expect(releasesBehind(app({ pinned: "0.0.1-beta.9" }), null)).toBe(0);
-    expect(
-      releasesBehind(app({ pinned: "0.0.1-beta.9" }), "0.0.1-beta.9")
-    ).toBe(0);
+    expect(releasesBehind(app({ pinned: "0.0.1-beta.9" }), "0.0.1-beta.9")).toBe(0);
   });
 });
 
@@ -55,7 +51,7 @@ test("needs lists one row per linked account, or a missing row", () => {
         },
       ],
       requirements: ["calendar", "mail"],
-    })
+    }),
   );
 
   expect(rows.map((row) => [row.requirement, row.label, row.health])).toEqual([
@@ -66,10 +62,6 @@ test("needs lists one row per linked account, or a missing row", () => {
 });
 
 test("sameSource ignores a trailing newline", () => {
-  expect(sameSource({ deployed: "a\n", local: "a", path: "index.ts" })).toBe(
-    true
-  );
-  expect(sameSource({ deployed: null, local: "a", path: "index.ts" })).toBe(
-    false
-  );
+  expect(sameSource({ deployed: "a\n", local: "a", path: "index.ts" })).toBe(true);
+  expect(sameSource({ deployed: null, local: "a", path: "index.ts" })).toBe(false);
 });

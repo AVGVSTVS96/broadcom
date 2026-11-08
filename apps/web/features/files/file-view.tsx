@@ -21,17 +21,13 @@ export const FileView = ({
 
   const before = useMemo(
     () => (original === null ? null : { contents: original, name }),
-    [name, original]
+    [name, original],
   );
 
   return (
     <Virtualizer className="min-h-0 flex-1 overflow-auto">
       {diff && before !== null ? (
-        <MultiFileDiff
-          oldFile={before}
-          newFile={file}
-          options={diffOptions(style)}
-        />
+        <MultiFileDiff oldFile={before} newFile={file} options={diffOptions(style)} />
       ) : (
         <File file={file} options={fileOptions} />
       )}

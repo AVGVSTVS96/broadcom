@@ -50,13 +50,9 @@ const readText = async (ws: Workspace, file: string) => {
   const full = inside(ws, file);
 
   const data =
-    full === null
-      ? null
-      : await readFile(/*turbopackIgnore: true*/ full).catch(() => null);
+    full === null ? null : await readFile(/*turbopackIgnore: true*/ full).catch(() => null);
 
-  return data === null || data.length > maxFile || isBinary(data)
-    ? ""
-    : data.toString("utf-8");
+  return data === null || data.length > maxFile || isBinary(data) ? "" : data.toString("utf-8");
 };
 
 const fork = cache(async (ws: Workspace) => {
@@ -70,9 +66,9 @@ const fork = cache(async (ws: Workspace) => {
 });
 
 const untracked = cache(async (ws: Workspace) =>
-  fields(
-    await git(ws.path, "ls-files", "-z", "--others", "--exclude-standard")
-  ).filter((file) => !file.endsWith("/"))
+  fields(await git(ws.path, "ls-files", "-z", "--others", "--exclude-standard")).filter(
+    (file) => !file.endsWith("/"),
+  ),
 );
 
 export const listFiles = cache(async (ws: Workspace) => {
@@ -106,13 +102,7 @@ export const readChanges = cache(async (ws: Workspace): Promise<Changes> => {
     untracked(ws),
     ws.base === null
       ? null
-      : tryGit(
-          ws.path,
-          "rev-list",
-          "--left-right",
-          "--count",
-          `${ws.base}...HEAD`
-        ),
+      : tryGit(ws.path, "rev-list", "--left-right", "--count", `${ws.base}...HEAD`),
   ]);
 
   const [behind = 0, ahead = 0] = (distance ?? "").split(/\s+/u).map(Number);
@@ -124,15 +114,7 @@ export const readDiff = async (ws: Workspace) => {
   const from = await fork(ws);
 
   const [tracked, fresh] = await Promise.all([
-    git(
-      ws.path,
-      "diff",
-      ...diffFlags,
-      "--src-prefix=a/",
-      "--dst-prefix=b/",
-      from,
-      "--"
-    ),
+    git(ws.path, "diff", ...diffFlags, "--src-prefix=a/", "--dst-prefix=b/", from, "--"),
     untracked(ws),
   ]);
 
@@ -143,7 +125,7 @@ export const readDiff = async (ws: Workspace) => {
       const text = await readText(ws, file);
 
       return text === "" ? [] : [newFilePatch(file, text)];
-    })
+    }),
   );
 
   return capPatch([...splitPatch(tracked), ...added.flat()], maxPatch);
@@ -163,28 +145,17 @@ export type FileBody =
     };
 
 const original = async (ws: Workspace, file: string) => {
-  const blob = await gitBytes(
-    ws.path,
-    "cat-file",
-    "blob",
-    `${await fork(ws)}:${file}`
-  ).catch(() => null);
+  const blob = await gitBytes(ws.path, "cat-file", "blob", `${await fork(ws)}:${file}`).catch(
+    () => null,
+  );
 
-  return blob === null || blob.length > maxFile || isBinary(blob)
-    ? null
-    : blob.toString("utf-8");
+  return blob === null || blob.length > maxFile || isBinary(blob) ? null : blob.toString("utf-8");
 };
 
-export const readBody = async (
-  ws: Workspace,
-  file: string
-): Promise<FileBody> => {
+export const readBody = async (ws: Workspace, file: string): Promise<FileBody> => {
   const full = inside(ws, file);
 
-  const stat =
-    full === null
-      ? null
-      : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
+  const stat = full === null ? null : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
 
   if (full === null || stat === null) {
     return { kind: "missing" };
@@ -224,16 +195,7 @@ export const readBody = async (
 };
 
 export const lastCommit = async (ws: Workspace, file: string) => {
-  const out = await tryGit(
-    ws.path,
-    "log",
-    "-1",
-    "--pretty=raw",
-    "--no-color",
-    "HEAD",
-    "--",
-    file
-  );
+  const out = await tryGit(ws.path, "log", "-1", "--pretty=raw", "--no-color", "HEAD", "--", file);
 
   return out === null ? null : parseCommit(out);
 };
@@ -250,8 +212,8 @@ export const listCommits = async (ws: Workspace, file: string | null) =>
       "150",
       "HEAD",
       "--",
-      ...(file === null ? [] : [file])
-    )) ?? ""
+      ...(file === null ? [] : [file]),
+    )) ?? "",
   );
 
 export interface CommitDetail {
@@ -260,10 +222,7 @@ export interface CommitDetail {
   readonly omitted: readonly string[];
 }
 
-export const readCommit = async (
-  ws: Workspace,
-  sha: string
-): Promise<CommitDetail | null> => {
+export const readCommit = async (ws: Workspace, sha: string): Promise<CommitDetail | null> => {
   if (!/^[0-9a-f]{4,64}$/iu.test(sha)) {
     return null;
   }
@@ -275,7 +234,7 @@ export const readCommit = async (
     "--pretty=raw",
     "--no-color",
     `${sha}^{commit}`,
-    "--"
+    "--",
   );
 
   const commit = head === null ? null : parseCommit(head);
@@ -294,7 +253,7 @@ export const readCommit = async (
     "--src-prefix=a/",
     "--dst-prefix=b/",
     commit.sha,
-    "--"
+    "--",
   );
 
   return { commit, ...capPatch(splitPatch(patch), maxPatch) };
@@ -311,17 +270,13 @@ const pictures = new Map([
   [".webp", "image/webp"],
 ]);
 
-export const pictureType = (file: string) =>
-  pictures.get(path.extname(file).toLowerCase()) ?? null;
+export const pictureType = (file: string) => pictures.get(path.extname(file).toLowerCase()) ?? null;
 
 export const readPicture = async (ws: Workspace, file: string) => {
   const type = pictureType(file);
   const full = inside(ws, file);
 
-  const stat =
-    full === null
-      ? null
-      : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
+  const stat = full === null ? null : await lstat(/*turbopackIgnore: true*/ full).catch(() => null);
 
   return type === null ||
     full === null ||
@@ -333,9 +288,7 @@ export const readPicture = async (ws: Workspace, file: string) => {
 };
 
 const blobText = async (ws: Workspace, spec: string) => {
-  const blob = await gitBytes(ws.path, "cat-file", "blob", spec).catch(
-    () => null
-  );
+  const blob = await gitBytes(ws.path, "cat-file", "blob", spec).catch(() => null);
 
   return blob === null || isBinary(blob) ? "" : blob.toString("utf-8");
 };

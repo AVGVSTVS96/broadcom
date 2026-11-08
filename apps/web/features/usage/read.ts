@@ -111,11 +111,10 @@ export interface Usage {
   }[];
 }
 
-const single = (value: string | string[] | undefined) =>
-  Array.isArray(value) ? value[0] : value;
+const single = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
 export const queryOf = (
-  params: Readonly<Record<string, string | string[] | undefined>>
+  params: Readonly<Record<string, string | string[] | undefined>>,
 ): UsageQuery => ({
   by: oneOf(groupings, single(params.by), "agent"),
   q: single(params.q)?.trim() ?? "",
@@ -129,10 +128,8 @@ export const queryOf = (
         ?.split(",")
         .filter((value) => value !== "");
 
-      return values === undefined || values.length === 0
-        ? []
-        : [[dimension, values]];
-    })
+      return values === undefined || values.length === 0 ? [] : [[dimension, values]];
+    }),
   ),
   within: single(params.within) ?? null,
 });
@@ -141,10 +138,7 @@ const everyMatch = 5000;
 
 const named = 3;
 
-const pathOf = (
-  query: UsageQuery,
-  change: Readonly<Record<string, string | null>>
-) => {
+const pathOf = (query: UsageQuery, change: Readonly<Record<string, string | null>>) => {
   const params = new URLSearchParams({
     by: query.by,
     measure: query.unit,
@@ -187,17 +181,14 @@ const totalsOf = (view: UsageView, searching: boolean) =>
             series: row.series,
             sessions: row.sessions,
             values: valuesOf(row.amount, row.points),
-          }))
+          })),
         ),
         cacheHit: null,
         previous: null,
       }
     : {
         cacheHit: view.totals.cacheHitRate,
-        previous:
-          view.previous === null
-            ? null
-            : valuesOf(view.previous, view.previous.points),
+        previous: view.previous === null ? null : valuesOf(view.previous, view.previous.points),
         series: sumSeries(view.series.map((line) => line.values)),
         sessions: view.totals.sessions,
         values: valuesOf(view.totals, view.totals.points),
@@ -205,9 +196,7 @@ const totalsOf = (view: UsageView, searching: boolean) =>
 
 const spentOf = (spend: UsageView, searching: boolean) =>
   sumSeries(
-    searching
-      ? spend.rows.map((row) => row.series)
-      : spend.series.map((line) => line.values)
+    searching ? spend.rows.map((row) => row.series) : spend.series.map((line) => line.values),
   );
 
 export const readUsage = async (query: UsageQuery): Promise<Usage> => {
@@ -218,11 +207,9 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
   const agent = (key: string | null) =>
     key === null
       ? Effect.succeed(null)
-      : get(
-          pathOf(query, { by: "agent", limit: "1", q: null, within: key })
-        ).pipe(
+      : get(pathOf(query, { by: "agent", limit: "1", q: null, within: key })).pipe(
           Effect.map((found) => found.rows[0] ?? null),
-          Effect.orElseSucceed(() => null)
+          Effect.orElseSucceed(() => null),
         );
 
   const { view, spend, credits, owner } = await runtime.runPromise(
@@ -237,17 +224,17 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
               pathOf(query, {
                 limit: searching ? String(everyMatch) : "1",
                 measure: "api",
-              })
+              }),
             )
           : Effect.succeed(null),
         view: get(
           pathOf(query, {
             limit: String(searching ? everyMatch : query.rows),
-          })
+          }),
         ),
       },
-      { concurrency: "unbounded" }
-    )
+      { concurrency: "unbounded" },
+    ),
   );
 
   const names = namesOf(view.facets.account ?? [], credits.api);
@@ -273,25 +260,24 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
   const { picked, drill } = await runtime.runPromise(
     Effect.gen(function* () {
       const row =
-        view.rows.find((one) => one.key === query.sel) ??
-        (agents ? yield* agent(query.sel) : null);
+        view.rows.find((one) => one.key === query.sel) ?? (agents ? yield* agent(query.sel) : null);
 
       if (row === null || !agents || row.sessions <= 1) {
         return { drill: null, picked: row };
       }
 
       const sessions = yield* get(
-        pathOf(query, { by: "session", limit: "8", q: null, within: row.key })
+        pathOf(query, { by: "session", limit: "8", q: null, within: row.key }),
       ).pipe(
         Effect.map((found) => ({
           count: found.rowCount,
           rows: found.rows.map(rowOf),
         })),
-        Effect.orElseSucceed(() => null)
+        Effect.orElseSucceed(() => null),
       );
 
       return { drill: sessions, picked: row };
-    })
+    }),
   );
 
   const now = Date.now();
@@ -314,7 +300,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
             values: picked.series,
           },
         ],
-    total.series
+    total.series,
   );
 
   const spent = spend === null ? null : spentOf(spend, searching);
@@ -335,9 +321,8 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
       ids.map((id) => ({
         dimension,
         id,
-        label:
-          view.facets[dimension]?.find((facet) => facet.id === id)?.label ?? id,
-      }))
+        label: view.facets[dimension]?.find((facet) => facet.id === id)?.label ?? id,
+      })),
     ),
     layers,
     now,

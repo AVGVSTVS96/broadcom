@@ -29,7 +29,7 @@ export const Segments = ({
         <div
           className={cn(
             "h-full rounded-full transition-[width] duration-500",
-            fills[part.tone ?? "ok"]
+            fills[part.tone ?? "ok"],
           )}
           style={{ width: `${Math.min(100, Math.max(0, part.value))}%` }}
         />

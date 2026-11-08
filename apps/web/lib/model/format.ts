@@ -61,8 +61,7 @@ export const clock = (at: number) => weekdayTime.format(at);
 
 export const date = (at: number) => monthDay.format(at);
 
-const sameDay = (a: number, b: number) =>
-  new Date(a).toDateString() === new Date(b).toDateString();
+const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 
 export const when = (exact: number, now: number) => {
   const at = Math.round(exact / minute) * minute;
@@ -72,9 +71,7 @@ export const when = (exact: number, now: number) => {
     return time;
   }
 
-  return Math.abs(at - now) < 6 * DAY
-    ? `${weekdayShort.format(at)} ${time}`
-    : monthDay.format(at);
+  return Math.abs(at - now) < 6 * DAY ? `${weekdayShort.format(at)} ${time}` : monthDay.format(at);
 };
 
 export const utcDate = (at: number) => monthDayUtc.format(at);
@@ -104,5 +101,4 @@ const usdWhole = new Intl.NumberFormat("en-US", {
 export const dollars = (value: number) =>
   value >= 100 ? usdWhole.format(value) : usd.format(value);
 
-export const times = (value: number) =>
-  `${value < 10 ? value.toFixed(1) : Math.round(value)}×`;
+export const times = (value: number) => `${value < 10 ? value.toFixed(1) : Math.round(value)}×`;

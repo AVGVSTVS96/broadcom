@@ -16,7 +16,7 @@ export interface Login {
 
 export const logins = (
   accounts: readonly Account[],
-  grants: readonly Grant[]
+  grants: readonly Grant[],
 ): readonly Login[] => {
   const keys = new Set(grants.map((grant) => grant.credentialId));
 
@@ -38,8 +38,7 @@ export const logins = (
 export const hasRoom = (account: Account) =>
   account.standing !== "limited" && account.standing !== "signed-out";
 
-export const left = (used: number | null) =>
-  used === null ? null : Math.max(0, 100 - used);
+export const left = (used: number | null) => (used === null ? null : Math.max(0, 100 - used));
 
 export const creditLeft = (grants: readonly Grant[]) =>
   grants.reduce((total, grant) => total + Math.max(0, grant.remaining), 0);
@@ -55,13 +54,11 @@ export const plansOf = (
   accounts: Readonly<Record<string, Account>>,
   grants: readonly Grant[],
   history: Readonly<Record<string, Points>>,
-  now: number
+  now: number,
 ): readonly Plan[] =>
   logins(Object.values(accounts), grants).map((login) => ({
     ...login,
-    pace: login.hasPlan
-      ? windowPace(login.account.week, history[login.id] ?? [], now)
-      : null,
+    pace: login.hasPlan ? windowPace(login.account.week, history[login.id] ?? [], now) : null,
   }));
 
 export interface Part {
@@ -86,8 +83,7 @@ const columnOf = (parts: readonly Part[], room: number, total: number) => ({
   total,
 });
 
-const sum = (values: readonly number[]) =>
-  values.reduce((total, value) => total + value, 0);
+const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0);
 
 export const poolOf = (plans: readonly Plan[]) => {
   const subscriptions = plans.filter((plan) => plan.hasPlan);
@@ -123,12 +119,8 @@ export const poolOf = (plans: readonly Plan[]) => {
   }));
 
   const [firstBack] = subscriptions
-    .filter(
-      (plan) => !hasRoom(plan.account) && plan.account.week.resetsAt !== null
-    )
-    .toSorted(
-      (a, b) => (a.account.week.resetsAt ?? 0) - (b.account.week.resetsAt ?? 0)
-    );
+    .filter((plan) => !hasRoom(plan.account) && plan.account.week.resetsAt !== null)
+    .toSorted((a, b) => (a.account.week.resetsAt ?? 0) - (b.account.week.resetsAt ?? 0));
 
   const [sessionReset] = open
     .flatMap((plan) => plan.account.fiveHour.resetsAt ?? [])
@@ -138,25 +130,14 @@ export const poolOf = (plans: readonly Plan[]) => {
     credit: {
       ...columnOf(credit, creditLeft(grants), creditTotal(grants)),
       empty: credit.filter((part) => part.tone === "bad").length,
-      endsAt:
-        grants.length === 0
-          ? null
-          : Math.min(...grants.map((grant) => grant.expiresAt)),
+      endsAt: grants.length === 0 ? null : Math.min(...grants.map((grant) => grant.expiresAt)),
     },
     firstBack,
     open,
-    session: columnOf(
-      session,
-      sum(session.map((part) => part.value)),
-      session.length * 100
-    ),
+    session: columnOf(session, sum(session.map((part) => part.value)), session.length * 100),
     sessionReset,
     subscriptions,
-    week: columnOf(
-      week,
-      sum(week.map((part) => part.value)),
-      week.length * 100
-    ),
+    week: columnOf(week, sum(week.map((part) => part.value)), week.length * 100),
   };
 };
 
@@ -170,7 +151,7 @@ export const byPace = (plans: readonly Plan[]): Paced[] =>
         Number(a.pace.locked) - Number(b.pace.locked) ||
         (a.pace.locked
           ? a.pace.resetsAt - b.pace.resetsAt
-          : (b.pace.pace ?? 0) - (a.pace.pace ?? 0))
+          : (b.pace.pace ?? 0) - (a.pace.pace ?? 0)),
     );
 
 export type Summary = ReturnType<typeof poolOf>;

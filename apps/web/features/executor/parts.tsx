@@ -15,20 +15,13 @@ import {
   DialogFooter,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  connectAccount,
-  deployApp,
-  saveFile,
-} from "@/features/executor/actions";
+import { connectAccount, deployApp, saveFile } from "@/features/executor/actions";
 import { diffOptions, fileOptions, useDiffStyle } from "@/features/files/code";
 import { sameSource } from "@/lib/model/executor";
 import type { SourceFile } from "@/lib/model/executor";
 
-const createEditor: EditorFactory<undefined, undefined> = (
-  type,
-  options,
-  key
-) => new Editor(type, options, key);
+const createEditor: EditorFactory<undefined, undefined> = (type, options, key) =>
+  new Editor(type, options, key);
 
 export const ConnectButton = ({
   slug,
@@ -95,9 +88,7 @@ export const DeployButton = ({
 
   return (
     <div className="flex items-center gap-3">
-      {said !== "" && (
-        <span className="text-sm text-muted-foreground">{said}</span>
-      )}
+      {said !== "" && <span className="text-sm text-muted-foreground">{said}</span>}
       <Button
         size="sm"
         disabled={pending}
@@ -111,13 +102,11 @@ export const DeployButton = ({
         <DialogContent>
           <DialogTitle>Deploy {name}?</DialogTitle>
           <DialogDescription>
-            The {differ === 1 ? "file" : `${differ} files`} you changed here
-            become the version Executor runs.
+            The {differ === 1 ? "file" : `${differ} files`} you changed here become the version
+            Executor runs.
           </DialogDescription>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancel
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button
               onClick={() => {
                 setOpen(false);
@@ -125,11 +114,7 @@ export const DeployButton = ({
                 startTransition(async () => {
                   const result = await deployApp(slug);
 
-                  setSaid(
-                    result.ok
-                      ? `Deployed ${result.value.files} files`
-                      : result.reason
-                  );
+                  setSaid(result.ok ? `Deployed ${result.value.files} files` : result.reason);
                 });
               }}
             >
@@ -174,17 +159,14 @@ const SourceFileRow = ({
   const text = file.local ?? file.deployed ?? "";
   const shown = open || editing;
 
-  const current = useMemo(
-    () => ({ contents: text, name: file.path }),
-    [file.path, text]
-  );
+  const current = useMemo(() => ({ contents: text, name: file.path }), [file.path, text]);
 
   const before = useMemo(
     () =>
       file.deployed === null || same || file.local === null
         ? null
         : { contents: file.deployed, name: file.path },
-    [file.deployed, file.local, file.path, same]
+    [file.deployed, file.local, file.path, same],
   );
 
   const keep = (contents: string) => {
@@ -222,11 +204,7 @@ const SourceFileRow = ({
             onClick={() => {
               startTransition(async () => {
                 if (latest.current !== null) {
-                  const result = await saveFile(
-                    slug,
-                    file.path,
-                    latest.current
-                  );
+                  const result = await saveFile(slug, file.path, latest.current);
 
                   if (!result.ok) {
                     setFailed(result.reason);
@@ -282,13 +260,7 @@ const SourceFileRow = ({
   );
 };
 
-export const SourceFiles = ({
-  slug,
-  files,
-}: {
-  slug: string;
-  files: readonly SourceFile[];
-}) => {
+export const SourceFiles = ({ slug, files }: { slug: string; files: readonly SourceFile[] }) => {
   const [editing, setEditing] = useState<string | null>(null);
 
   return (

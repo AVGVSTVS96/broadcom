@@ -63,9 +63,7 @@ const Code = ({ value }: { value: string }) => {
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-2xl bg-muted px-4 py-3">
-      <output className="font-mono text-2xl tracking-[0.2em] select-all">
-        {value}
-      </output>
+      <output className="font-mono text-2xl tracking-[0.2em] select-all">{value}</output>
       <Button
         variant="ghost"
         size="sm"
@@ -118,9 +116,7 @@ const Steps = ({
         }
       }}
     >
-      {link.code === null
-        ? `Open ${brand} sign-in`
-        : `Copy code and open ${brand}`}
+      {link.code === null ? `Open ${brand} sign-in` : `Copy code and open ${brand}`}
       <ExternalLinkIcon />
     </a>
   );
@@ -152,8 +148,7 @@ const Steps = ({
         </label>
         {link.flow === "code" ? null : (
           <p className="text-muted-foreground">
-            After you approve, that page won&apos;t load. Copy its address from
-            the address bar.
+            After you approve, that page won&apos;t load. Copy its address from the address bar.
           </p>
         )}
         <div className="flex gap-2">
@@ -227,9 +222,7 @@ export const SignIn = ({
     } else {
       setPhase({
         at: "failed",
-        reason: result.ok
-          ? (result.value.error ?? "Sign-in failed")
-          : result.reason,
+        reason: result.ok ? (result.value.error ?? "Sign-in failed") : result.reason,
       });
     }
   };
@@ -276,7 +269,7 @@ export const SignIn = ({
             problem: result.ok ? null : result.reason,
             sending: false,
           }
-        : current
+        : current,
     );
   };
 
@@ -305,9 +298,7 @@ export const SignIn = ({
       <DialogContent className="gap-5 p-5 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg">
-            {target === null
-              ? `Add a ${brand} account`
-              : `Sign in to ${target}`}
+            {target === null ? `Add a ${brand} account` : `Sign in to ${target}`}
           </DialogTitle>
         </DialogHeader>
         {phase.at === "starting" || phase.at === "idle" ? (

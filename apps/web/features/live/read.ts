@@ -29,7 +29,7 @@ const readHandoffs = async () => {
       const { moves } = yield* (yield* Proxy).get("/deck/accounts", Moves);
 
       return handoffs(moves, now);
-    })
+    }),
   );
 };
 
@@ -42,16 +42,13 @@ const readGrants = async () =>
         account: grant.account,
         credentialId: grant.credentialId,
       }));
-    }).pipe(Effect.orElseSucceed(() => []))
+    }).pipe(Effect.orElseSucceed(() => [])),
   );
 
 export const readLiveData = async (): Promise<LiveData> => {
   await connection();
 
-  const [moves, grants] = await Promise.all([
-    readHandoffs().catch(() => null),
-    readGrants(),
-  ]);
+  const [moves, grants] = await Promise.all([readHandoffs().catch(() => null), readGrants()]);
 
   return { grants, handoffs: moves, now: Date.now() };
 };

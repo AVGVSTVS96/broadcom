@@ -55,8 +55,7 @@ export const releasesBehind = (app: ExecutorApp, framework: string | null) => {
   return Math.max(0, host - pinned);
 };
 
-export const shortRelease = (version: string) =>
-  version.replace(/^0\.0\.1-/u, "");
+export const shortRelease = (version: string) => version.replace(/^0\.0\.1-/u, "");
 
 export const healthOf = (health: string | null): Health => {
   if (health === null) {
@@ -68,9 +67,7 @@ export const healthOf = (health: string | null): Health => {
 
 export const needs = (app: ExecutorApp): Need[] =>
   app.requirements.flatMap((requirement): Need[] => {
-    const linked = app.accounts.filter(
-      (account) => account.requirement === requirement
-    );
+    const linked = app.accounts.filter((account) => account.requirement === requirement);
 
     if (linked.length === 0) {
       return [
@@ -92,6 +89,4 @@ export const needs = (app: ExecutorApp): Need[] =>
   });
 
 export const sameSource = (file: SourceFile) =>
-  file.local !== null &&
-  file.deployed !== null &&
-  file.local.trimEnd() === file.deployed.trimEnd();
+  file.local !== null && file.deployed !== null && file.local.trimEnd() === file.deployed.trimEnd();

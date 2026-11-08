@@ -6,12 +6,8 @@ import { walletOf } from "@/lib/model/wallet";
 const input = {
   byAccount: { a: 4000, b: 3000, k: 600, none: 2100 },
   byHarness: { claude: 9700, codex: 1000 },
-  grants: [
-    { allowance: 600, expiresAt: 20, id: "k", name: "a API", remaining: 2 },
-  ],
-  plans: [
-    { monthly: 200, name: "ChatGPT Pro", providers: ["openai"], since: null },
-  ],
+  grants: [{ allowance: 600, expiresAt: 20, id: "k", name: "a API", remaining: 2 }],
+  plans: [{ monthly: 200, name: "ChatGPT Pro", providers: ["openai"], since: null }],
   seats: [
     { id: "a", name: "a", plan: "Max 20x" },
     { id: "b", name: "b", plan: "Max 20x" },
@@ -30,9 +26,7 @@ describe("walletOf", () => {
   });
 
   test("each source's parts add up to what it ran", () => {
-    expect(
-      wallet.sources.map((source) => [source.key, Math.round(source.ran)])
-    ).toEqual([
+    expect(wallet.sources.map((source) => [source.key, Math.round(source.ran)])).toEqual([
       ["claude", 9100],
       ["plan:ChatGPT Pro", 1000],
       ["credit", 600],

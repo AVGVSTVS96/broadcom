@@ -7,10 +7,7 @@ import { readGrants, readWeekHistory } from "@/lib/proxy/read";
 const OverviewPage = async () => {
   await connection();
 
-  const [history, grants] = await Promise.all([
-    readWeekHistory(),
-    readGrants(),
-  ]);
+  const [history, grants] = await Promise.all([readWeekHistory(), readGrants()]);
 
   const problems = [
     history.ok ? null : `Limit history didn't load: ${history.reason}`,

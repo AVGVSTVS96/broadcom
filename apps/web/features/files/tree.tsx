@@ -35,12 +35,8 @@ const counts = (change: Change): FileTreeRowDecoration | null =>
     ? null
     : {
         parts: [
-          ...(change.added > 0
-            ? [{ color: "var(--ok)", text: `+${change.added}` }]
-            : []),
-          ...(change.removed > 0
-            ? [{ color: "var(--bad)", text: ` −${change.removed}` }]
-            : []),
+          ...(change.added > 0 ? [{ color: "var(--ok)", text: `+${change.added}` }] : []),
+          ...(change.removed > 0 ? [{ color: "var(--bad)", text: ` −${change.removed}` }] : []),
         ],
         text: `+${change.added} −${change.removed}`,
       };
@@ -98,9 +94,7 @@ export const Tree = ({
     unsafeCSS: look,
   });
 
-  const startOpen = useEffectEvent(() => [
-    ...new Set([...open, selected].flatMap(ancestors)),
-  ]);
+  const startOpen = useEffectEvent(() => [...new Set([...open, selected].flatMap(ancestors))]);
 
   const all = useMemo(() => [...paths, ...fresh].toSorted(), [paths, fresh]);
 
@@ -117,11 +111,11 @@ export const Tree = ({
     }
 
     const removed = [...previous].flatMap((file) =>
-      next.has(file) ? [] : [{ path: file, type: "remove" as const }]
+      next.has(file) ? [] : [{ path: file, type: "remove" as const }],
     );
 
     const added = all.flatMap((file) =>
-      previous.has(file) ? [] : [{ path: file, type: "add" as const }]
+      previous.has(file) ? [] : [{ path: file, type: "add" as const }],
     );
 
     if (removed.length > 0 || added.length > 0) {

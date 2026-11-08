@@ -3,17 +3,8 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export const Pills = ({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) => (
-  <nav
-    aria-label={label}
-    className="flex shrink-0 items-center rounded-full bg-muted p-0.5"
-  >
+export const Pills = ({ label, children }: { label: string; children: ReactNode }) => (
+  <nav aria-label={label} className="flex shrink-0 items-center rounded-full bg-muted p-0.5">
     {children}
   </nav>
 );
@@ -21,7 +12,7 @@ export const Pills = ({
 const pill = (current: boolean) =>
   cn(
     "flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] text-muted-foreground transition-colors hover:text-foreground pointer-coarse:h-9",
-    current && "bg-card text-foreground shadow-xs"
+    current && "bg-card text-foreground shadow-xs",
   );
 
 export const PillLink = ({
@@ -55,12 +46,7 @@ export const PillButton = ({
   onClick: () => void;
   children: ReactNode;
 }) => (
-  <button
-    type="button"
-    aria-pressed={current}
-    onClick={onClick}
-    className={pill(current)}
-  >
+  <button type="button" aria-pressed={current} onClick={onClick} className={pill(current)}>
     {children}
   </button>
 );

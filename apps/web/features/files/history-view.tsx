@@ -42,7 +42,7 @@ export const HistoryView = ({
     (commit) =>
       needle === "" ||
       commit.subject.toLowerCase().includes(needle) ||
-      commit.sha.startsWith(needle)
+      commit.sha.startsWith(needle),
   );
 
   return (
@@ -85,9 +85,7 @@ export const HistoryView = ({
                       href={filesHref.history(ws, commit.sha, path)}
                       replace
                       scroll={false}
-                      aria-current={
-                        commit.sha === picked?.sha ? "page" : undefined
-                      }
+                      aria-current={commit.sha === picked?.sha ? "page" : undefined}
                       className="block rounded-lg px-2 py-1.5 hover:bg-muted aria-[current=page]:bg-accent"
                     >
                       <span className="line-clamp-2 text-[13px] leading-snug">
@@ -96,9 +94,7 @@ export const HistoryView = ({
                       <span className="mt-0.5 flex gap-2 text-xs text-faint tabular-nums">
                         <span>{timeOfDay(commit.at)}</span>
                         <span className="font-mono">{commit.short}</span>
-                        {!commit.signed && (
-                          <span className="text-bad">unsigned</span>
-                        )}
+                        {!commit.signed && <span className="text-bad">unsigned</span>}
                       </span>
                     </Link>
                   </li>
@@ -110,9 +106,7 @@ export const HistoryView = ({
       </Side>
       <div className="flex min-w-0 flex-1 flex-col">
         {picked === null ? (
-          <p className="m-auto p-6 text-sm text-muted-foreground">
-            No commits yet.
-          </p>
+          <p className="m-auto p-6 text-sm text-muted-foreground">No commits yet.</p>
         ) : (
           <>
             <FileBar>
@@ -131,16 +125,10 @@ export const HistoryView = ({
                 <span>{ago(picked.at, now)}</span>
                 <span className="font-mono">{picked.short}</span>
               </span>
-              {!picked.signed && (
-                <span className="shrink-0 text-bad">Unsigned</span>
-              )}
+              {!picked.signed && <span className="shrink-0 text-bad">Unsigned</span>}
               <span className="ml-auto flex shrink-0 gap-1.5 tabular-nums max-sm:hidden">
-                <span className="text-ok">
-                  +{added.toLocaleString("en-US")}
-                </span>
-                <span className="text-bad">
-                  −{removed.toLocaleString("en-US")}
-                </span>
+                <span className="text-ok">+{added.toLocaleString("en-US")}</span>
+                <span className="text-bad">−{removed.toLocaleString("en-US")}</span>
               </span>
               <Tools>
                 <StylePills />
@@ -150,16 +138,14 @@ export const HistoryView = ({
             {showBody && (
               <p
                 className={cn(
-                  "shrink-0 border-b px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground"
+                  "shrink-0 border-b px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground",
                 )}
               >
                 {picked.body}
               </p>
             )}
             {patch === "" ? (
-              <p className="m-auto p-6 text-sm text-muted-foreground">
-                No file changes.
-              </p>
+              <p className="m-auto p-6 text-sm text-muted-foreground">No file changes.</p>
             ) : (
               <Review ws={ws} sha={picked.sha} patch={patch} focus={path} />
             )}

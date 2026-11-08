@@ -72,9 +72,7 @@ export const FilesBar = ({
       <SideToggle label={drafting ? "drafts" : sideLabels[view]} />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm hover:bg-muted aria-expanded:bg-muted">
-          <span className="shrink-0 font-medium">
-            {drafting ? "Drafts" : repo?.name}
-          </span>
+          <span className="shrink-0 font-medium">{drafting ? "Drafts" : repo?.name}</span>
           <span className="truncate text-muted-foreground">{place?.name}</span>
           <ChevronsUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
@@ -107,9 +105,7 @@ export const FilesBar = ({
                 className="aria-[current=page]:bg-accent"
               >
                 Drafts
-                <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                  {drafts}
-                </span>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums">{drafts}</span>
               </DropdownMenuLinkItem>
             </DropdownMenuGroup>
           )}

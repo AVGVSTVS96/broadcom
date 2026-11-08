@@ -25,9 +25,7 @@ const owned = (source: Source, live: Live, snapshot: Live): Live =>
     : { ...live, sessions: snapshot.sessions };
 
 const ownChange = (source: Source, change: LiveChange): LiveChange =>
-  source === "proxy"
-    ? { ...change, sessions: {} }
-    : { ...change, accounts: {}, pool: null };
+  source === "proxy" ? { ...change, sessions: {} } : { ...change, accounts: {}, pool: null };
 
 const createHub = (): Hub => {
   const { promise, resolve } = Promise.withResolvers<boolean>();
@@ -73,13 +71,13 @@ const createHub = (): Hub => {
               if (event !== null) {
                 publish(source, event);
               }
-            })
+            }),
           ),
           Effect.ignore,
           Effect.andThen(Effect.sleep("2 seconds")),
-          Effect.forever
+          Effect.forever,
         );
-      })
+      }),
     );
 
   follow("proxy");
@@ -110,8 +108,7 @@ export const readLive = async () => {
 
 const encoder = new TextEncoder();
 
-const frame = (event: LiveEvent) =>
-  encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+const frame = (event: LiveEvent) => encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
 
 export const liveResponse = async () => {
   await readLive();

@@ -47,7 +47,6 @@ const Wires = ({
 
       return (
         <path
-          // oxlint-disable-next-line react/no-array-index-key
           key={index}
           d={`M0 ${start} C50 ${start} 50 ${end} 100 ${end}`}
           fill="none"
@@ -57,7 +56,7 @@ const Wires = ({
           className={cn(
             state === "busy" && "stroke-ok",
             state === "on" && "stroke-foreground/40",
-            state === "off" && "stroke-faint"
+            state === "off" && "stroke-faint",
           )}
         />
       );
@@ -65,12 +64,7 @@ const Wires = ({
   </svg>
 );
 
-const note = (row: {
-  channel: Channel;
-  threads: number;
-  working: number;
-  waiting: number;
-}) => {
+const note = (row: { channel: Channel; threads: number; working: number; waiting: number }) => {
   if (row.channel.state === "set up") {
     return "Set up, hub not connected";
   }
@@ -106,9 +100,7 @@ export const Wiring = ({
     return {
       channel,
       threads: mine.length,
-      waiting: mine.filter(
-        (each) => each.state === "blocked" && each.since >= now - day
-      ).length,
+      waiting: mine.filter((each) => each.state === "blocked" && each.since >= now - day).length,
       working: mine.filter((each) => each.state === "working").length,
     };
   });
@@ -129,7 +121,7 @@ export const Wiring = ({
                 <span
                   className={cn(
                     "size-2 shrink-0 rounded-full",
-                    row.channel.state === "connected" ? "bg-ok" : "bg-faint"
+                    row.channel.state === "connected" ? "bg-ok" : "bg-faint",
                   )}
                 />
                 <span className="min-w-0 flex-1">
@@ -138,21 +130,14 @@ export const Wiring = ({
                       {names.get(row.channel.name) ?? row.channel.name}
                     </span>
                     {row.channel.version !== null && (
-                      <span className="font-mono text-xs text-faint">
-                        {row.channel.version}
-                      </span>
+                      <span className="font-mono text-xs text-faint">{row.channel.version}</span>
                     )}
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {note(row)}
-                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">{note(row)}</span>
                 </span>
                 {row.channel.source !== null && (
                   <Link
-                    href={filesHref.code(
-                      row.channel.source.ws,
-                      row.channel.source.file
-                    )}
+                    href={filesHref.code(row.channel.source.ws, row.channel.source.file)}
                     className="-my-2 shrink-0 py-2 text-xs text-muted-foreground hover:text-foreground"
                   >
                     Source
@@ -191,9 +176,7 @@ export const Wiring = ({
                 className="flex min-h-11 flex-1 items-center justify-between gap-3 rounded-2xl bg-muted/60 px-4 py-2 text-sm hover:bg-muted"
               >
                 <span>{load.name}</span>
-                <span className="text-muted-foreground tabular-nums">
-                  {load.value}
-                </span>
+                <span className="text-muted-foreground tabular-nums">{load.value}</span>
               </a>
             </li>
           ))}

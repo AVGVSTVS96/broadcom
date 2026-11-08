@@ -11,11 +11,7 @@ const window = (used: number | null, resetsAt: number | null = null) => ({
   used,
 });
 
-const account = (
-  id: string,
-  label: string,
-  extra: Partial<Account> = {}
-): Account => ({
+const account = (id: string, label: string, extra: Partial<Account> = {}): Account => ({
   atLimit: null,
   cloud: null,
   fiveHour: window(null),
@@ -34,10 +30,7 @@ const account = (
   ...extra,
 });
 
-const credential = (
-  name: string,
-  extra: Partial<Credential> = {}
-): Credential => ({
+const credential = (name: string, extra: Partial<Credential> = {}): Credential => ({
   auth_index: name,
   disabled: false,
   email: name,
@@ -47,11 +40,7 @@ const credential = (
   ...extra,
 });
 
-const grant = (
-  credentialId: string,
-  owner: string,
-  remaining: number
-): Grant => ({
+const grant = (credentialId: string, owner: string, remaining: number): Grant => ({
   account: owner,
   allowance: 200,
   credentialId,
@@ -171,7 +160,7 @@ describe("accountRows", () => {
             status: "error",
             status_message: limited,
             unavailable: true,
-          })
+          }),
         ),
       ],
       order: ["a1"],
@@ -208,7 +197,7 @@ describe("accountRows", () => {
           credential("a@example.com", {
             status: "error",
             status_message: "refresh token revoked",
-          })
+          }),
         ),
       ],
       order: [],
@@ -231,7 +220,7 @@ describe("accountRows", () => {
           },
           type: "error",
         }),
-      })
+      }),
     );
 
     expect(login.error).toBe("Invalid bearer token");

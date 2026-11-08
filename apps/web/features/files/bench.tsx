@@ -2,13 +2,7 @@
 
 import { PanelLeftIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import {
-  createContext,
-  use,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { createContext, use, useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -32,7 +26,7 @@ const useNarrow = () =>
   useSyncExternalStore(
     subscribe,
     () => window.matchMedia(narrowQuery).matches,
-    () => false
+    () => false,
   );
 
 interface BenchState {
@@ -76,7 +70,7 @@ export const Bench = ({ children }: { children: ReactNode }) => {
       sideOpen: narrow ? sheetAt === pathname : !sideHidden,
       slot,
     }),
-    [narrow, pathname, sheetAt, sideHidden, slot]
+    [narrow, pathname, sheetAt, sideHidden, slot],
   );
 
   return (
@@ -106,13 +100,7 @@ export const SideToggle = ({ label }: { label: string }) => {
   );
 };
 
-export const Side = ({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) => {
+export const Side = ({ title, children }: { title: string; children: ReactNode }) => {
   const { narrow, sideOpen, setSideOpen } = useBench();
 
   if (narrow) {
@@ -134,7 +122,7 @@ export const Side = ({
     <aside
       className={cn(
         "flex w-72 shrink-0 flex-col border-r max-md:hidden lg:w-80",
-        !sideOpen && "hidden"
+        !sideOpen && "hidden",
       )}
     >
       {children}
@@ -145,21 +133,14 @@ export const Side = ({
 export const ToolSlot = () => {
   const { setSlot } = useBench();
 
-  return (
-    <div
-      ref={setSlot}
-      className="ml-auto flex items-center gap-1 max-md:hidden"
-    />
-  );
+  return <div ref={setSlot} className="ml-auto flex items-center gap-1 max-md:hidden" />;
 };
 
 export const Tools = ({ children }: { children: ReactNode }) => {
   const { narrow, slot } = useBench();
 
   if (narrow) {
-    return (
-      <div className="ml-auto flex shrink-0 items-center gap-1">{children}</div>
-    );
+    return <div className="ml-auto flex shrink-0 items-center gap-1">{children}</div>;
   }
 
   return slot === null ? null : createPortal(children, slot);

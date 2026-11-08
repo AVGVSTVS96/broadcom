@@ -10,13 +10,7 @@ import { valuesOf } from "@/lib/model/settings";
 import type { Daily } from "@/lib/model/weeks";
 import { attempt, attemptCached } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
-import {
-  Config,
-  Credentials,
-  Credits,
-  History,
-  LimitUsage,
-} from "@/lib/proxy/schema";
+import { Config, Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
 
 const weekHistory = async (): Promise<Readonly<Record<string, Points>>> => {
@@ -30,9 +24,9 @@ const weekHistory = async (): Promise<Readonly<Record<string, Points>>> => {
       return Object.fromEntries(
         history
           .filter((series) => series.kind === "week")
-          .map((series) => [series.account, compact(series.points)])
+          .map((series) => [series.account, compact(series.points)]),
       );
-    })
+    }),
   );
 };
 
@@ -45,7 +39,7 @@ const grants = async (): Promise<readonly Grant[]> => {
       const credits = yield* (yield* Proxy).get("/deck/credits", Credits);
 
       return credits.api;
-    })
+    }),
   );
 };
 
@@ -60,30 +54,25 @@ const dailyLimits = async (): Promise<{
     Effect.gen(function* () {
       const usage = yield* (yield* Proxy).get(
         "/deck/usage?range=30d&by=account&measure=week",
-        LimitUsage
+        LimitUsage,
       );
 
       return {
         accounts: usage.rows.map((row) => ({
-          days: row.series.map(
-            (used, index) => [usage.buckets[index]?.at ?? 0, used] as const
-          ),
+          days: row.series.map((used, index) => [usage.buckets[index]?.at ?? 0, used] as const),
           id: row.key.replace(/^a:/u, ""),
         })),
         since: usage.coverage.limitsSince,
       };
-    })
+    }),
   );
 };
 
-export const readWeekHistory = async () =>
-  await attemptCached("/deck/accounts", weekHistory);
+export const readWeekHistory = async () => await attemptCached("/deck/accounts", weekHistory);
 
-export const readGrants = async () =>
-  await attemptCached("/deck/credits", grants);
+export const readGrants = async () => await attemptCached("/deck/credits", grants);
 
-export const readDailyLimits = async () =>
-  await attemptCached("/deck/usage", dailyLimits);
+export const readDailyLimits = async () => await attemptCached("/deck/usage", dailyLimits);
 
 export const readLogins = async () =>
   await attempt(
@@ -91,7 +80,7 @@ export const readLogins = async () =>
       const list = yield* (yield* Proxy).get("/credentials", Credentials);
 
       return list.files.map(loginOf);
-    })
+    }),
   );
 
 export const readCredits = async () =>
@@ -100,7 +89,7 @@ export const readCredits = async () =>
       const view = yield* (yield* Proxy).get("/deck/credits", Credits);
 
       return view.api.map(creditOf);
-    })
+    }),
   );
 
 export const readSettings = async () =>
@@ -109,9 +98,7 @@ export const readSettings = async () =>
       const raw = yield* (yield* Proxy).get("/config", Schema.Json);
 
       const config = yield* Schema.decodeUnknownEffect(Config)(raw).pipe(
-        Effect.mapError(
-          (error) => new ProxyError({ path: "/config", reason: error.message })
-        )
+        Effect.mapError((error) => new ProxyError({ path: "/config", reason: error.message })),
       );
 
       return {
@@ -132,5 +119,5 @@ export const readSettings = async () =>
         raw: JSON.stringify(redact(raw), null, 2),
         values: valuesOf(config),
       };
-    })
+    }),
   );

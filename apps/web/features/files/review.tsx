@@ -43,11 +43,6 @@ export const Review = ({
   }, [focus]);
 
   return (
-    <CodeView
-      ref={view}
-      className="min-h-0 flex-1 overflow-auto"
-      items={items}
-      options={options}
-    />
+    <CodeView ref={view} className="min-h-0 flex-1 overflow-auto" items={items} options={options} />
   );
 };

@@ -40,7 +40,7 @@ describe("live events", () => {
           "app:hex": { connected: true },
         },
         type: "snapshot",
-      })
+      }),
     );
 
     expect(event).toEqual({
@@ -63,8 +63,9 @@ describe("live events", () => {
   });
 
   test("stale names the resources to refetch", () => {
-    expect(
-      decodeLiveEvent(JSON.stringify({ tags: ["usage"], type: "stale" }))
-    ).toEqual({ tags: ["usage"], type: "stale" });
+    expect(decodeLiveEvent(JSON.stringify({ tags: ["usage"], type: "stale" }))).toEqual({
+      tags: ["usage"],
+      type: "stale",
+    });
   });
 });

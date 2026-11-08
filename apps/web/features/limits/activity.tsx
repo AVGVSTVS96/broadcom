@@ -57,11 +57,7 @@ const Matrix = ({
         <div />
         <div className="relative h-5 text-xs text-muted-foreground">
           {hourMarks.map((mark) => (
-            <span
-              key={mark}
-              className="absolute"
-              style={{ left: `${(mark / 24) * 100}%` }}
-            >
+            <span key={mark} className="absolute" style={{ left: `${(mark / 24) * 100}%` }}>
               {hourOf(new Date(2026, 0, 1, mark).getTime())}
             </span>
           ))}
@@ -86,12 +82,10 @@ const Matrix = ({
                   }}
                   className={cn(
                     "relative grid h-5 place-items-center rounded-[3px] transition-opacity hover:opacity-70",
-                    cell.future ? "border border-dashed" : level(cell.used)
+                    cell.future ? "border border-dashed" : level(cell.used),
                   )}
                 >
-                  {cell.runOuts.length > 0 ? (
-                    <Dot tone="bad" className="size-2 ring-0" />
-                  ) : null}
+                  {cell.runOuts.length > 0 ? <Dot tone="bad" className="size-2 ring-0" /> : null}
                 </button>
               ))}
             </div>
@@ -99,7 +93,7 @@ const Matrix = ({
               <div
                 className={cn(
                   "grid h-5 place-items-center rounded-[3px]",
-                  day.locked === 0 && "bg-track"
+                  day.locked === 0 && "bg-track",
                 )}
                 style={day.locked === 0 ? undefined : hatchStyle}
               >
@@ -116,9 +110,8 @@ const Matrix = ({
       <p className="min-h-5 text-sm text-muted-foreground">
         {focus === null ? null : (
           <>
-            <span className="text-foreground">{clock(focus.from)}</span> ·{" "}
-            {Math.round(focus.used)} points · {focus.free} of {focus.present}{" "}
-            plans free
+            <span className="text-foreground">{clock(focus.from)}</span> · {Math.round(focus.used)}{" "}
+            points · {focus.free} of {focus.present} plans free
             {focus.runOuts.length > 0
               ? ` · ${focus.runOuts.map((id) => names.get(id) ?? id).join(", ")} ran out`
               : null}
@@ -152,9 +145,7 @@ export const ActivityView = ({
   const days = activity(activityPlans(plans, history), now);
   const { byHour, start, end } = busiest(days);
 
-  const runOuts = days
-    .flatMap((day) => day.hours)
-    .flatMap((cell) => cell.runOuts).length;
+  const runOuts = days.flatMap((day) => day.hours).flatMap((cell) => cell.runOuts).length;
 
   const names = new Map(plans.map((plan) => [plan.id, plan.name]));
 

@@ -34,7 +34,7 @@ const keep = <A>(
   into: Record<string, A | null>,
   id: string,
   value: Schema.Json,
-  decode: (input: Schema.Json) => Option.Option<A>
+  decode: (input: Schema.Json) => Option.Option<A>,
 ) => {
   if (value === null) {
     into[id] = null;

@@ -41,10 +41,7 @@ export const ChangesView = ({
   const outside = new Set(left);
   const paths = [...files.map((file) => file.path), ...fresh].toSorted();
 
-  const open =
-    files.length > 0 || fresh.length > 300
-      ? files.map((file) => file.path)
-      : fresh;
+  const open = files.length > 0 || fresh.length > 300 ? files.map((file) => file.path) : fresh;
 
   return (
     <>
@@ -69,17 +66,9 @@ export const ChangesView = ({
       <div className="flex min-w-0 flex-1 flex-col">
         <FileBar>
           <span className="flex min-w-0 items-center gap-2 tabular-nums">
-            {files.length > 0 && (
-              <span className="shrink-0">{many(files.length, "file")}</span>
-            )}
-            {added > 0 && (
-              <span className="text-ok">+{added.toLocaleString("en-US")}</span>
-            )}
-            {removed > 0 && (
-              <span className="text-bad">
-                −{removed.toLocaleString("en-US")}
-              </span>
-            )}
+            {files.length > 0 && <span className="shrink-0">{many(files.length, "file")}</span>}
+            {added > 0 && <span className="text-ok">+{added.toLocaleString("en-US")}</span>}
+            {removed > 0 && <span className="text-bad">−{removed.toLocaleString("en-US")}</span>}
             {fresh.length > 0 && (
               <span className="shrink-0 text-muted-foreground">
                 {many(fresh.length, "new file")}
@@ -98,9 +87,7 @@ export const ChangesView = ({
           )}
         </FileBar>
         {paths.length === 0 ? (
-          <p className="m-auto p-6 text-sm text-muted-foreground">
-            No changes.
-          </p>
+          <p className="m-auto p-6 text-sm text-muted-foreground">No changes.</p>
         ) : (
           <Review ws={ws} patch={patch} focus={focus} />
         )}

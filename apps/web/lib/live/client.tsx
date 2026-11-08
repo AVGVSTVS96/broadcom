@@ -1,13 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-  createContext,
-  use,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { createContext, use, useEffect, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { applyChange } from "@/lib/live/event";
@@ -32,10 +26,7 @@ const createStore = (initial: Live): Store => {
         return;
       }
 
-      live =
-        event.type === "snapshot"
-          ? event.live
-          : applyChange(live, event.change);
+      live = event.type === "snapshot" ? event.live : applyChange(live, event.change);
 
       for (const listener of listeners) {
         listener();
@@ -65,13 +56,7 @@ const useStore = () => {
   return store;
 };
 
-export const LiveProvider = ({
-  initial,
-  children,
-}: {
-  initial: Live;
-  children: ReactNode;
-}) => {
+export const LiveProvider = ({ initial, children }: { initial: Live; children: ReactNode }) => {
   const [store] = useState(() => createStore(initial));
   const router = useRouter();
 
@@ -88,7 +73,7 @@ export const LiveProvider = ({
 
     source.addEventListener("message", (message: MessageEvent<string>) => {
       // SAFETY: /api/live only sends events lib/live/decode.ts decoded and serialized.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the server already decoded it, and decoding again would ship every schema to the browser
       const event = JSON.parse(message.data) as LiveEvent;
 
       store.apply(event);
@@ -98,10 +83,7 @@ export const LiveProvider = ({
         pending === undefined &&
         event.tags.some((tag) => store.wanted.has(tag))
       ) {
-        pending = setTimeout(
-          refresh,
-          Math.max(0, last + refreshEvery - Date.now())
-        );
+        pending = setTimeout(refresh, Math.max(0, last + refreshEvery - Date.now()));
       }
     });
 
@@ -120,7 +102,7 @@ export const useLive = <A,>(select: (live: Live) => A): A => {
   return useSyncExternalStore(
     store.subscribe,
     () => select(store.read()),
-    () => select(store.read())
+    () => select(store.read()),
   );
 };
 

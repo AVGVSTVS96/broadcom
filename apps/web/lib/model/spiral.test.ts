@@ -111,10 +111,7 @@ describe("spiral", () => {
   });
 
   test("the shift compares where in the week each run-out came", () => {
-    const turns = [
-      ranOutTurn(day(9, 19), day(9, 23, 15)),
-      ranOutTurn(day(9, 26), day(9, 30, 11)),
-    ];
+    const turns = [ranOutTurn(day(9, 19), day(9, 23, 15)), ranOutTurn(day(9, 26), day(9, 30, 11))];
 
     expect(shiftOf(turns, 1)).toEqual({
       earlier: 4 * HOUR,

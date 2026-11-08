@@ -30,6 +30,4 @@ export const startOfWeek = (at: number) => {
 };
 
 export const lastDays = (now: number, count: number) =>
-  Array.from({ length: count }, (_, index) =>
-    addDays(startOfDay(now), index - count + 1)
-  );
+  Array.from({ length: count }, (_, index) => addDays(startOfDay(now), index - count + 1));

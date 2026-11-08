@@ -42,9 +42,7 @@ export const Nav = () => {
       <nav className="-mx-1 hidden items-center rounded-full bg-muted p-1 md:flex">
         {groups.map((group, index) => (
           <Fragment key={group[0].href}>
-            {index > 0 && (
-              <span aria-hidden className="mx-1 h-4 w-px bg-border" />
-            )}
+            {index > 0 && <span aria-hidden className="mx-1 h-4 w-px bg-border" />}
             {group.map((page) => (
               <Link
                 key={page.href}

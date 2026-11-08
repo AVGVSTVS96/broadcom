@@ -5,16 +5,13 @@ const secret = /key|secret|token|password|credential/iu;
 
 const hidden = "••••";
 
-const scalar = (
-  value: Schema.Json
-): value is string | number | boolean | null =>
+const scalar = (value: Schema.Json): value is string | number | boolean | null =>
   value === null ||
   Predicate.isString(value) ||
   Predicate.isNumber(value) ||
   Predicate.isBoolean(value);
 
-const isList = (value: Schema.Json): value is Schema.JsonArray =>
-  Array.isArray(value);
+const isList = (value: Schema.Json): value is Schema.JsonArray => Array.isArray(value);
 
 export const redact = (config: Schema.Json, hide = false): Schema.Json => {
   if (isList(config)) {
@@ -29,6 +26,6 @@ export const redact = (config: Schema.Json, hide = false): Schema.Json => {
     Object.entries(config).map(([name, value]) => [
       name,
       redact(value, secret.test(name) && (scalar(value) || isList(value))),
-    ])
+    ]),
   );
 };

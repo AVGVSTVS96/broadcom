@@ -9,9 +9,7 @@ import { Config } from "@/lib/proxy/schema";
 const config = {
   access: { "api-keys": ["sk-one", "sk-two"] },
   "api-keys": {
-    claude: [
-      { keys: [{ "api-key": "sk-ant", auth_index: "a1" }], name: "org" },
-    ],
+    claude: [{ keys: [{ "api-key": "sk-ant", auth_index: "a1" }], name: "org" }],
   },
   management: { "allow-remote": true, "secret-key": "hash" },
   routing: {
@@ -37,9 +35,7 @@ describe("settings", () => {
   test("changes carry only what changed, at its config path", () => {
     const before = valuesOf(Schema.decodeUnknownSync(Config)(config));
 
-    expect(
-      changesOf(before, { ...before, resetCommand: "", sessionAffinity: false })
-    ).toEqual([
+    expect(changesOf(before, { ...before, resetCommand: "", sessionAffinity: false })).toEqual([
       { from: true, path: "routing/session-affinity", value: false },
       { from: "notify", path: "routing/pool/reset-command", value: "" },
     ]);
@@ -68,9 +64,7 @@ describe("settings", () => {
 
     expect(conflicts(changes, before)).toEqual([]);
     expect(
-      conflicts(changes, { ...before, strategy: "round-robin" }).map(
-        (field) => field.key
-      )
+      conflicts(changes, { ...before, strategy: "round-robin" }).map((field) => field.key),
     ).toEqual(["strategy"]);
   });
 
@@ -78,9 +72,7 @@ describe("settings", () => {
     expect(redact(config)).toEqual({
       access: { "api-keys": ["••••", "••••"] },
       "api-keys": {
-        claude: [
-          { keys: [{ "api-key": "••••", auth_index: "a1" }], name: "org" },
-        ],
+        claude: [{ keys: [{ "api-key": "••••", auth_index: "a1" }], name: "org" }],
       },
       management: { "allow-remote": true, "secret-key": "••••" },
       routing: config.routing,

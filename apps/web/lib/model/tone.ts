@@ -7,10 +7,7 @@ export const emptyCredit = 1;
 
 const lowCredit = 0.1;
 
-export const windowTone = (
-  window: LimitWindow,
-  pace: Pace | null = null
-): Tone => {
+export const windowTone = (window: LimitWindow, pace: Pace | null = null): Tone => {
   if (window.used === null) {
     return "none";
   }

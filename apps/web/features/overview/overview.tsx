@@ -30,10 +30,7 @@ export const Overview = ({
   const summary = poolOf(plans);
   const next = plans.find((plan) => plan.id === pool?.next);
 
-  const active = Object.values(accounts).reduce(
-    (sum, account) => sum + account.working,
-    0
-  );
+  const active = Object.values(accounts).reduce((sum, account) => sum + account.working, 0);
 
   return (
     <div className="space-y-10">
@@ -58,11 +55,7 @@ export const Overview = ({
           </p>
         </div>
         <Problems problems={problems} />
-        <Pools
-          summary={summary}
-          creditProblem={grants === null ? "Didn't load" : null}
-          now={now}
-        />
+        <Pools summary={summary} creditProblem={grants === null ? "Didn't load" : null} now={now} />
         <PlanRows plans={plans} next={pool?.next ?? null} now={now} />
       </section>
       <PaceSection plans={plans} now={now} />

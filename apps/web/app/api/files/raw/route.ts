@@ -7,8 +7,7 @@ export const GET = async (request: NextRequest) => {
   const params = request.nextUrl.searchParams;
   const ws = await findWorkspace(params.get("ws") ?? "");
 
-  const picture =
-    ws === null ? null : await readPicture(ws, params.get("path") ?? "");
+  const picture = ws === null ? null : await readPicture(ws, params.get("path") ?? "");
 
   return picture === null
     ? new Response("Not a picture in this workspace", { status: 404 })

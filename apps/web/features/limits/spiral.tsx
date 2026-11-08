@@ -75,9 +75,7 @@ const shownRunOuts = 4;
 
 const runOutsText = (spiral: Spiral) => {
   const outs = spiral.turns.flatMap((turn) =>
-    turn.runOuts.map((at) =>
-      turn.current ? clock(toMinute(at)) : `${date(at)} ${timeOnly(at)}`
-    )
+    turn.runOuts.map((at) => (turn.current ? clock(toMinute(at)) : `${date(at)} ${timeOnly(at)}`)),
   );
 
   if (outs.length === 0) {
@@ -100,7 +98,7 @@ const detailOf = (spiral: Spiral, plan: Plan, now: number) => {
       : `Then locked until ${when(pace.resetsAt, now)}.`;
 
   const estimated = spiral.turns.some((turn) =>
-    turn.cells.some((cell) => cell.to - cell.from > HOUR)
+    turn.cells.some((cell) => cell.to - cell.from > HOUR),
   );
 
   const estimates =
@@ -108,23 +106,13 @@ const detailOf = (spiral: Spiral, plan: Plan, now: number) => {
       ? `Before ${date(spiral.exactFrom)}, daily estimates.`
       : null;
 
-  return [after, runOutsText(spiral), estimates]
-    .filter((part) => part !== null)
-    .join(" ");
+  return [after, runOutsText(spiral), estimates].filter((part) => part !== null).join(" ");
 };
 
 const lockedTime = (spans: readonly Span[]) =>
   spans.reduce((sum, [from, to]) => sum + (to - from), 0);
 
-const Center = ({
-  spiral,
-  selected,
-  now,
-}: {
-  spiral: Spiral;
-  selected: number;
-  now: number;
-}) => {
+const Center = ({ spiral, selected, now }: { spiral: Spiral; selected: number; now: number }) => {
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -138,14 +126,10 @@ const Center = ({
 
   const lockCaption = () => {
     if (end === undefined) {
-      return turn.current
-        ? "locked this week"
-        : `locked, week of ${date(turn.from)}`;
+      return turn.current ? "locked this week" : `locked, week of ${date(turn.from)}`;
     }
 
-    return turn.ranOut === null
-      ? "locked if the pace holds"
-      : `locked until ${when(end, now)}`;
+    return turn.ranOut === null ? "locked if the pace holds" : `locked until ${when(end, now)}`;
   };
 
   const [value, caption] =
@@ -159,12 +143,8 @@ const Center = ({
   return (
     <div className="pointer-events-none absolute inset-0 grid place-items-center">
       <div className="max-w-[40%] text-center">
-        <div className="text-base font-normal tracking-tight tabular-nums sm:text-2xl">
-          {value}
-        </div>
-        <div className="text-[11px] leading-tight text-muted-foreground sm:text-xs">
-          {caption}
-        </div>
+        <div className="text-base font-normal tracking-tight tabular-nums sm:text-2xl">{value}</div>
+        <div className="text-[11px] leading-tight text-muted-foreground sm:text-xs">{caption}</div>
       </div>
     </div>
   );
@@ -202,8 +182,7 @@ const Scale = () => (
   </span>
 );
 
-const x = (turn: Turn, at: number) =>
-  ((at - turn.from) / (turn.to - turn.from)) * 100;
+const x = (turn: Turn, at: number) => ((at - turn.from) / (turn.to - turn.from)) * 100;
 
 const y = (used: number) => 100 - used;
 
@@ -267,13 +246,7 @@ const Curve = ({
         ))}
         <span className="absolute inset-x-0 bottom-0 border-t" />
         {turn.locks.map(([from, to]) => (
-          <Band
-            key={from}
-            x0={x(turn, from)}
-            x1={x(turn, to)}
-            y0={y(cutoff)}
-            style={hatchStyle}
-          />
+          <Band key={from} x0={x(turn, from)} x1={x(turn, to)} y0={y(cutoff)} style={hatchStyle} />
         ))}
         {locksIn(turn, ahead)
           .slice(turn.locks.length)
@@ -334,11 +307,9 @@ const Curve = ({
   );
 };
 
-const points = (value: number) =>
-  value < 10 ? value.toFixed(1) : String(Math.round(value));
+const points = (value: number) => (value < 10 ? value.toFixed(1) : String(Math.round(value)));
 
-const barHeight = (value: number, top: number) =>
-  `${Math.max(2, (value / top) * 100)}%`;
+const barHeight = (value: number, top: number) => `${Math.max(2, (value / top) * 100)}%`;
 
 const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
   const used = day.used ?? 0;
@@ -362,10 +333,7 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
   return (
     <div className="flex h-full min-w-0 flex-col items-center justify-end gap-1">
       <span
-        className={cn(
-          "text-xs tabular-nums",
-          over ? "text-foreground" : "text-muted-foreground"
-        )}
+        className={cn("text-xs tabular-nums", over ? "text-foreground" : "text-muted-foreground")}
       >
         {ahead ? `~${points(day.forecast)}` : null}
         {day.used === null ? null : points(used)}
@@ -378,10 +346,7 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
       ) : null}
       {day.used === null ? null : (
         <span
-          className={cn(
-            "w-full max-w-9 rounded-t-[3px]",
-            over ? "bg-over" : "bg-foreground/35"
-          )}
+          className={cn("w-full max-w-9 rounded-t-[3px]", over ? "bg-over" : "bg-foreground/35")}
           style={{ height: barHeight(used, top) }}
         />
       )}
@@ -390,10 +355,7 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
 };
 
 const PerDay = ({ turn }: { turn: Turn }) => {
-  const top = Math.max(
-    evenPerDay * 2,
-    ...turn.days.map((day) => (day.used ?? 0) + day.forecast)
-  );
+  const top = Math.max(evenPerDay * 2, ...turn.days.map((day) => (day.used ?? 0) + day.forecast));
 
   return (
     <div className="space-y-3">
@@ -451,19 +413,9 @@ const outNote = (turn: Turn, shift: number | null, projected: boolean) => {
   return turn.ranOut === null ? "not this week" : "";
 };
 
-const muted = (text: string) => (
-  <span className="text-muted-foreground">{text}</span>
-);
+const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-const Stats = ({
-  spiral,
-  selected,
-  now,
-}: {
-  spiral: Spiral;
-  selected: number;
-  now: number;
-}) => {
+const Stats = ({ spiral, selected, now }: { spiral: Spiral; selected: number; now: number }) => {
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -491,24 +443,14 @@ const Stats = ({
           </span>
         }
       >
-        <div className="text-sm text-muted-foreground">
-          {outNote(turn, shift, projected)}
-        </div>
+        <div className="text-sm text-muted-foreground">{outNote(turn, shift, projected)}</div>
       </Stat>
-      <Stat
-        compact
-        label={muted("Locked")}
-        value={held.all === 0 ? "0 h" : span(held.all)}
-      >
+      <Stat compact label={muted("Locked")} value={held.all === 0 ? "0 h" : span(held.all)}>
         <div className="text-sm text-muted-foreground">
           {end === null ? "not this week" : `until ${when(end, now)}`}
         </div>
       </Stat>
-      <Stat
-        compact
-        label={muted("Usual hours")}
-        value={usualWeek === 0 ? "–" : `${held.usual} h`}
-      >
+      <Stat compact label={muted("Usual hours")} value={usualWeek === 0 ? "–" : `${held.usual} h`}>
         <div className="text-sm text-muted-foreground">
           {usualWeek === 0 ? "none regular yet" : `locked, of ${usualWeek}`}
         </div>
@@ -542,12 +484,7 @@ const Panel = ({
           {plan.account.plan} · 7-day limit · week of {date(turn.from)}
         </div>
       </div>
-      <Curve
-        turn={turn}
-        pace={plan.pace}
-        ahead={turn.current ? spiral.ahead : null}
-        now={now}
-      />
+      <Curve turn={turn} pace={plan.pace} ahead={turn.current ? spiral.ahead : null} now={now} />
       <Legend
         items={[
           { key: "line", label: "Used" },
@@ -601,10 +538,7 @@ const Picker = ({
       {plans.map((plan) => (
         <SelectItem key={plan.id} value={plan.id}>
           <span
-            className={cn(
-              "size-2 rounded-full",
-              plan.id === next ? "bg-brand" : "bg-transparent"
-            )}
+            className={cn("size-2 rounded-full", plan.id === next ? "bg-brand" : "bg-transparent")}
           />
           {plan.name}
         </SelectItem>
@@ -673,14 +607,7 @@ export const SpiralView = ({
     <Section
       title={titleOf(plan, now)}
       detail={detailOf(spiral, plan, now)}
-      actions={
-        <Picker
-          plans={plans}
-          value={plan.id}
-          next={next}
-          onChange={setChosen}
-        />
-      }
+      actions={<Picker plans={plans} value={plan.id} next={next} onChange={setChosen} />}
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
         <div className="min-w-0 space-y-3">

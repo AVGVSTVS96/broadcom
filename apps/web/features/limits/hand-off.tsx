@@ -26,9 +26,7 @@ const freeFill = (cell: Hour) => {
 };
 
 const noneFree = (day: Day) =>
-  day.hours.filter(
-    (cell) => !cell.future && cell.present > 0 && cell.free === 0
-  ).length;
+  day.hours.filter((cell) => !cell.future && cell.present > 0 && cell.free === 0).length;
 
 const DayRow = ({
   day,
@@ -64,24 +62,19 @@ const DayRow = ({
                       "h-2.5 rounded-[2px]",
                       own === undefined || cell.future || !own.present
                         ? "border border-dashed"
-                        : level(own.used)
+                        : level(own.used),
                     )}
-                    style={own?.locked && !cell.future ? hatchStyle : undefined}
+                    style={own?.locked === true && !cell.future ? hatchStyle : undefined}
                   />
                 );
               })}
             </div>
           </Fragment>
         ))}
-        <span className="pt-0.5 text-[10px] leading-none text-muted-foreground">
-          Free
-        </span>
+        <span className="pt-0.5 text-[10px] leading-none text-muted-foreground">Free</span>
         <div className="grid grid-cols-24 gap-0.5 pt-0.5">
           {day.hours.map((cell) => (
-            <span
-              key={cell.from}
-              className={cn("h-2.5 rounded-[2px]", freeFill(cell))}
-            />
+            <span key={cell.from} className={cn("h-2.5 rounded-[2px]", freeFill(cell))} />
           ))}
         </div>
       </div>
@@ -122,15 +115,10 @@ const PerDay = ({ days }: { days: readonly Day[] }) => {
             >
               <span className="text-xs tabular-nums">{count}</span>
               <span
-                className={cn(
-                  "w-full max-w-6 rounded-t-[4px]",
-                  count > 0 ? "bg-bad" : "bg-track"
-                )}
+                className={cn("w-full max-w-6 rounded-t-[4px]", count > 0 ? "bg-bad" : "bg-track")}
                 style={{ height: `${Math.max(4, (count / top) * 100)}%` }}
               />
-              <span className="text-xs text-muted-foreground">
-                {weekday(day.from)}
-              </span>
+              <span className="text-xs text-muted-foreground">{weekday(day.from)}</span>
             </div>
           );
         })}
@@ -174,7 +162,7 @@ export const HandOffView = ({
               day={day}
               plans={plans}
               dayGaps={found.filter(
-                (gap) => gap.from < addHours(day.from, 24) && gap.to > day.from
+                (gap) => gap.from < addHours(day.from, 24) && gap.to > day.from,
               )}
             />
           ))}

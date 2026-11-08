@@ -21,9 +21,7 @@ const LimitsPage = async ({ searchParams }: PageProps<"/limits">) => {
 
   const problems = [
     history.ok ? null : `Limit history didn't load: ${history.reason}`,
-    daily === null || daily.ok
-      ? null
-      : `Daily limits didn't load: ${daily.reason}`,
+    daily === null || daily.ok ? null : `Daily limits didn't load: ${daily.reason}`,
   ].filter((problem) => problem !== null);
 
   return (

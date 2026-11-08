@@ -2,14 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { activity, busiest, gaps } from "@/lib/model/activity";
 import { duration, when } from "@/lib/model/format";
-import {
-  HOUR,
-  WEEK,
-  compact,
-  lastDrop,
-  lockedSpans,
-  usedBetween,
-} from "@/lib/model/history";
+import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/model/history";
 import type { Points } from "@/lib/model/history";
 import { namesOf } from "@/lib/model/names";
 import { windowPace } from "@/lib/model/pace";
@@ -71,13 +64,13 @@ describe("history", () => {
         [1, 98],
         [2, 100],
         [3, 2],
-      ])
+      ]),
     ).toBe(3);
     expect(
       lastDrop([
         [0, 99],
         [1, 98],
-      ])
+      ]),
     ).toBeNull();
   });
 
@@ -111,18 +104,14 @@ describe("windowPace", () => {
 
     expect(pace?.pace).toBeCloseTo(1);
     expect(pace?.even).toBeCloseTo(50);
-    expect(
-      Math.abs((pace?.runsOut ?? 0) - at(84 + 48 * (84 / 50)))
-    ).toBeLessThan(2 * HOUR);
+    expect(Math.abs((pace?.runsOut ?? 0) - at(84 + 48 * (84 / 50)))).toBeLessThan(2 * HOUR);
   });
 
   test("ahead of pace runs out before reset", () => {
     const pace = windowPace(window(50), ramp(0, 42, 50 / 42), at(42));
 
     expect(pace?.pace).toBeCloseTo(2);
-    expect(
-      Math.abs((pace?.runsOut ?? 0) - at(42 + 48 * (42 / 50)))
-    ).toBeLessThan(2 * HOUR);
+    expect(Math.abs((pace?.runsOut ?? 0) - at(42 + 48 * (42 / 50)))).toBeLessThan(2 * HOUR);
     expect(pace?.atReset).toBe(100);
   });
 
@@ -143,12 +132,7 @@ describe("windowPace", () => {
   });
 
   test("a plan change restarts the window the pace and the chart count from", () => {
-    const points: Points = [
-      [at(0), 0],
-      [at(10), 8],
-      [at(12), 0],
-      ...ramp(12, 24, 2 / 12),
-    ];
+    const points: Points = [[at(0), 0], [at(10), 8], [at(12), 0], ...ramp(12, 24, 2 / 12)];
 
     const pace = windowPace(window(2), points, at(24));
 
@@ -164,12 +148,10 @@ describe("windowPace", () => {
     const runOuts = [0, 3, 6, 9].map((minutes) => {
       const now = at(2) + minutes * 60_000;
 
-      return windowPace({ ...window(12), sampledAt: now }, points, now)
-        ?.runsOut;
+      return windowPace({ ...window(12), sampledAt: now }, points, now)?.runsOut;
     });
 
-    const spread =
-      Math.max(...runOuts.map(Number)) - Math.min(...runOuts.map(Number));
+    const spread = Math.max(...runOuts.map(Number)) - Math.min(...runOuts.map(Number));
 
     expect(spread).toBeLessThan(15 * 60_000);
   });
@@ -224,15 +206,15 @@ describe("pool", () => {
           { id: "2", label: "b@y.com" },
           { id: "3", label: "b@z.com" },
         ],
-        []
-      )
+        [],
+      ),
     ).toEqual({ "1": "a", "2": "b@y.com", "3": "b@z.com", none: "No account" });
   });
 
   test("an API key folds into the login that owns its credit", () => {
     const result = logins(
       [account("plan", "me@x.com"), account("key", "", "")],
-      [grant("key", "plan")]
+      [grant("key", "plan")],
     );
 
     expect(result).toHaveLength(1);
@@ -258,9 +240,7 @@ describe("format", () => {
 
     expect(when(new Date(2026, 10, 5, 20, 13).getTime(), now)).toBe("8:13 PM");
     expect(when(new Date(2026, 10, 7, 18).getTime(), now)).toBe("Sat 6 PM");
-    expect(when(new Date(2026, 10, 7, 17, 59, 59).getTime(), now)).toBe(
-      "Sat 6 PM"
-    );
+    expect(when(new Date(2026, 10, 7, 17, 59, 59).getTime(), now)).toBe("Sat 6 PM");
     expect(when(new Date(2026, 10, 11, 18).getTime(), now)).toBe("Nov 11");
   });
 });
@@ -292,9 +272,7 @@ describe("activity", () => {
 
     const days = activity(plans, now, 1);
 
-    expect(gaps(days)).toEqual([
-      { from: dayStart + 3 * HOUR, to: dayStart + 6 * HOUR },
-    ]);
+    expect(gaps(days)).toEqual([{ from: dayStart + 3 * HOUR, to: dayStart + 6 * HOUR }]);
     expect(days[0]?.hours[2]?.runOuts).toEqual(["a"]);
     expect(days[0]?.locked).toBe(2);
     expect(busiest(days).start).toBe(1);
@@ -308,8 +286,7 @@ describe("windows", () => {
   });
 });
 
-const novemberDay = (date: number, hour = 0) =>
-  new Date(2026, 10, date, hour).getTime();
+const novemberDay = (date: number, hour = 0) => new Date(2026, 10, date, hour).getTime();
 
 const outlook = (overrides: Partial<Outlook>): Outlook => ({
   cutoff: 98,
@@ -335,12 +312,7 @@ describe("weeks", () => {
   };
 
   test("weeks split Monday to Sunday, the first one partial", () => {
-    const result = weeksOf(
-      daily,
-      since,
-      now,
-      outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 })
-    );
+    const result = weeksOf(daily, since, now, outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 }));
 
     expect(result.weeks).toHaveLength(4);
     expect(result.weeks[0]?.part).toBe(true);
@@ -351,12 +323,9 @@ describe("weeks", () => {
   });
 
   test("the forecast starts now, so today's run-out lands on today", () => {
-    const week = weeksOf(
-      daily,
-      since,
-      now,
-      outlook({ rate: 10 / (24 * HOUR), room: 3 })
-    ).weeks.at(-1);
+    const week = weeksOf(daily, since, now, outlook({ rate: 10 / (24 * HOUR), room: 3 })).weeks.at(
+      -1,
+    );
 
     expect(week?.days[3]?.forecast).toBeCloseTo(3);
     expect(week?.days[3]?.out).toBe("forecast");
@@ -369,15 +338,10 @@ describe("weeks", () => {
       since,
       now,
       outlook({
-        locks: [
-          [
-            new Date(2026, 10, 3, 10).getTime(),
-            new Date(2026, 10, 7, 18).getTime(),
-          ],
-        ],
+        locks: [[new Date(2026, 10, 3, 10).getTime(), new Date(2026, 10, 7, 18).getTime()]],
         rate: 10 / (24 * HOUR),
         resetsAt: new Date(2026, 10, 7, 18).getTime(),
-      })
+      }),
     ).weeks.at(-1);
 
     expect(week?.expected).toBeCloseTo(20 + 2.5 + 10);
@@ -391,7 +355,7 @@ describe("weeks", () => {
       { days: [[new Date(2026, 10, 2).getTime(), 0.002]], id: "a" },
       since,
       now,
-      outlook({ since: new Date(2026, 10, 4, 22).getTime() })
+      outlook({ since: new Date(2026, 10, 4, 22).getTime() }),
     ).weeks.at(-1);
 
     expect(week?.days[0]?.used).toBeNull();
@@ -412,7 +376,7 @@ describe("weeks", () => {
         [novemberDay(3, 9), 60],
         [novemberDay(3, 20), 99],
       ],
-      novemberDay(3, 21)
+      novemberDay(3, 21),
     );
 
     expect(merged.days).toEqual([

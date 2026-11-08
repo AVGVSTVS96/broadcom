@@ -9,8 +9,5 @@ export const GET = async (request: NextRequest) => {
 
   return ws === null
     ? new Response("No such workspace", { status: 404 })
-    : changeStream(
-        request.signal,
-        async (changed) => await watchWorkspace(ws, changed)
-      );
+    : changeStream(request.signal, async (changed) => await watchWorkspace(ws, changed));
 };

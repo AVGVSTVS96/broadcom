@@ -22,12 +22,7 @@ const Column = ({
   <div className="min-w-0 space-y-3 py-5 sm:px-6 sm:first:pl-0 sm:last:pr-0">
     <div className="text-sm">{label}</div>
     <div className="flex items-baseline gap-1.5">
-      <span
-        className={cn(
-          "text-5xl font-light tracking-tight tabular-nums",
-          texts[totals.tone]
-        )}
-      >
+      <span className={cn("text-5xl font-light tracking-tight tabular-nums", texts[totals.tone])}>
         {value}
       </span>
       <span className="text-sm text-muted-foreground">{unit}</span>
@@ -48,8 +43,7 @@ export const Pools = ({
   creditProblem: string | null;
   now: number;
 }) => {
-  const { credit, firstBack, open, session, sessionReset, subscriptions } =
-    summary;
+  const { credit, firstBack, open, session, sessionReset, subscriptions } = summary;
 
   return (
     <div className="grid border-y max-sm:divide-y sm:grid-cols-3 sm:divide-x">

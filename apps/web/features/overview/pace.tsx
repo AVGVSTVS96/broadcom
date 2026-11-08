@@ -5,16 +5,7 @@ import type { PointerEvent, ReactNode } from "react";
 
 import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
-import {
-  Area,
-  At,
-  Band,
-  Dot,
-  Path,
-  Plot,
-  Strokes,
-  freeSpot,
-} from "@/components/viz/plot";
+import { Area, At, Band, Dot, Path, Plot, Strokes, freeSpot } from "@/components/viz/plot";
 import type { Box, XY } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { duration, percent, times, when } from "@/lib/model/format";
@@ -26,10 +17,7 @@ import type { Paced, Plan } from "@/lib/model/pool";
 import { cn } from "@/lib/utils";
 
 const fraction = (pace: Pace, at: number) =>
-  Math.min(
-    100,
-    Math.max(0, ((at - pace.start) / (pace.resetsAt - pace.start)) * 100)
-  );
+  Math.min(100, Math.max(0, ((at - pace.start) / (pace.resetsAt - pace.start)) * 100));
 
 const lineOf = (pace: Pace, now: number): XY[] => {
   const end = pace.ranOut ?? now;
@@ -38,9 +26,7 @@ const lineOf = (pace: Pace, now: number): XY[] => {
     .filter(([at]) => at <= end)
     .map(([at, used]) => [fraction(pace, at), 100 - used]);
 
-  return pace.locked
-    ? drawn
-    : [...drawn, [fraction(pace, now), 100 - pace.used]];
+  return pace.locked ? drawn : [...drawn, [fraction(pace, now), 100 - pace.used]];
 };
 
 const projectionOf = (pace: Pace, now: number): XY[] | null => {
@@ -108,11 +94,7 @@ const Readout = ({
 }) => (
   <div className="space-y-1">
     <div className="text-sm text-muted-foreground">{label}</div>
-    <div
-      className={cn("text-2xl font-light tracking-tight", bad && "text-bad")}
-    >
-      {value}
-    </div>
+    <div className={cn("text-2xl font-light tracking-tight", bad && "text-bad")}>{value}</div>
   </div>
 );
 
@@ -120,11 +102,7 @@ const Outlook = ({ pace, now }: { pace: Pace; now: number }) => {
   if (pace.locked) {
     return (
       <>
-        <Readout
-          label="Ran out"
-          value={pace.ranOut === null ? "–" : when(pace.ranOut, now)}
-          bad
-        />
+        <Readout label="Ran out" value={pace.ranOut === null ? "–" : when(pace.ranOut, now)} bad />
         <Readout label="Back" value={when(pace.resetsAt, now)} />
       </>
     );
@@ -232,7 +210,7 @@ const zoneSpots = (size: { height: number; width: number }) => {
 
   return {
     ahead: grid((left, top) => ({ ...ahead, left, top })).filter(
-      (spot) => spot.top + spot.height < 99 - spot.left - spot.width
+      (spot) => spot.top + spot.height < 99 - spot.left - spot.width,
     ),
     behind: grid((right, bottom) => ({
       ...behind,
@@ -264,13 +242,7 @@ const xTicks = [
 
 const yTicks = [0, 25, 50, 75, 100] as const;
 
-export const PaceSection = ({
-  plans,
-  now,
-}: {
-  plans: readonly Plan[];
-  now: number;
-}) => {
+export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: number }) => {
   const ranked = byPace(plans);
 
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -288,9 +260,7 @@ export const PaceSection = ({
   const drawn = ranked.flatMap((plan) => {
     const projection = projectionOf(plan.pace, now);
 
-    return projection === null
-      ? [lineOf(plan.pace, now)]
-      : [lineOf(plan.pace, now), projection];
+    return projection === null ? [lineOf(plan.pace, now)] : [lineOf(plan.pace, now), projection];
   });
 
   const spots = zoneSpots(size);
@@ -303,9 +273,7 @@ export const PaceSection = ({
   const track = (event: PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
 
-    setHover(
-      Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100))
-    );
+    setHover(Math.min(100, Math.max(0, ((event.clientX - box.left) / box.width) * 100)));
   };
 
   return (
@@ -383,15 +351,11 @@ export const PaceSection = ({
                   {ordered.map((plan) => {
                     const projection = projectionOf(plan.pace, now);
 
-                    const tone =
-                      plan === focus ? "text-foreground" : "text-faint";
+                    const tone = plan === focus ? "text-foreground" : "text-faint";
 
                     return (
                       <g key={plan.id}>
-                        <Path
-                          points={lineOf(plan.pace, now)}
-                          className={tone}
-                        />
+                        <Path points={lineOf(plan.pace, now)} className={tone} />
                         {projection === null ? null : (
                           <Path points={projection} dashed className={tone} />
                         )}
@@ -447,10 +411,7 @@ export const PaceSection = ({
                       key={plan.id}
                       x0={fraction(plan.pace, from)}
                       x1={100}
-                      className={cn(
-                        "rounded-[2px]",
-                        plan !== focus && "opacity-35"
-                      )}
+                      className={cn("rounded-[2px]", plan !== focus && "opacity-35")}
                       style={{
                         ...(plan.pace.locked ? hatchStyle : forecastHatchStyle),
                         height: "8px",
@@ -466,22 +427,13 @@ export const PaceSection = ({
 
                   return (
                     <div key={plan.id}>
-                      {projected === undefined ||
-                      plan.pace.runsOut !== null ? null : (
-                        <At
-                          x={projected[0]}
-                          y={projected[1]}
-                          className="text-faint"
-                        >
+                      {projected === undefined || plan.pace.runsOut !== null ? null : (
+                        <At x={projected[0]} y={projected[1]} className="text-faint">
                           <Dot hollow className="size-2" />
                         </At>
                       )}
                       {end === undefined ? null : (
-                        <At
-                          x={end[0]}
-                          y={end[1]}
-                          className={isFocus ? "z-20" : "z-10"}
-                        >
+                        <At x={end[0]} y={end[1]} className={isFocus ? "z-20" : "z-10"}>
                           <button
                             type="button"
                             aria-label={plan.name}
@@ -504,14 +456,8 @@ export const PaceSection = ({
                         </At>
                       )}
                       {plan.pace.runsOut === null ? null : (
-                        <At
-                          x={fraction(plan.pace, plan.pace.runsOut)}
-                          y={100 - plan.pace.cutoff}
-                        >
-                          <Dot
-                            tone="bad"
-                            className={isFocus ? undefined : "opacity-50"}
-                          />
+                        <At x={fraction(plan.pace, plan.pace.runsOut)} y={100 - plan.pace.cutoff}>
+                          <Dot tone="bad" className={cn(!isFocus && "opacity-50")} />
                         </At>
                       )}
                     </div>
@@ -525,8 +471,7 @@ export const PaceSection = ({
                         left: `${Math.min(80, fraction(focus.pace, lockFrom))}%`,
                       }}
                     >
-                      {focus.pace.locked ? "Ran out" : "Runs out"}{" "}
-                      {when(lockFrom, now)}
+                      {focus.pace.locked ? "Ran out" : "Runs out"} {when(lockFrom, now)}
                     </span>
                     <span className="absolute -top-8 right-0 text-xs text-bad max-sm:hidden">
                       Locked {duration(lockedFor(focus.pace))}
@@ -537,9 +482,7 @@ export const PaceSection = ({
                   <div
                     className="pointer-events-none absolute top-6 z-30 min-w-40 rounded-xl border bg-popover px-3 py-2 text-xs shadow-sm"
                     style={
-                      hover > 55
-                        ? { right: `${100 - hover + 1}%` }
-                        : { left: `${hover + 1}%` }
+                      hover > 55 ? { right: `${100 - hover + 1}%` } : { left: `${hover + 1}%` }
                     }
                   >
                     <div className="mb-1 text-muted-foreground">
@@ -547,20 +490,13 @@ export const PaceSection = ({
                     </div>
                     {ranked.map((plan) => {
                       const at =
-                        plan.pace.start +
-                        (hover / 100) * (plan.pace.resetsAt - plan.pace.start);
+                        plan.pace.start + (hover / 100) * (plan.pace.resetsAt - plan.pace.start);
 
-                      const used =
-                        at > now ? null : valueAt(plan.pace.line, at);
+                      const used = at > now ? null : valueAt(plan.pace.line, at);
 
                       return (
-                        <div
-                          key={plan.id}
-                          className="flex justify-between gap-4"
-                        >
-                          <span className="text-muted-foreground">
-                            {plan.name}
-                          </span>
+                        <div key={plan.id} className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">{plan.name}</span>
                           <span className="font-medium tabular-nums">
                             {used === null ? "–" : percent(used)}
                           </span>
@@ -582,7 +518,7 @@ export const PaceSection = ({
                   key={tick.at}
                   className={cn(
                     "absolute top-1.5 -translate-x-1/2",
-                    tick.at !== 50 && "max-sm:hidden"
+                    tick.at !== 50 && "max-sm:hidden",
                   )}
                   style={{ left: `${tick.at}%` }}
                 >
@@ -620,21 +556,19 @@ export const PaceSection = ({
                   }}
                   className={cn(
                     "grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                    plan === focus && "bg-muted"
+                    plan === focus && "bg-muted",
                   )}
                 >
                   <span className="truncate">{plan.name}</span>
                   <span
                     className={cn(
                       "text-right tabular-nums",
-                      result.bad ? "text-bad" : "text-muted-foreground"
+                      result.bad ? "text-bad" : "text-muted-foreground",
                     )}
                   >
                     {result.text}
                   </span>
-                  <span className="col-span-2 text-xs text-muted-foreground">
-                    {result.note}
-                  </span>
+                  <span className="col-span-2 text-xs text-muted-foreground">{result.note}</span>
                 </button>
               );
             })}

@@ -14,12 +14,7 @@ import { duration, plural, when } from "@/lib/model/format";
 import { agentSdk, byState, threadHref, waiting } from "@/lib/model/live";
 import type { Handoff, Handoffs } from "@/lib/model/live";
 import { nameOf, namesOf } from "@/lib/model/names";
-import type {
-  Account,
-  LiveSession,
-  MoveCause,
-  SessionState,
-} from "@/lib/proxy/schema";
+import type { Account, LiveSession, MoveCause, SessionState } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
 const dots = {
@@ -55,8 +50,7 @@ const causes = {
   start: "started",
 } as const satisfies Record<MoveCause, string>;
 
-const home = (cwd: string) =>
-  cwd.replace(/^\/(?:home|Users)\/[^/]+/u, "~") || "~";
+const home = (cwd: string) => cwd.replace(/^\/(?:home|Users)\/[^/]+/u, "~") || "~";
 
 const useNames = (data: LiveData) => {
   const accounts = useLive((live) => live.accounts);
@@ -66,7 +60,7 @@ const useNames = (data: LiveData) => {
       id: account.id,
       label: account.label,
     })),
-    data.grants
+    data.grants,
   );
 
   return (id: string | null) => nameOf(named, id);
@@ -78,10 +72,7 @@ const listOf = (items: readonly string[]) =>
 type Name = ReturnType<typeof useNames>;
 
 const Dot = ({ state }: { state: SessionState }) => (
-  <span
-    title={state}
-    className={cn("size-2 shrink-0 rounded-full", dots[state])}
-  >
+  <span title={state} className={cn("size-2 shrink-0 rounded-full", dots[state])}>
     <span className="sr-only">{state}</span>
   </span>
 );
@@ -108,8 +99,7 @@ const Open = ({ href, children }: { href: string; children: ReactNode }) => (
   </a>
 );
 
-const usageHref = (row: string) =>
-  `/usage?range=30d&sel=${encodeURIComponent(row)}`;
+const usageHref = (row: string) => `/usage?range=30d&sel=${encodeURIComponent(row)}`;
 
 const Waiting = ({
   sessions,
@@ -172,13 +162,7 @@ const Waiting = ({
   );
 };
 
-const SessionLine = ({
-  session,
-  now,
-}: {
-  session: LiveSession;
-  now: number;
-}) => {
+const SessionLine = ({ session, now }: { session: LiveSession; now: number }) => {
   const href = threadHref(session.row);
 
   return (
@@ -243,14 +227,10 @@ const AccountLane = ({
         <div className="flex min-w-0 items-baseline gap-2">
           <h3 className="truncate font-medium">{label}</h3>
           {account === null || account.plan === "" ? null : (
-            <span className="text-sm text-muted-foreground">
-              {account.plan}
-            </span>
+            <span className="text-sm text-muted-foreground">{account.plan}</span>
           )}
           {next ? (
-            <span className="rounded-full bg-brand/15 px-2 py-0.5 text-xs text-brand">
-              Next
-            </span>
+            <span className="rounded-full bg-brand/15 px-2 py-0.5 text-xs text-brand">Next</span>
           ) : null}
         </div>
         <div className="flex items-baseline gap-1.5 text-sm">
@@ -263,10 +243,7 @@ const AccountLane = ({
           className="rounded-full bg-foreground"
           style={{ width: `${(working.length / most) * 100}%` }}
         />
-        <span
-          className="rounded-full bg-chart-4"
-          style={{ width: `${(idle / most) * 100}%` }}
-        />
+        <span className="rounded-full bg-chart-4" style={{ width: `${(idle / most) * 100}%` }} />
       </div>
       <ul className="divide-y">
         {sessions.map((session) => (
@@ -304,9 +281,7 @@ const Running = ({
   const hosts = [...new Set(sessions.map((session) => session.host))];
   const most = Math.max(1, ...lanes.map((lane) => lane.sessions.length));
 
-  const [busiest] = lanes.toSorted(
-    (a, b) => b.sessions.length - a.sessions.length
-  );
+  const [busiest] = lanes.toSorted((a, b) => b.sessions.length - a.sessions.length);
 
   const title =
     sessions.length === 0
@@ -322,9 +297,7 @@ const Running = ({
       title={title}
       detail={
         [
-          sdk.length === 0
-            ? null
-            : `${sdk.length} on the Agent SDK or claude -p.`,
+          sdk.length === 0 ? null : `${sdk.length} on the Agent SDK or claude -p.`,
           hosts.length > 1 ? `On ${listOf(hosts)}.` : null,
         ]
           .filter((part) => part !== null)
@@ -366,15 +339,7 @@ const hourClock = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
 });
 
-const Group = ({
-  group,
-  name,
-  now,
-}: {
-  group: Handoff;
-  name: Name;
-  now: number;
-}) => {
+const Group = ({ group, name, now }: { group: Handoff; name: Name; now: number }) => {
   const shown = group.labels.slice(0, 2);
   const more = group.labels.length - shown.length;
 
@@ -392,34 +357,23 @@ const Group = ({
       <div className="truncate text-xs text-muted-foreground">
         <span
           className={cn(
-            group.cause === "limit" || group.cause === "over"
-              ? "text-bad"
-              : "text-foreground"
+            group.cause === "limit" || group.cause === "over" ? "text-bad" : "text-foreground",
           )}
         >
           {group.count > 1 ? `${group.count}× ` : ""}
           {causes[group.cause]}
         </span>
-        {shown.length === 0
-          ? null
-          : ` · ${shown.join(", ")}${more > 0 ? ` +${more}` : ""}`}
+        {shown.length === 0 ? null : ` · ${shown.join(", ")}${more > 0 ? ` +${more}` : ""}`}
       </div>
     </li>
   );
 };
 
-const between = (
-  ids: readonly string[],
-  name: Name,
-  keys: ReadonlySet<string>
-) => {
+const between = (ids: readonly string[], name: Name, keys: ReadonlySet<string>) => {
   const plans = ids.flatMap((id) => (keys.has(id) ? [] : [name(id)]));
   const apiKeys = ids.length - plans.length;
 
-  return listOf([
-    ...plans,
-    ...(apiKeys === 0 ? [] : [plural(apiKeys, "API key")]),
-  ]);
+  return listOf([...plans, ...(apiKeys === 0 ? [] : [plural(apiKeys, "API key")])]);
 };
 
 const limitTitle = (limit: number) =>
@@ -448,15 +402,13 @@ const Moves = ({
 
   const order = pool?.order ?? [];
 
-  const lanes = moves.lanes.toSorted(
-    (a, b) => rankIn(order, a.account) - rankIn(order, b.account)
-  );
+  const lanes = moves.lanes.toSorted((a, b) => rankIn(order, a.account) - rankIn(order, b.account));
 
   const peak = Math.max(
     1,
     ...lanes.flatMap((lane) =>
-      lane.started.map((count, index) => count + (lane.arrived[index] ?? 0))
-    )
+      lane.started.map((count, index) => count + (lane.arrived[index] ?? 0)),
+    ),
   );
 
   const limit = (moves.moved.limit ?? 0) + (moves.moved.over ?? 0);
@@ -466,9 +418,7 @@ const Moves = ({
     .flatMap((cause) => {
       const count = moves.moved[cause] ?? 0;
 
-      return count === 0
-        ? []
-        : [`${count.toLocaleString("en")} ${causes[cause]}`];
+      return count === 0 ? [] : [`${count.toLocaleString("en")} ${causes[cause]}`];
     })
     .join(", ");
 
@@ -487,9 +437,7 @@ const Moves = ({
       : `${who} in an hour, between ${between(bounce.between, name, keys)}`;
   };
 
-  const detail = over
-    ? `Between ${between(bounce.between, name, keys)}. ${counts}`
-    : counts;
+  const detail = over ? `Between ${between(bounce.between, name, keys)}. ${counts}` : counts;
 
   const describe = (lane: Handoffs["lanes"][number], index: number) =>
     `${hourClock.format(moves.from + index * 3_600_000)}: ${lane.started[index] ?? 0} started, ${lane.arrived[index] ?? 0} moved in, ${lane.left[index] ?? 0} moved off a limit`;
@@ -515,19 +463,16 @@ const Moves = ({
               ))}
             </div>
             {lanes.map((lane) => {
-              const started = lane.started.reduce(
-                (sum, count) => sum + count,
-                0
-              );
+              const started = lane.started.reduce((sum, count) => sum + count, 0);
 
               return (
                 <div key={lane.account} className="contents">
                   <div className="min-w-0 sm:pt-0.5">
                     <div className="truncate text-sm">{name(lane.account)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {accounts[lane.account]?.plan ?? ""}
-                      {accounts[lane.account]?.plan ? " · " : ""}
-                      {started.toLocaleString("en")} started
+                      {[accounts[lane.account]?.plan, `${started.toLocaleString("en")} started`]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </div>
                   </div>
                   <div className="grid grid-cols-24 gap-0.5">
@@ -538,9 +483,7 @@ const Moves = ({
 
                       const read = describe(lane, index);
 
-                      const on =
-                        picked?.account === lane.account &&
-                        picked.index === index;
+                      const on = picked?.account === lane.account && picked.index === index;
 
                       return (
                         <button
@@ -550,14 +493,12 @@ const Moves = ({
                           aria-label={`${name(lane.account)}, ${read}`}
                           aria-pressed={on}
                           onClick={() => {
-                            setPicked(
-                              on ? null : { account: lane.account, index }
-                            );
+                            setPicked(on ? null : { account: lane.account, index });
                           }}
                           className={cn(
                             "relative flex h-7 items-center justify-center rounded-[3px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             shades[shadeOf(count + arrived, peak)],
-                            on && "ring-2 ring-foreground"
+                            on && "ring-2 ring-foreground",
                           )}
                         >
                           {left > 0 ? (
@@ -571,9 +512,7 @@ const Moves = ({
               );
             })}
           </div>
-          <p className="min-h-5 text-sm text-muted-foreground tabular-nums">
-            {readout}
-          </p>
+          <p className="min-h-5 text-sm text-muted-foreground tabular-nums">{readout}</p>
           <Legend
             items={[
               { key: "box", label: "Sessions per hour" },

@@ -16,17 +16,13 @@ export const setPlugin = async (id: string, enabled: boolean) => {
     return { ok: false, reason: `No Claude Code plugin ${id}` };
   }
 
-  const child = spawn(
-    "claude",
-    ["plugin", enabled ? "enable" : "disable", id, "--scope", "user"],
-    {
-      env:
-        claudeDir === path.join(homedir(), ".claude")
-          ? process.env
-          : { ...process.env, CLAUDE_CONFIG_DIR: claudeDir },
-      stdio: ["ignore", "ignore", "pipe"],
-    }
-  );
+  const child = spawn("claude", ["plugin", enabled ? "enable" : "disable", id, "--scope", "user"], {
+    env:
+      claudeDir === path.join(homedir(), ".claude")
+        ? process.env
+        : { ...process.env, CLAUDE_CONFIG_DIR: claudeDir },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
 
   const chunks: Uint8Array[] = [];
 

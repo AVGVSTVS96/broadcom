@@ -30,7 +30,7 @@ export const Segmented = <T extends string>({
     }}
     className={cn(
       "flex w-fit max-w-full [scrollbar-width:none] overflow-x-auto rounded-full bg-muted p-1",
-      className
+      className,
     )}
   >
     {options.map(([option, name]) => (

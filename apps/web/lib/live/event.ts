@@ -23,9 +23,7 @@ export type LiveEvent =
 
 export const present = <A>(entries: Readonly<Record<string, A | null>>) =>
   Object.fromEntries(
-    Object.entries(entries).filter(
-      (entry): entry is [string, A] => entry[1] !== null
-    )
+    Object.entries(entries).filter((entry): entry is [string, A] => entry[1] !== null),
   );
 
 export const applyChange = (live: Live, change: LiveChange): Live => ({

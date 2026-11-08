@@ -13,7 +13,7 @@ const move = (
   cause: Move["cause"],
   from: string | null,
   to: string,
-  label: string | null = null
+  label: string | null = null,
 ): Move => ({ at, cause, from, label, session: `${at}${label}`, to });
 
 test("handoffs count starts and moves per hour, and group moves by route", () => {
@@ -29,7 +29,7 @@ test("handoffs count starts and moves per hour, and group moves by route", () =>
       move(burst + 20 * 60_000, "limit", "a", "b", "four"),
       move(now - hour, "early", "b", "a", "three"),
     ],
-    now
+    now,
   );
 
   expect(digest.started).toBe(1);
@@ -63,13 +63,13 @@ test("the worst hour of one session's moves in the day reads as a bounce", () =>
           "limit",
           index % 2 === 0 ? "a" : "b",
           index % 2 === 0 ? "b" : "a",
-          "busy"
-        )
+          "busy",
+        ),
       ),
       move(now - 20 * 60_000, "limit", "a", "c", "busy"),
       move(now - 2 * hour, "limit", "a", "b", "calm"),
     ].map((one) => ({ ...one, session: one.label ?? "" })),
-    now
+    now,
   );
 
   expect(digest.bounce).toEqual({
@@ -85,7 +85,7 @@ const session = (
   since: number,
   state: LiveSession["state"],
   account: string | null,
-  label = id
+  label = id,
 ): LiveSession => ({
   account,
   app: null,
@@ -106,6 +106,6 @@ test("only blocked sessions the proxy still seats, on a thread nothing newer too
       session("asks", now - hour, "blocked", "a"),
       session("dm", now - 3 * hour, "blocked", "a", "DM"),
       session("dm2", now - hour, "working", "a", "DM"),
-    ]).map((one) => one.id)
+    ]).map((one) => one.id),
   ).toEqual(["asks"]);
 });

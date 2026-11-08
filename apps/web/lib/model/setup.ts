@@ -101,11 +101,7 @@ export const hookSummary = (command: string) => {
   const answer = /^echo '(?<json>.*)'$/u.exec(command.trim())?.groups?.json;
 
   const behavior =
-    answer === undefined
-      ? undefined
-      : behaviorPattern.exec(answer)?.groups?.behavior;
+    answer === undefined ? undefined : behaviorPattern.exec(answer)?.groups?.behavior;
 
-  return behavior === undefined
-    ? command
-    : `Answers “${behavior}” without asking`;
+  return behavior === undefined ? command : `Answers “${behavior}” without asking`;
 };

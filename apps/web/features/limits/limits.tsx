@@ -36,15 +36,11 @@ export const Limits = ({
   const [chosen, setChosen] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
 
-  const plans = plansOf(accounts, [], history, now).filter(
-    (plan) => plan.hasPlan
-  );
+  const plans = plansOf(accounts, [], history, now).filter((plan) => plan.hasPlan);
 
   const body = () => {
     if (view === "weeks") {
-      return (
-        <WeeksView plans={plans} daily={daily} history={history} now={now} />
-      );
+      return <WeeksView plans={plans} daily={daily} history={history} now={now} />;
     }
 
     if (view === "activity") {

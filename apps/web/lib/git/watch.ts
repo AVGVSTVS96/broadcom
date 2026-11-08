@@ -12,13 +12,7 @@ const gitState = new Set(["HEAD", "index", "packed-refs"]);
 export const watchWorkspace = async (ws: Workspace, changed: () => void) => {
   const [files, dirs] = await Promise.all([
     listFiles(ws),
-    git(
-      ws.path,
-      "rev-parse",
-      "--path-format=absolute",
-      "--git-dir",
-      "--git-common-dir"
-    ),
+    git(ws.path, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"),
   ]);
 
   const [gitDir = "", commonDir = ""] = dirs.trim().split("\n");
@@ -30,18 +24,14 @@ export const watchWorkspace = async (ws: Workspace, changed: () => void) => {
 
   const watchers: FSWatcher[] = [];
 
-  const follow = (
-    dir: string,
-    wanted: (name: string) => boolean,
-    recursive = false
-  ) => {
+  const follow = (dir: string, wanted: (name: string) => boolean, recursive = false) => {
     if (existsSync(/*turbopackIgnore: true*/ dir)) {
       watchers.push(
         watch(/*turbopackIgnore: true*/ dir, { recursive }, (_, name) => {
           if (name !== null && !name.endsWith(".lock") && wanted(name)) {
             changed();
           }
-        })
+        }),
       );
     }
   };
