@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
-import { activity, busiest, gaps } from "@/lib/model/activity";
-import { duration, when } from "@/lib/model/format";
-import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import { namesOf } from "@/lib/model/names";
-import { windowPace } from "@/lib/model/pace";
-import { logins } from "@/lib/model/pool";
-import { windows } from "@/lib/model/timeline";
-import { weeksOf, withHistory } from "@/lib/model/weeks";
-import type { Outlook } from "@/lib/model/weeks";
+import { activity, busiest, gaps } from "@/lib/pool/activity";
+import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import { namesOf } from "@/lib/pool/names";
+import { windowPace } from "@/lib/pool/pace";
+import { logins } from "@/lib/pool/pool";
+import { windows } from "@/lib/pool/timeline";
+import { weeksOf, withHistory } from "@/lib/pool/weeks";
+import type { Outlook } from "@/lib/pool/weeks";
 import type { Account, Grant } from "@/lib/proxy/schema";
+import { duration, when } from "@/lib/time/format";
 
 const resetsAt = Date.UTC(2026, 10, 8, 2);
 const start = resetsAt - WEEK;

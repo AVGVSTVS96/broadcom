@@ -25,11 +25,11 @@ import {
   unitNames,
 } from "@/features/usage/words";
 import { useLive } from "@/lib/live/client";
-import { dollars, when } from "@/lib/model/format";
-import { format, isLimit } from "@/lib/model/usage";
-import type { Unit } from "@/lib/model/usage";
 import { useSubscription } from "@/lib/outside";
 import type { SessionState } from "@/lib/proxy/schema";
+import { dollars, when } from "@/lib/time/format";
+import { format, isLimit } from "@/lib/usage/usage";
+import type { Unit } from "@/lib/usage/usage";
 import { cn } from "@/lib/utils";
 
 const strength = { blocked: 3, idle: 1, working: 2 } as const;

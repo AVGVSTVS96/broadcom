@@ -3,10 +3,10 @@
 import { Problems } from "@/components/viz/problems";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { plural } from "@/lib/model/format";
-import type { Points } from "@/lib/model/history";
-import { plansOf, poolOf } from "@/lib/model/pool";
+import type { Points } from "@/lib/pool/history";
+import { plansOf, poolOf } from "@/lib/pool/pool";
 import type { Grant } from "@/lib/proxy/schema";
+import { plural } from "@/lib/time/format";
 
 import { PaceSection } from "./pace";
 import { PlanRows } from "./plans";

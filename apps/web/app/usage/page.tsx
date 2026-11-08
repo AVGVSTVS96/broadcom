@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 
 import { Views } from "@/components/viz/views";
-import { queryOf, readUsage } from "@/features/usage/read";
+import { queryOf, readUsage, readWallet } from "@/features/usage/read";
 import { UsageView } from "@/features/usage/usage";
 import { viewOf, views } from "@/features/usage/views";
 import { WalletView } from "@/features/usage/wallet";
-import { readWallet } from "@/features/usage/wallet-read";
 import { RefreshOnStale } from "@/lib/live/client";
 
 export const metadata: Metadata = { title: "Usage" };

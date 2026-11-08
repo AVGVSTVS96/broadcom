@@ -9,7 +9,7 @@ import { Review } from "@/features/files/review";
 import { StylePills } from "@/features/files/style-pills";
 import { Tree } from "@/features/files/tree";
 import { filesHref } from "@/features/files/urls";
-import type { Change } from "@/lib/model/files";
+import type { Change } from "@/lib/files/files";
 
 const many = (count: number, word: string) =>
   `${count.toLocaleString("en-US")} ${word}${count === 1 ? "" : "s"}`;

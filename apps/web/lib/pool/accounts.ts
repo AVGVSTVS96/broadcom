@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect";
 
-import { nameOf, namesOf } from "@/lib/model/names";
-import { creditTone, emptyCredit } from "@/lib/model/tone";
+import { nameOf, namesOf } from "@/lib/pool/names";
+import { creditTone, emptyCredit } from "@/lib/pool/tone";
 import type { Account, Credential, Grant, LimitWindow } from "@/lib/proxy/schema";
 
 export interface Login {

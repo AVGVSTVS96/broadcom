@@ -6,10 +6,10 @@ import path from "node:path";
 
 import { Option, Schema } from "effect";
 
-import { listRepos } from "@/lib/git/repos";
-import type { Repo } from "@/lib/git/repos";
-import { frontMatter, hookSummary } from "@/lib/model/setup";
-import type { Hook, Setup, Source } from "@/lib/model/setup";
+import { listRepos } from "@/lib/files/repos";
+import type { Repo } from "@/lib/files/repos";
+import { frontMatter, hookSummary } from "@/lib/plugins/setup";
+import type { Hook, Setup, Source } from "@/lib/plugins/setup";
 
 const home = homedir();
 

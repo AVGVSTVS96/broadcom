@@ -13,11 +13,10 @@ import { At, Band, Dot, Path, Strokes } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
 import { useLive } from "@/lib/live/client";
-import { clock, date, duration, weekday, when } from "@/lib/model/format";
-import { HOUR } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import type { Pace } from "@/lib/model/pace";
-import type { Plan } from "@/lib/model/pool";
+import { HOUR } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import type { Pace } from "@/lib/pool/pace";
+import type { Plan } from "@/lib/pool/pool";
 import {
   lockedHours,
   locksFrom,
@@ -25,10 +24,11 @@ import {
   shiftOf,
   spiralOf,
   usualPerWeek,
-} from "@/lib/model/spiral";
-import type { Span, Spiral, Turn } from "@/lib/model/spiral";
-import { evenPerDay } from "@/lib/model/weeks";
-import type { Daily, WeekDay } from "@/lib/model/weeks";
+} from "@/lib/pool/spiral";
+import type { Span, Spiral, Turn } from "@/lib/pool/spiral";
+import { evenPerDay } from "@/lib/pool/weeks";
+import type { Daily, WeekDay } from "@/lib/pool/weeks";
+import { clock, date, duration, weekday, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { legendLevels, planSteps } from "./cells";

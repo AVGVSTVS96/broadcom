@@ -1,5 +1,5 @@
-import { WEEK, since, valueAt } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
+import { WEEK, since, valueAt } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
 
 export interface Span {
   readonly from: number;

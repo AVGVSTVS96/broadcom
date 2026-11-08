@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { namesOf } from "@/lib/model/names";
+import { namesOf } from "@/lib/pool/names";
 import {
   cellsOf,
   coverageOf,
@@ -12,7 +12,7 @@ import {
   sumCells,
   totalOf,
   valuesOf,
-} from "@/lib/model/usage";
+} from "@/lib/usage/usage";
 
 const zone = "America/Los_Angeles";
 

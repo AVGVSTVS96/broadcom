@@ -9,9 +9,9 @@ import { FileView } from "@/features/files/file-view";
 import { FilesBar } from "@/features/files/files-bar";
 import { StylePills } from "@/features/files/style-pills";
 import { filesHref } from "@/features/files/urls";
-import { readBody } from "@/lib/git/read";
-import { findWorkspace, listDrafts, listPlaces } from "@/lib/git/repos";
-import type { Draft } from "@/lib/git/repos";
+import { readBody } from "@/lib/files/read";
+import { findWorkspace, listDrafts, listPlaces } from "@/lib/files/repos";
+import type { Draft } from "@/lib/files/repos";
 
 export const metadata: Metadata = { title: "Drafts" };
 

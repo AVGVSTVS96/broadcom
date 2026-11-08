@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { labelsOf } from "@/lib/model/usage";
-import { walletOf } from "@/lib/model/wallet";
+import { labelsOf } from "@/lib/usage/usage";
+import { walletOf } from "@/lib/usage/wallet";
 
 const input = {
   byAccount: { a: 4000, b: 3000, k: 600, none: 2100 },

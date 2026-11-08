@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { needs, releasesBehind, sameSource, shortRelease } from "./executor";
-import type { ExecutorApp } from "./executor";
+import { needs, releasesBehind, sameSource, shortRelease } from "@/lib/executor/executor";
+import type { ExecutorApp } from "@/lib/executor/executor";
 
 const app = (over: Partial<ExecutorApp>): ExecutorApp => ({
   accounts: [],

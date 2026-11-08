@@ -1,4 +1,4 @@
-import type { Tone } from "@/lib/model/tone";
+import type { Tone } from "@/lib/pool/tone";
 import { cn } from "@/lib/utils";
 
 export const fills = {

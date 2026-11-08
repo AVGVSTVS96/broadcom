@@ -4,11 +4,11 @@ import { hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot, Path, Strokes } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { activity, activityPlans, busiest } from "@/lib/model/activity";
-import type { Day, Hour } from "@/lib/model/activity";
-import { clock, hour as hourOf, plural, weekday } from "@/lib/model/format";
-import type { Points } from "@/lib/model/history";
-import type { Plan } from "@/lib/model/pool";
+import { activity, activityPlans, busiest } from "@/lib/pool/activity";
+import type { Day, Hour } from "@/lib/pool/activity";
+import type { Points } from "@/lib/pool/history";
+import type { Plan } from "@/lib/pool/pool";
+import { clock, hour as hourOf, plural, weekday } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { legendLevels, level, steps } from "./cells";

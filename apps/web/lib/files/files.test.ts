@@ -12,7 +12,7 @@ import {
   patchPath,
   resolveLink,
   splitPatch,
-} from "@/lib/model/files";
+} from "@/lib/files/files";
 
 describe("parseWorktrees", () => {
   test("reads branches, detached heads and skips prunable entries", () => {

@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { connectAccount, deployApp, saveFile } from "@/features/executor/actions";
 import { diffOptions, fileOptions, useDiffStyle } from "@/features/files/code";
-import { sameSource } from "@/lib/model/executor";
-import type { SourceFile } from "@/lib/model/executor";
+import { sameSource } from "@/lib/executor/executor";
+import type { SourceFile } from "@/lib/executor/executor";
 
 const createEditor: EditorFactory<undefined, undefined> = (type, options, key) =>
   new Editor(type, options, key);

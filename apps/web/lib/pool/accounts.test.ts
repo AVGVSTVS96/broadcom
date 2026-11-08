@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { accountRows, creditOf, loginOf } from "@/lib/model/accounts";
+import { accountRows, creditOf, loginOf } from "@/lib/pool/accounts";
 import type { Account, Credential, Grant } from "@/lib/proxy/schema";
 
 const window = (used: number | null, resetsAt: number | null = null) => ({

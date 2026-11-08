@@ -4,8 +4,6 @@ import path from "node:path";
 
 import { cache } from "react";
 
-import type { Workspace } from "@/lib/git/repos";
-import { git, gitBytes, tryGit } from "@/lib/git/run";
 import {
   capPatch,
   fields,
@@ -15,8 +13,10 @@ import {
   parseCommit,
   parseCommits,
   splitPatch,
-} from "@/lib/model/files";
-import type { Change, Commit } from "@/lib/model/files";
+} from "@/lib/files/files";
+import type { Change, Commit } from "@/lib/files/files";
+import type { Workspace } from "@/lib/files/repos";
+import { git, gitBytes, tryGit } from "@/lib/files/run";
 
 const maxFile = 2_000_000;
 const maxPatch = 4_000_000;

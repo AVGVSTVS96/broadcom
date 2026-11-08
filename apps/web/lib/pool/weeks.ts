@@ -1,7 +1,7 @@
-import { addDays, startOfDay, startOfWeek } from "@/lib/model/calendar";
-import { lockedSpans, usedBetween } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import type { Pace } from "@/lib/model/pace";
+import { lockedSpans, usedBetween } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import type { Pace } from "@/lib/pool/pace";
+import { addDays, startOfDay, startOfWeek } from "@/lib/time/calendar";
 
 export interface Daily {
   readonly id: string;

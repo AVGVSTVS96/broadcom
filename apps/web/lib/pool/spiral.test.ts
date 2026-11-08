@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { DAY, HOUR } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import { lockedHours, locksFrom, shiftOf, spiralOf } from "@/lib/model/spiral";
-import type { Turn } from "@/lib/model/spiral";
+import { DAY, HOUR } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import { lockedHours, locksFrom, shiftOf, spiralOf } from "@/lib/pool/spiral";
+import type { Turn } from "@/lib/pool/spiral";
 
 const day = (month: number, date: number, hour = 0, minute = 0) =>
   new Date(2026, month, date, hour, minute).getTime();

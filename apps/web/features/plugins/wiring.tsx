@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Section } from "@/components/viz/section";
 import { filesHref } from "@/features/files/urls";
 import { useLive } from "@/lib/live/client";
-import type { Channel } from "@/lib/model/setup";
+import type { Channel } from "@/lib/plugins/setup";
 import { cn } from "@/lib/utils";
 
 const names = new Map([

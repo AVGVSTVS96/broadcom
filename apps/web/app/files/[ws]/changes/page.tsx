@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { ChangesView } from "@/features/files/changes-view";
-import { readChanges, readDiff } from "@/lib/git/read";
-import { findWorkspace } from "@/lib/git/repos";
-import { patchPath, splitPatch } from "@/lib/model/files";
+import { patchPath, splitPatch } from "@/lib/files/files";
+import { readChanges, readDiff } from "@/lib/files/read";
+import { findWorkspace } from "@/lib/files/repos";
 
 export const metadata: Metadata = { title: "Changes" };
 

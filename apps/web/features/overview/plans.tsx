@@ -4,13 +4,13 @@ import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
 import { fills, texts } from "@/components/viz/meter";
-import { dollars, duration, percent, when } from "@/lib/model/format";
-import { WEEK } from "@/lib/model/history";
-import { creditLeft, creditTotal } from "@/lib/model/pool";
-import type { Plan } from "@/lib/model/pool";
-import { creditTone, windowTone } from "@/lib/model/tone";
-import type { Tone } from "@/lib/model/tone";
+import { WEEK } from "@/lib/pool/history";
+import { creditLeft, creditTotal } from "@/lib/pool/pool";
+import type { Plan } from "@/lib/pool/pool";
+import { creditTone, windowTone } from "@/lib/pool/tone";
+import type { Tone } from "@/lib/pool/tone";
 import type { LimitWindow } from "@/lib/proxy/schema";
+import { dollars, duration, percent, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const Bar = ({ value, tone, locked = false }: { value: number; tone: Tone; locked?: boolean }) => (

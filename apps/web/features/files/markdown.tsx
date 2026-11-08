@@ -5,7 +5,7 @@ import type { ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { filesHref } from "@/features/files/urls";
-import { resolveLink } from "@/lib/model/files";
+import { resolveLink } from "@/lib/files/files";
 
 const Anchor = ({ node: _node, href = "", children }: ComponentProps<"a"> & ExtraProps) =>
   href.startsWith("/files/") ? (

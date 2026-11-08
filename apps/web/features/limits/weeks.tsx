@@ -2,13 +2,13 @@ import { forecastHatchStyle, hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Dot } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { addDays, startOfDay } from "@/lib/model/calendar";
-import { date, times, weekday } from "@/lib/model/format";
-import type { Points } from "@/lib/model/history";
-import { outcome } from "@/lib/model/pace";
-import type { Plan } from "@/lib/model/pool";
-import { evenPerDay, outlookOf, weeksOf, withHistory } from "@/lib/model/weeks";
-import type { Daily, Mark, Week, WeekDay } from "@/lib/model/weeks";
+import type { Points } from "@/lib/pool/history";
+import { outcome } from "@/lib/pool/pace";
+import type { Plan } from "@/lib/pool/pool";
+import { evenPerDay, outlookOf, weeksOf, withHistory } from "@/lib/pool/weeks";
+import type { Daily, Mark, Week, WeekDay } from "@/lib/pool/weeks";
+import { addDays, startOfDay } from "@/lib/time/calendar";
+import { date, times, weekday } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const ratioLabel = (week: Week, base: number | null) => {

@@ -1,4 +1,4 @@
-import type { Pace } from "@/lib/model/pace";
+import type { Pace } from "@/lib/pool/pace";
 import type { LimitWindow } from "@/lib/proxy/schema";
 
 export type Tone = "ok" | "over" | "bad" | "none";

@@ -3,9 +3,9 @@ import { existsSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import path from "node:path";
 
-import { listFiles } from "@/lib/git/read";
-import type { Workspace } from "@/lib/git/repos";
-import { git } from "@/lib/git/run";
+import { listFiles } from "@/lib/files/read";
+import type { Workspace } from "@/lib/files/repos";
+import { git } from "@/lib/files/run";
 
 const gitState = new Set(["HEAD", "index", "packed-refs"]);
 

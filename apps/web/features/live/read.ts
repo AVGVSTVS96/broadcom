@@ -1,15 +1,13 @@
 import "server-only";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
 
-import { handoffs } from "@/lib/model/live";
-import type { Handoffs } from "@/lib/model/live";
+import { handoffs } from "@/lib/pool/live";
+import type { Handoffs } from "@/lib/pool/live";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { Credits, History } from "@/lib/proxy/schema";
+import { Credits, Moves } from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
-
-const Moves = Schema.Struct({ moves: History.fields.moves });
 
 export interface LiveData {
   readonly now: number;

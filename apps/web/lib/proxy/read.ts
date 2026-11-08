@@ -2,16 +2,16 @@ import "server-only";
 import { Effect, Schema } from "effect";
 import { cacheLife } from "next/cache";
 
-import { creditOf, loginOf } from "@/lib/model/accounts";
-import { compact } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import { redact } from "@/lib/model/redact";
-import { valuesOf } from "@/lib/model/settings";
-import type { Daily } from "@/lib/model/weeks";
+import { creditOf, loginOf } from "@/lib/pool/accounts";
+import { compact } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import type { Daily } from "@/lib/pool/weeks";
 import { attempt, attemptCached } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
 import { Config, Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
+import { redact } from "@/lib/settings/redact";
+import { valuesOf } from "@/lib/settings/settings";
 
 const weekHistory = async (): Promise<Readonly<Record<string, Points>>> => {
   "use cache";

@@ -3,8 +3,8 @@
 import { scaleLinear } from "d3-scale";
 import { useState } from "react";
 
-import { format, formatShort, gapsOf, rest } from "@/lib/model/usage";
-import type { Cell, Layer, Reading, Unit } from "@/lib/model/usage";
+import { format, formatShort, gapsOf, rest } from "@/lib/usage/usage";
+import type { Cell, Layer, Reading, Unit } from "@/lib/usage/usage";
 import { cn } from "@/lib/utils";
 
 const fills = ["bg-chart-1", "bg-chart-2", "bg-chart-3"] as const;

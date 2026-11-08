@@ -1,7 +1,7 @@
-import { percent, times, when } from "@/lib/model/format";
-import { DAY, HOUR, WEEK, firstReaching, lastDrop, since, valueAt } from "@/lib/model/history";
-import type { Point, Points } from "@/lib/model/history";
+import { DAY, HOUR, WEEK, firstReaching, lastDrop, since, valueAt } from "@/lib/pool/history";
+import type { Point, Points } from "@/lib/pool/history";
 import type { LimitWindow } from "@/lib/proxy/schema";
+import { percent, times, when } from "@/lib/time/format";
 
 export interface Pace {
   readonly start: number;

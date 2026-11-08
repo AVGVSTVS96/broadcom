@@ -12,11 +12,11 @@ import { Markdown } from "@/features/files/markdown";
 import { PillLink, Pills } from "@/features/files/pills";
 import { ago, bytes } from "@/features/files/time";
 import { filesHref } from "@/features/files/urls";
-import { lastCommit, listFiles, pictureType, readBody } from "@/lib/git/read";
-import type { FileBody } from "@/lib/git/read";
-import { findWorkspace } from "@/lib/git/repos";
-import type { Workspace } from "@/lib/git/repos";
-import { countLines, folderEntries } from "@/lib/model/files";
+import { countLines, folderEntries } from "@/lib/files/files";
+import { lastCommit, listFiles, pictureType, readBody } from "@/lib/files/read";
+import type { FileBody } from "@/lib/files/read";
+import { findWorkspace } from "@/lib/files/repos";
+import type { Workspace } from "@/lib/files/repos";
 
 const overviews = ["README.md", "readme.md", "AGENTS.md", "CLAUDE.md", "README"];
 

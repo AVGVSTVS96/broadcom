@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { HistoryView } from "@/features/files/history-view";
-import { listCommits, readCommit } from "@/lib/git/read";
-import { findWorkspace } from "@/lib/git/repos";
+import { listCommits, readCommit } from "@/lib/files/read";
+import { findWorkspace } from "@/lib/files/repos";
 
 export const metadata: Metadata = { title: "History" };
 
