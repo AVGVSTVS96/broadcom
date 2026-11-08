@@ -1,0 +1,16 @@
+{
+  "listen": "127.0.0.1:8317",
+  "accountOwner": true,
+  "clientKeysFile": "~/.config/broadcom-proxy/client-keys",
+  "managementKeyFile": "~/.config/broadcom-proxy/management-key",
+  "credentialsDir": "~/.config/broadcom-proxy/auths",
+  "stateDir": "~/.local/state/broadcom-proxy",
+  "accountsFile": "~/.local/state/broadcom-proxy/accounts.json",
+  "apiKeys": [
+    { "name": "included-credit", "keyFile": "~/.config/broadcom-proxy/included-api-key", "free": true },
+    { "name": "paid-credit", "keyFile": "~/.config/broadcom-proxy/paid-api-key", "account": "you@example.com" }
+  ],
+  "policy": { "sessionCutoff": 90, "weeklyCutoff": 98, "agentsPerAccount": 100 },
+  "agentSdkFactor": 1.7,
+  "resetCommand": "logger -t broadcom-proxy"
+}
