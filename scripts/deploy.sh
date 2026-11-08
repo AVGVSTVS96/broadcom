@@ -10,8 +10,8 @@ next=$([ "$live" = .next-a ] && echo .next-b || echo .next-a)
 git fetch --quiet origin main
 git merge --ff-only --quiet origin/main
 bun install --frozen-lockfile --silent
-rm -rf "$next"
-BROADCOM_DIST=$next bun run build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
+rm -rf "apps/web/$next"
+BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
 echo "BROADCOM_DIST=$next" >"$state/slot"
 systemctl --user restart broadcom.service
 for _ in $(seq 20); do
