@@ -7,8 +7,9 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit",
-    "test": "bun test --conditions react-server"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test --conditions react-server",
+    "typegen": "next typegen"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
