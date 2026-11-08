@@ -28,17 +28,26 @@ impl Login {
     pub fn read(path: &Path) -> anyhow::Result<Self> {
         let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok();
         let fields = serde_json::from_slice(&std::fs::read(path)?)?;
-        Ok(Self { path: path.to_path_buf(), fields, modified })
+        Ok(Self {
+            path: path.to_path_buf(),
+            fields,
+            modified,
+        })
     }
 
     pub fn save(&mut self) -> std::io::Result<()> {
         files::write_json(&self.path, &self.fields)?;
-        self.modified = std::fs::metadata(&self.path).and_then(|m| m.modified()).ok();
+        self.modified = std::fs::metadata(&self.path)
+            .and_then(|m| m.modified())
+            .ok();
         Ok(())
     }
 
     pub fn get(&self, key: &str) -> &str {
-        self.fields.get(key).and_then(Value::as_str).map_or("", str::trim)
+        self.fields
+            .get(key)
+            .and_then(Value::as_str)
+            .map_or("", str::trim)
     }
 
     pub fn set(&mut self, key: &str, value: impl Into<Value>) {
@@ -50,7 +59,10 @@ impl Login {
     }
 
     pub fn disabled(&self) -> bool {
-        self.fields.get("disabled").and_then(Value::as_bool).unwrap_or(false)
+        self.fields
+            .get("disabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
     }
 
     /// When the access token expires (unix ms).
@@ -65,12 +77,17 @@ impl Login {
 
     /// The file name, which management calls use as the credential's id.
     pub fn name(&self) -> String {
-        self.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+        self.path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default()
     }
 
     /// Every login in `dir`, skipping files that aren't one.
     pub fn read_dir(dir: &Path) -> Vec<Self> {
-        let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
         let mut logins: Vec<Self> = entries
             .filter_map(Result::ok)
             .map(|e| e.path())
@@ -148,7 +165,10 @@ impl Account {
             && now < s.until
             && r.week.is_some_and(|w| w.used >= s.week)
         {
-            r.week = Some(crate::pool::Window { used: 0.0, resets_at: s.week_ends });
+            r.week = Some(crate::pool::Window {
+                used: 0.0,
+                resets_at: s.week_ends,
+            });
             return (r, true);
         }
         (r, false)

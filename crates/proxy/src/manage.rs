@@ -42,8 +42,11 @@ pub fn router(app: Arc<App>) -> Router<Arc<App>> {
 }
 
 async fn authorize(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
-    let bearer =
-        request.headers().get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer "));
+    let bearer = request
+        .headers()
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
     if bearer.map(str::trim) != Some(app.management_key.as_str()) {
         return fail(StatusCode::UNAUTHORIZED, "This needs the management key.");
     }
@@ -63,8 +66,12 @@ fn done() -> Response {
 }
 
 fn owner_only(app: &App) -> Option<Response> {
-    (!app.config.account_owner)
-        .then(|| fail(StatusCode::CONFLICT, "This proxy doesn't own the accounts, so it leaves their logins alone."))
+    (!app.config.account_owner).then(|| {
+        fail(
+            StatusCode::CONFLICT,
+            "This proxy doesn't own the accounts, so it leaves their logins alone.",
+        )
+    })
 }
 
 /// Keeps the live stream current after anything changes, with a heartbeat every 20 seconds.
@@ -84,8 +91,10 @@ pub async fn run_live(app: Arc<App>) {
             (state.policy, state.revision.clone())
         };
         let (accounts, pool) = snapshot(&app, policy, &revision);
-        let mut entries: Vec<(String, Value)> =
-            accounts.into_iter().map(|a| (format!("a:{}", a["id"].as_str().unwrap_or("")), a)).collect();
+        let mut entries: Vec<(String, Value)> = accounts
+            .into_iter()
+            .map(|a| (format!("a:{}", a["id"].as_str().unwrap_or("")), a))
+            .collect();
         entries.push(("pool".into(), pool));
         app.live.publish(&entries);
     }
@@ -94,11 +103,9 @@ pub async fn run_live(app: Arc<App>) {
 async fn events(State(app): State<Arc<App>>) -> Response {
     app.changed.notify_one();
     let rx = app.live.subscribe();
-    let stream =
-        futures_util::stream::unfold(
-            rx,
-            |mut rx| async move { rx.recv().await.map(|b| (Ok::<_, std::io::Error>(b), rx)) },
-        );
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|b| (Ok::<_, std::io::Error>(b), rx))
+    });
     Response::builder()
         .header("content-type", "text/event-stream")
         .header("cache-control", "no-cache")
@@ -112,16 +119,20 @@ async fn events(State(app): State<Arc<App>>) -> Response {
 pub fn snapshot(app: &App, policy: Policy, revision: &str) -> (Vec<Value>, Value) {
     let spent = sampler::resets_spent(app);
     let now = files::now_ms();
-    let plans: HashMap<String, String> =
-        sampler::reset_plans(app, now).into_iter().map(|(id, p)| (id, p.plan)).collect();
+    let plans: HashMap<String, String> = sampler::reset_plans(app, now)
+        .into_iter()
+        .map(|(id, p)| (id, p.plan))
+        .collect();
     let state = app.state();
     let factor = app.config.agent_sdk_factor;
-    let (enabled, disabled): (Vec<_>, Vec<_>) = state.accounts.iter().partition(|a| !a.login.disabled());
+    let (enabled, disabled): (Vec<_>, Vec<_>) =
+        state.accounts.iter().partition(|a| !a.login.disabled());
     let views = state.views(&enabled, now, factor);
-    let mut ranked: Vec<(&crate::accounts::Account, Row, Reading)> = pool::rank(&views, &policy, now, 1.0)
-        .into_iter()
-        .map(|r| (enabled[r.index], r.clone(), views[r.index].reading))
-        .collect();
+    let mut ranked: Vec<(&crate::accounts::Account, Row, Reading)> =
+        pool::rank(&views, &policy, now, 1.0)
+            .into_iter()
+            .map(|r| (enabled[r.index], r.clone(), views[r.index].reading))
+            .collect();
     for a in &disabled {
         let views = state.views(&[a], now, factor);
         let row = pool::rank(&views, &policy, now, 1.0).remove(0);
@@ -171,7 +182,10 @@ pub fn snapshot(app: &App, policy: Policy, revision: &str) -> (Vec<Value>, Value
     let decision = match first {
         Some((a, row, _)) if row.usable => format!("New sessions go to {}.", a.label()),
         Some((a, row, _)) if row.open => {
-            format!("Every account is past a cutoff; new sessions go to {}, which has the most room left.", a.label())
+            format!(
+                "Every account is past a cutoff; new sessions go to {}, which has the most room left.",
+                a.label()
+            )
         }
         _ => "No Claude account can take a new session.".into(),
     };
@@ -187,10 +201,16 @@ pub fn snapshot(app: &App, policy: Policy, revision: &str) -> (Vec<Value>, Value
 }
 
 fn plan_name(tier: Option<&str>) -> String {
-    let Some(tier) = tier.filter(|t| !t.is_empty()) else { return String::new() };
+    let Some(tier) = tier.filter(|t| !t.is_empty()) else {
+        return String::new();
+    };
     let t = tier.to_lowercase();
     let near = |a: &str, b: &str| {
-        t.find(a).is_some_and(|i| t[i + a.len()..].trim_start_matches(|c: char| !c.is_alphanumeric()).starts_with(b))
+        t.find(a).is_some_and(|i| {
+            t[i + a.len()..]
+                .trim_start_matches(|c: char| !c.is_alphanumeric())
+                .starts_with(b)
+        })
     };
     if near("max", "20x") {
         "Max 20x".into()
@@ -225,18 +245,28 @@ fn reasons(disabled: bool, row: &Row, policy: &Policy) -> Vec<String> {
     }
     if !row.usable {
         return vec![if row.five >= policy.session_cutoff {
-            format!("Past the {}% five-hour cutoff.", number(policy.session_cutoff))
+            format!(
+                "Past the {}% five-hour cutoff.",
+                number(policy.session_cutoff)
+            )
         } else {
             format!("Past the {}% weekly cutoff.", number(policy.weekly_cutoff))
         }];
     }
     let mut out = Vec::new();
     if row.holds_reset {
-        out.push("Holds a limit reset, so its week gets used first and the reset clears a whole one.".into());
+        out.push(
+            "Holds a limit reset, so its week gets used first and the reset clears a whole one."
+                .into(),
+        );
     }
     out.push(
-        if row.comfortable { "Has room for another working session." } else { "Crowded for its five-hour room." }
-            .into(),
+        if row.comfortable {
+            "Has room for another working session."
+        } else {
+            "Crowded for its five-hour room."
+        }
+        .into(),
     );
     out
 }
@@ -248,27 +278,40 @@ async fn accounts(State(app): State<Arc<App>>) -> Response {
     let mut history: Vec<Value> = Vec::new();
     let mut at: HashMap<(String, &str), usize> = HashMap::new();
     for line in read("usage-history.ndjson").lines() {
-        let Ok(r) = serde_json::from_str::<Value>(line) else { continue };
-        let (Some(account), Some(when)) = (r["account"].as_str(), r["at"].as_f64()) else { continue };
+        let Ok(r) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let (Some(account), Some(when)) = (r["account"].as_str(), r["at"].as_f64()) else {
+            continue;
+        };
         if when < (now - WEEK) as f64 {
             continue;
         }
         for kind in ["fiveHour", "week"] {
-            let Some(used) = r[kind].as_f64() else { continue };
+            let Some(used) = r[kind].as_f64() else {
+                continue;
+            };
             let i = *at.entry((account.to_string(), kind)).or_insert_with(|| {
                 history.push(json!({"account": account, "kind": kind, "points": []}));
                 history.len() - 1
             });
-            history[i]["points"].as_array_mut().expect("points").push(json!([when, used]));
+            history[i]["points"]
+                .as_array_mut()
+                .expect("points")
+                .push(json!([when, used]));
         }
     }
     let mut moves = Vec::new();
     let mut last: HashMap<String, String> = HashMap::new();
     for line in read("attribution.ndjson").lines() {
-        let Ok(r) = serde_json::from_str::<Value>(line) else { continue };
-        let (Some(session), Some(to), Some(when)) =
-            (r["sessionId"].as_str(), r["accountId"].as_str(), r["at"].as_str().and_then(files::parse_ms))
-        else {
+        let Ok(r) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let (Some(session), Some(to), Some(when)) = (
+            r["sessionId"].as_str(),
+            r["accountId"].as_str(),
+            r["at"].as_str().and_then(files::parse_ms),
+        ) else {
             continue;
         };
         if to.is_empty() {
@@ -280,13 +323,18 @@ async fn accounts(State(app): State<Arc<App>>) -> Response {
         }
         let cause = match &before {
             None => "start",
-            Some(_) => r["cause"].as_str().filter(|c| !c.is_empty()).unwrap_or("limit"),
+            Some(_) => r["cause"]
+                .as_str()
+                .filter(|c| !c.is_empty())
+                .unwrap_or("limit"),
         };
         moves.push(json!({"at": when, "session": session, "label": null, "from": before, "to": to, "cause": cause}));
     }
     moves.sort_by_key(|m| std::cmp::Reverse(m["at"].as_i64().unwrap_or(0)));
     let seats = app.state().seats.len();
-    no_store(json!({"history": history, "moves": moves, "hosts": [{"host": "server", "seats": seats, "seenAt": null}]}))
+    no_store(
+        json!({"history": history, "moves": moves, "hosts": [{"host": "server", "seats": seats, "seenAt": null}]}),
+    )
 }
 
 #[derive(Deserialize)]
@@ -311,11 +359,15 @@ async fn policy(State(app): State<Arc<App>>, Json(body): Json<PolicyRequest>) ->
     };
     let current = app.state().revision.clone();
     if !body.save {
-        return no_store(json!({"pool": snapshot(&app, body.policy, &revision).1, "saved": false, "conflict": false}));
+        return no_store(
+            json!({"pool": snapshot(&app, body.policy, &revision).1, "saved": false, "conflict": false}),
+        );
     }
     if revision != current {
         let policy = app.state().policy;
-        return no_store(json!({"pool": snapshot(&app, policy, &current).1, "saved": false, "conflict": true}));
+        return no_store(
+            json!({"pool": snapshot(&app, policy, &current).1, "saved": false, "conflict": true}),
+        );
     }
     match Config::save_policy(&app.config_path, body.policy) {
         Ok(next) => {
@@ -325,9 +377,14 @@ async fn policy(State(app): State<Arc<App>>, Json(body): Json<PolicyRequest>) ->
                 state.revision.clone_from(&next);
             }
             app.changed.notify_one();
-            no_store(json!({"pool": snapshot(&app, body.policy, &next).1, "saved": true, "conflict": false}))
+            no_store(
+                json!({"pool": snapshot(&app, body.policy, &next).1, "saved": true, "conflict": false}),
+            )
         }
-        Err(err) => fail(StatusCode::INTERNAL_SERVER_ERROR, &format!("Couldn't save the policy: {err}")),
+        Err(err) => fail(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            &format!("Couldn't save the policy: {err}"),
+        ),
     }
 }
 
@@ -371,12 +428,17 @@ struct StatusRequest {
     disabled: bool,
 }
 
-async fn credential_status(State(app): State<Arc<App>>, Json(body): Json<StatusRequest>) -> Response {
+async fn credential_status(
+    State(app): State<Arc<App>>,
+    Json(body): Json<StatusRequest>,
+) -> Response {
     if let Some(refused) = owner_only(&app) {
         return refused;
     }
     let path = app.config.credentials_dir.join(&body.name);
-    let fields = [("disabled".to_string(), Value::from(body.disabled))].into_iter().collect();
+    let fields = [("disabled".to_string(), Value::from(body.disabled))]
+        .into_iter()
+        .collect();
     match app.update_login(&path, fields) {
         Some(_) => done(),
         None => fail(StatusCode::NOT_FOUND, "No such credential."),
@@ -396,9 +458,17 @@ async fn delete_credentials(State(app): State<Arc<App>>, Json(body): Json<Names>
     let mut state = app.state();
     for name in &body.names {
         let path = app.config.credentials_dir.join(name);
-        let known = state.accounts.iter().map(|a| &a.login).chain(state.others.iter()).any(|l| l.path == path);
+        let known = state
+            .accounts
+            .iter()
+            .map(|a| &a.login)
+            .chain(state.others.iter())
+            .any(|l| l.path == path);
         if !known {
-            return fail(StatusCode::NOT_FOUND, &format!("No credential named {name}."));
+            return fail(
+                StatusCode::NOT_FOUND,
+                &format!("No credential named {name}."),
+            );
         }
         if let Err(err) = std::fs::remove_file(&path) {
             return fail(StatusCode::INTERNAL_SERVER_ERROR, &err.to_string());
@@ -461,10 +531,17 @@ struct Callback {
 /// The code from Claude's page, or the address it redirected to.
 async fn sign_in_callback(State(app): State<Arc<App>>, Json(body): Json<Callback>) -> Response {
     if body.provider != Provider::Claude {
-        return fail(StatusCode::BAD_REQUEST, "ChatGPT signs in with its device code; there's nothing to paste.");
+        return fail(
+            StatusCode::BAD_REQUEST,
+            "ChatGPT signs in with its device code; there's nothing to paste.",
+        );
     }
     let (mut code, mut state) = (body.code, body.state);
-    if let Some(url) = body.redirect_url.as_deref().and_then(|u| reqwest::Url::parse(u).ok()) {
+    if let Some(url) = body
+        .redirect_url
+        .as_deref()
+        .and_then(|u| reqwest::Url::parse(u).ok())
+    {
         for (key, value) in url.query_pairs() {
             match &*key {
                 "code" => code = value.into_owned(),

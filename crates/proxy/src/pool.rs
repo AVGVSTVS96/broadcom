@@ -44,9 +44,20 @@ impl Reading {
     /// The reading with windows whose reset time has passed counted as empty.
     #[must_use]
     pub fn live(self, now: i64) -> Self {
-        let live =
-            |w: Option<Window>| w.map(|w| if w.resets_at > 0 && w.resets_at <= now { Window::default() } else { w });
-        Self { five_hour: live(self.five_hour), week: live(self.week), at: self.at }
+        let live = |w: Option<Window>| {
+            w.map(|w| {
+                if w.resets_at > 0 && w.resets_at <= now {
+                    Window::default()
+                } else {
+                    w
+                }
+            })
+        };
+        Self {
+            five_hour: live(self.five_hour),
+            week: live(self.week),
+            at: self.at,
+        }
     }
 }
 
@@ -86,7 +97,11 @@ pub struct Policy {
 
 impl Default for Policy {
     fn default() -> Self {
-        Self { session_cutoff: 90.0, weekly_cutoff: 98.0, agents_per_account: 100 }
+        Self {
+            session_cutoff: 90.0,
+            weekly_cutoff: 98.0,
+            agents_per_account: 100,
+        }
     }
 }
 
@@ -174,7 +189,11 @@ pub fn next_reset(mut at: i64, now: i64, period: i64) -> i64 {
 /// soonest, then the most five-hour room per working session. With nothing usable, the most
 /// real room wins. `weight` is the incoming session's five-hour weight.
 pub fn rank(views: &[View], policy: &Policy, now: i64, weight: f64) -> Vec<Row> {
-    let mut rows: Vec<Row> = views.iter().enumerate().map(|(index, v)| row(index, v, policy, now, weight)).collect();
+    let mut rows: Vec<Row> = views
+        .iter()
+        .enumerate()
+        .map(|(index, v)| row(index, v, policy, now, weight))
+        .collect();
     rows.sort_by(order);
     rows
 }
@@ -188,12 +207,23 @@ fn row(index: usize, v: &View, policy: &Policy, now: i64, weight: f64) -> Row {
     }
     let five = r.five_hour.map_or(0.0, |w| w.used);
     let week = r.week.map_or(0.0, |w| w.used);
-    let holds_reset = v.resets.iter().any(|g| g.left > 0 && !g.paused && g.expires_at.is_none_or(|at| at > now));
-    let week_cutoff = if v.resets.iter().any(|g| g.needs_limit && g.live(now)) { 100.0 } else { policy.weekly_cutoff };
+    let holds_reset = v
+        .resets
+        .iter()
+        .any(|g| g.left > 0 && !g.paused && g.expires_at.is_none_or(|at| at > now));
+    let week_cutoff = if v.resets.iter().any(|g| g.needs_limit && g.live(now)) {
+        100.0
+    } else {
+        policy.weekly_cutoff
+    };
     let five_room = policy.session_cutoff - five;
     let week_room = week_cutoff - week;
     let room = five_room / (load + incoming);
-    let week_resets_at = r.week.map(|w| next_reset(w.resets_at, now, WEEK)).filter(|&at| at > 0).unwrap_or(now + WEEK);
+    let week_resets_at = r
+        .week
+        .map(|w| next_reset(w.resets_at, now, WEEK))
+        .filter(|&at| at > 0)
+        .unwrap_or(now + WEEK);
     let mut free_at = 0;
     if five_room <= 0.0
         && let Some(w) = r.five_hour
@@ -211,7 +241,8 @@ fn row(index: usize, v: &View, policy: &Policy, now: i64, weight: f64) -> Row {
         usable: five_room > 0.0 && week_room > 0.0 && !v.needs_reauth,
         open: five < 100.0 && week < 100.0 && !v.needs_reauth,
         known: r.at > 0,
-        comfortable: room >= policy.session_cutoff / f64::from(policy.agents_per_account) && week_room >= 5.0,
+        comfortable: room >= policy.session_cutoff / f64::from(policy.agents_per_account)
+            && week_room >= 5.0,
         holds_reset,
         needs_reauth: v.needs_reauth,
         working: v.working,
@@ -259,13 +290,20 @@ fn order(a: &Row, b: &Row) -> Ordering {
 pub fn move_away(rows: &[Row], index: usize, policy: &Policy, weight: f64) -> Option<Cause> {
     let mine = rows.iter().find(|r| r.index == index)?;
     let urgent = !mine.usable;
-    let soon = mine.five >= policy.session_cutoff - MARGIN * weight || mine.week_cutoff - mine.week < 5.0;
+    let soon =
+        mine.five >= policy.session_cutoff - MARGIN * weight || mine.week_cutoff - mine.week < 5.0;
     if !urgent && !soon {
         return None;
     }
-    let calm =
-        |r: &Row| r.usable && r.comfortable && r.five < policy.session_cutoff - MARGIN && r.week_cutoff - r.week >= 5.0;
-    let better = rows.iter().any(|r| r.index != index && (calm(r) || (urgent && r.usable)));
+    let calm = |r: &Row| {
+        r.usable
+            && r.comfortable
+            && r.five < policy.session_cutoff - MARGIN
+            && r.week_cutoff - r.week >= 5.0
+    };
+    let better = rows
+        .iter()
+        .any(|r| r.index != index && (calm(r) || (urgent && r.usable)));
     better.then_some(if urgent { Cause::Over } else { Cause::Early })
 }
 
@@ -286,7 +324,12 @@ pub struct ResetPlan {
 /// per dry spell, the one whose account's week ends last. A reset in its last hour is spent
 /// whatever the pool holds. A reset that only works at the weekly limit makes its holder
 /// take work past the weekly cutoff until it gets there.
-pub fn plan_resets(views: &[View], rows: &[Row], now: i64, when: impl Fn(i64) -> String) -> Vec<ResetPlan> {
+pub fn plan_resets(
+    views: &[View],
+    rows: &[Row],
+    now: i64,
+    when: impl Fn(i64) -> String,
+) -> Vec<ResetPlan> {
     let mut busy = Vec::new();
     let mut dry_until = i64::MAX;
     let mut holders: Vec<(&Row, ResetPlan)> = Vec::new();
@@ -298,9 +341,21 @@ pub fn plan_resets(views: &[View], rows: &[Row], now: i64, when: impl Fn(i64) ->
             busy.push(views[r.index].label);
         }
         dry_until = dry_until.min(r.week_resets_at);
-        let grant = views[r.index].resets.iter().filter(|g| g.live(now)).min_by_key(|g| g.time_left(now));
+        let grant = views[r.index]
+            .resets
+            .iter()
+            .filter(|g| g.live(now))
+            .min_by_key(|g| g.time_left(now));
         if let Some(grant) = grant {
-            holders.push((r, ResetPlan { index: r.index, grant: grant.clone(), why: None, plan: String::new() }));
+            holders.push((
+                r,
+                ResetPlan {
+                    index: r.index,
+                    grant: grant.clone(),
+                    why: None,
+                    plan: String::new(),
+                },
+            ));
         }
     }
     holders.sort_by_key(|(row, _)| std::cmp::Reverse(row.week_resets_at));
@@ -342,11 +397,20 @@ pub fn plan_resets(views: &[View], rows: &[Row], now: i64, when: impl Fn(i64) ->
         } else if spent {
             h.plan = "Every account has used its week, but another reset is being spent, so this one waits for the next time they all have.".into();
         } else if dry >= DRY_SPELL {
-            spend(h, format!("every account had used its week and none came back before {}", when(dry_until)));
+            spend(
+                h,
+                format!(
+                    "every account had used its week and none came back before {}",
+                    when(dry_until)
+                ),
+            );
             spent = true;
         } else if h.grant.time_left(now) < LAST_WEEK {
             let expires = when(h.grant.expires_at.unwrap_or_default());
-            spend(h, format!("every account had used its week and the reset expires {expires}"));
+            spend(
+                h,
+                format!("every account had used its week and the reset expires {expires}"),
+            );
             spent = true;
         } else {
             h.plan = format!(
@@ -368,14 +432,24 @@ mod tests {
     /// hour and its week in `week_reset_in` ms.
     fn reading(five: f64, week: f64, week_reset_in: i64) -> Reading {
         Reading {
-            five_hour: Some(Window { used: five, resets_at: NOW + HOUR }),
-            week: Some(Window { used: week, resets_at: NOW + week_reset_in }),
+            five_hour: Some(Window {
+                used: five,
+                resets_at: NOW + HOUR,
+            }),
+            week: Some(Window {
+                used: week,
+                resets_at: NOW + week_reset_in,
+            }),
             at: NOW,
         }
     }
 
     fn view(label: &str, five: f64, week: f64, week_reset_in: i64) -> View<'_> {
-        View { label, reading: reading(five, week, week_reset_in), ..View::default() }
+        View {
+            label,
+            reading: reading(five, week, week_reset_in),
+            ..View::default()
+        }
     }
 
     fn first<'a>(views: &'a [View], weight: f64) -> &'a str {
@@ -397,35 +471,68 @@ mod tests {
 
     #[test]
     fn skips_accounts_past_a_cutoff() {
-        let views =
-            [view("a", 95.0, 10.0, 48 * HOUR), view("b", 20.0, 99.0, 48 * HOUR), view("c", 50.0, 50.0, 96 * HOUR)];
+        let views = [
+            view("a", 95.0, 10.0, 48 * HOUR),
+            view("b", 20.0, 99.0, 48 * HOUR),
+            view("c", 50.0, 50.0, 96 * HOUR),
+        ];
         assert_eq!(first(&views, 1.0), "c");
     }
 
     #[test]
     fn spends_the_week_that_runs_out_soonest() {
-        let views = [view("later", 10.0, 40.0, 120 * HOUR), view("soon", 10.0, 40.0, 10 * HOUR)];
+        let views = [
+            view("later", 10.0, 40.0, 120 * HOUR),
+            view("soon", 10.0, 40.0, 10 * HOUR),
+        ];
         assert_eq!(first(&views, 1.0), "soon");
     }
 
     #[test]
     fn prefers_an_account_holding_a_reset() {
-        let held = [Reset { kind: "weekly".into(), left: 1, expires_at: Some(NOW + 24 * HOUR), ..Reset::default() }];
-        let holder = View { resets: &held, ..view("holder", 10.0, 40.0, 120 * HOUR) };
-        assert_eq!(first(&[view("soon", 10.0, 40.0, 10 * HOUR), holder], 1.0), "holder");
+        let held = [Reset {
+            kind: "weekly".into(),
+            left: 1,
+            expires_at: Some(NOW + 24 * HOUR),
+            ..Reset::default()
+        }];
+        let holder = View {
+            resets: &held,
+            ..view("holder", 10.0, 40.0, 120 * HOUR)
+        };
+        assert_eq!(
+            first(&[view("soon", 10.0, 40.0, 10 * HOUR), holder], 1.0),
+            "holder"
+        );
     }
 
     #[test]
     fn agent_sdk_sessions_load_the_five_hour_room_by_their_factor() {
-        let x = View { working: 1, load: 1.7, ..view("x", 50.0, 30.0, 48 * HOUR) };
-        let y = View { working: 1, load: 1.0, ..view("y", 50.0, 30.0, 48 * HOUR) };
+        let x = View {
+            working: 1,
+            load: 1.7,
+            ..view("x", 50.0, 30.0, 48 * HOUR)
+        };
+        let y = View {
+            working: 1,
+            load: 1.0,
+            ..view("y", 50.0, 30.0, 48 * HOUR)
+        };
         assert_eq!(first(&[x, y], 1.0), "y");
     }
 
     #[test]
     fn an_account_without_a_five_hour_limit_counts_sessions_alike() {
-        let mut x = View { working: 1, load: 1.7, ..view("x", 0.0, 30.0, 48 * HOUR) };
-        let mut y = View { working: 1, load: 1.0, ..view("y", 0.0, 30.0, 48 * HOUR) };
+        let mut x = View {
+            working: 1,
+            load: 1.7,
+            ..view("x", 0.0, 30.0, 48 * HOUR)
+        };
+        let mut y = View {
+            working: 1,
+            load: 1.0,
+            ..view("y", 0.0, 30.0, 48 * HOUR)
+        };
         x.reading.five_hour = None;
         y.reading.five_hour = None;
         let rows = rank(&[x, y], &Policy::default(), NOW, 1.7);
@@ -435,8 +542,14 @@ mod tests {
     #[test]
     fn an_expired_window_counts_as_empty() {
         let mut stale = view("stale", 95.0, 99.0, 48 * HOUR);
-        stale.reading.five_hour = Some(Window { used: 95.0, resets_at: NOW - MINUTE });
-        stale.reading.week = Some(Window { used: 99.0, resets_at: NOW - MINUTE });
+        stale.reading.five_hour = Some(Window {
+            used: 95.0,
+            resets_at: NOW - MINUTE,
+        });
+        stale.reading.week = Some(Window {
+            used: 99.0,
+            resets_at: NOW - MINUTE,
+        });
         stale.reading = stale.reading.live(NOW);
         assert!(rank(&[stale], &Policy::default(), NOW, 1.0)[0].usable);
     }
@@ -444,29 +557,58 @@ mod tests {
     #[test]
     fn move_away_leaves_an_account_near_its_cutoff_only_for_a_clear_one() {
         let policy = Policy::default();
-        let views = [view("hot", 85.0, 30.0, 48 * HOUR), view("calm", 10.0, 30.0, 48 * HOUR)];
+        let views = [
+            view("hot", 85.0, 30.0, 48 * HOUR),
+            view("calm", 10.0, 30.0, 48 * HOUR),
+        ];
         let rows = rank(&views, &policy, NOW, 1.0);
         assert_eq!(move_away(&rows, 0, &policy, 1.0), Some(Cause::Early));
-        assert_eq!(move_away(&rows, 1, &policy, 1.0), None, "moved a session off a calm account");
+        assert_eq!(
+            move_away(&rows, 1, &policy, 1.0),
+            None,
+            "moved a session off a calm account"
+        );
 
-        let views = [view("hot", 85.0, 30.0, 48 * HOUR), view("warm", 82.0, 30.0, 48 * HOUR)];
+        let views = [
+            view("hot", 85.0, 30.0, 48 * HOUR),
+            view("warm", 82.0, 30.0, 48 * HOUR),
+        ];
         let rows = rank(&views, &policy, NOW, 1.0);
-        assert_eq!(move_away(&rows, 0, &policy, 1.0), None, "moved to an account that is no clearer");
+        assert_eq!(
+            move_away(&rows, 0, &policy, 1.0),
+            None,
+            "moved to an account that is no clearer"
+        );
     }
 
     #[test]
     fn move_away_gives_an_agent_sdk_session_a_wider_margin() {
         let policy = Policy::default();
-        let views = [view("hot", 76.0, 30.0, 48 * HOUR), view("calm", 10.0, 30.0, 48 * HOUR)];
-        assert_eq!(move_away(&rank(&views, &policy, NOW, 1.0), 0, &policy, 1.0), None);
-        assert_eq!(move_away(&rank(&views, &policy, NOW, 1.7), 0, &policy, 1.7), Some(Cause::Early));
+        let views = [
+            view("hot", 76.0, 30.0, 48 * HOUR),
+            view("calm", 10.0, 30.0, 48 * HOUR),
+        ];
+        assert_eq!(
+            move_away(&rank(&views, &policy, NOW, 1.0), 0, &policy, 1.0),
+            None
+        );
+        assert_eq!(
+            move_away(&rank(&views, &policy, NOW, 1.7), 0, &policy, 1.7),
+            Some(Cause::Early)
+        );
     }
 
     #[test]
     fn move_away_leaves_an_account_past_its_cutoff_for_any_usable_one() {
         let policy = Policy::default();
-        let views = [view("over", 92.0, 30.0, 48 * HOUR), view("warm", 82.0, 30.0, 48 * HOUR)];
-        assert_eq!(move_away(&rank(&views, &policy, NOW, 1.0), 0, &policy, 1.0), Some(Cause::Over));
+        let views = [
+            view("over", 92.0, 30.0, 48 * HOUR),
+            view("warm", 82.0, 30.0, 48 * HOUR),
+        ];
+        assert_eq!(
+            move_away(&rank(&views, &policy, NOW, 1.0), 0, &policy, 1.0),
+            Some(Cause::Over)
+        );
     }
 
     fn plans(views: &[View]) -> Vec<(String, ResetPlan)> {
@@ -478,57 +620,107 @@ mod tests {
     }
 
     fn why(all: &[(String, ResetPlan)], label: &str) -> Option<String> {
-        all.iter().find(|(l, _)| l == label).and_then(|(_, p)| p.why.clone())
+        all.iter()
+            .find(|(l, _)| l == label)
+            .and_then(|(_, p)| p.why.clone())
     }
 
     fn plan_for(views: &[View]) -> ResetPlan {
-        plans(views).into_iter().find(|(label, _)| label == "holder").expect("holder has a plan").1
+        plans(views)
+            .into_iter()
+            .find(|(label, _)| label == "holder")
+            .expect("holder has a plan")
+            .1
     }
 
     #[test]
     fn reset_waits_while_another_account_has_week_left() {
         let held = [weekly(40 * 24 * HOUR)];
-        let holder = View { resets: &held, ..view("holder", 0.0, 100.0, 110 * HOUR) };
-        let plan = plan_for(&[holder, view("b", 0.0, 42.0, 112 * HOUR), view("c", 0.0, 36.0, 124 * HOUR)]);
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 100.0, 110 * HOUR)
+        };
+        let plan = plan_for(&[
+            holder,
+            view("b", 0.0, 42.0, 112 * HOUR),
+            view("c", 0.0, 36.0, 124 * HOUR),
+        ]);
         assert_eq!(plan.why, None);
-        assert!(plan.plan.contains("b and c have used their week"), "{}", plan.plan);
+        assert!(
+            plan.plan.contains("b and c have used their week"),
+            "{}",
+            plan.plan
+        );
     }
 
     #[test]
     fn reset_spends_the_moment_the_pool_runs_dry() {
         let held = [weekly(40 * 24 * HOUR)];
-        let holder = View { resets: &held, ..view("holder", 0.0, 100.0, 60 * HOUR) };
-        let plan = plan_for(&[holder, view("b", 0.0, 98.0, 62 * HOUR), view("c", 0.0, 99.0, 74 * HOUR)]);
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 100.0, 60 * HOUR)
+        };
+        let plan = plan_for(&[
+            holder,
+            view("b", 0.0, 98.0, 62 * HOUR),
+            view("c", 0.0, 99.0, 74 * HOUR),
+        ]);
         assert!(plan.why.is_some(), "{plan:?}");
     }
 
     #[test]
     fn reset_waits_out_a_short_dry_spell() {
         let held = [weekly(40 * 24 * HOUR)];
-        let holder = View { resets: &held, ..view("holder", 0.0, 100.0, 60 * HOUR) };
-        assert_eq!(plan_for(&[holder, view("b", 0.0, 99.0, 3 * HOUR)]).why, None);
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 100.0, 60 * HOUR)
+        };
+        assert_eq!(
+            plan_for(&[holder, view("b", 0.0, 99.0, 3 * HOUR)]).why,
+            None
+        );
     }
 
     #[test]
     fn reset_takes_a_short_dry_spell_in_its_last_week() {
         let held = [weekly(5 * 24 * HOUR)];
-        let holder = View { resets: &held, ..view("holder", 0.0, 100.0, 60 * HOUR) };
-        assert!(plan_for(&[holder, view("b", 0.0, 99.0, 3 * HOUR)]).why.is_some());
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 100.0, 60 * HOUR)
+        };
+        assert!(
+            plan_for(&[holder, view("b", 0.0, 99.0, 3 * HOUR)])
+                .why
+                .is_some()
+        );
     }
 
     #[test]
     fn reset_is_spent_in_its_last_hour() {
         let held = [weekly(30 * MINUTE)];
-        let holder = View { resets: &held, ..view("holder", 0.0, 40.0, 60 * HOUR) };
-        assert!(plan_for(&[holder, view("b", 0.0, 10.0, 60 * HOUR)]).why.is_some());
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 40.0, 60 * HOUR)
+        };
+        assert!(
+            plan_for(&[holder, view("b", 0.0, 10.0, 60 * HOUR)])
+                .why
+                .is_some()
+        );
     }
 
     #[test]
     fn every_held_reset_gets_its_last_hour() {
         let (late, expiring) = ([weekly(40 * 24 * HOUR)], [weekly(30 * MINUTE)]);
         let all = plans(&[
-            View { resets: &late, ..view("late", 0.0, 100.0, 120 * HOUR) },
-            View { resets: &expiring, ..view("expiring", 0.0, 40.0, 20 * HOUR) },
+            View {
+                resets: &late,
+                ..view("late", 0.0, 100.0, 120 * HOUR)
+            },
+            View {
+                resets: &expiring,
+                ..view("expiring", 0.0, 40.0, 20 * HOUR)
+            },
             view("b", 0.0, 10.0, 60 * HOUR),
         ]);
         assert!(why(&all, "expiring").is_some());
@@ -539,8 +731,14 @@ mod tests {
     fn one_reset_per_dry_spell_on_the_week_that_ends_last() {
         let (soon, late) = ([weekly(40 * 24 * HOUR)], [weekly(40 * 24 * HOUR)]);
         let all = plans(&[
-            View { resets: &soon, ..view("soon", 0.0, 100.0, 20 * HOUR) },
-            View { resets: &late, ..view("late", 0.0, 100.0, 120 * HOUR) },
+            View {
+                resets: &soon,
+                ..view("soon", 0.0, 100.0, 20 * HOUR)
+            },
+            View {
+                resets: &late,
+                ..view("late", 0.0, 100.0, 120 * HOUR)
+            },
             view("b", 0.0, 99.0, 30 * HOUR),
         ]);
         assert!(why(&all, "late").is_some());
@@ -549,8 +747,14 @@ mod tests {
 
     #[test]
     fn a_reset_that_needs_the_limit_runs_its_holder_to_the_limit() {
-        let held = [Reset { needs_limit: true, ..weekly(30 * MINUTE) }];
-        let holder = View { resets: &held, ..view("holder", 0.0, 99.0, 60 * HOUR) };
+        let held = [Reset {
+            needs_limit: true,
+            ..weekly(30 * MINUTE)
+        }];
+        let holder = View {
+            resets: &held,
+            ..view("holder", 0.0, 99.0, 60 * HOUR)
+        };
         let b = view("b", 0.0, 10.0, 60 * HOUR);
         let rows = rank(&[holder.clone(), b.clone()], &Policy::default(), NOW, 1.0);
         assert_eq!(rows[0].index, 0);
@@ -560,15 +764,39 @@ mod tests {
         assert_eq!(plan.why, None);
         assert!(plan.plan.contains("weekly limit"), "{}", plan.plan);
 
-        let at_limit = View { resets: &held, ..view("holder", 0.0, 100.0, 60 * HOUR) };
+        let at_limit = View {
+            resets: &held,
+            ..view("holder", 0.0, 100.0, 60 * HOUR)
+        };
         assert!(plan_for(&[at_limit, b]).why.is_some());
     }
 
     #[test]
     fn policy_rejects_out_of_range_values() {
         assert!(Policy::default().validate().is_ok());
-        assert!(Policy { session_cutoff: 0.0, ..Policy::default() }.validate().is_err());
-        assert!(Policy { weekly_cutoff: 101.0, ..Policy::default() }.validate().is_err());
-        assert!(Policy { agents_per_account: 0, ..Policy::default() }.validate().is_err());
+        assert!(
+            Policy {
+                session_cutoff: 0.0,
+                ..Policy::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            Policy {
+                weekly_cutoff: 101.0,
+                ..Policy::default()
+            }
+            .validate()
+            .is_err()
+        );
+        assert!(
+            Policy {
+                agents_per_account: 0,
+                ..Policy::default()
+            }
+            .validate()
+            .is_err()
+        );
     }
 }

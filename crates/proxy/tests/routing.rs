@@ -45,20 +45,37 @@ impl Upstream {
     }
 
     fn answer_with(&self, credential: &str, status: u16, body: &str, headers: &[(&str, &str)]) {
-        let headers = headers.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect();
-        self.answers.lock().unwrap().insert(credential.into(), (status, body.into(), headers));
+        let headers = headers
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        self.answers
+            .lock()
+            .unwrap()
+            .insert(credential.into(), (status, body.into(), headers));
     }
 
     fn served(&self) -> Vec<String> {
-        std::mem::take(&mut *self.seen.lock().unwrap()).into_iter().map(|s| s.credential).collect()
+        std::mem::take(&mut *self.seen.lock().unwrap())
+            .into_iter()
+            .map(|s| s.credential)
+            .collect()
     }
 }
 
 async fn anthropic(State(up): State<Arc<Upstream>>, uri: Uri, headers: HeaderMap) -> Response {
-    let header = |n: &str| headers.get(n).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    let header = |n: &str| {
+        headers
+            .get(n)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string()
+    };
     let credential = match header("x-api-key") {
         key if !key.is_empty() => key,
-        _ => header("authorization").trim_start_matches("Bearer ").to_string(),
+        _ => header("authorization")
+            .trim_start_matches("Bearer ")
+            .to_string(),
     };
     up.seen.lock().unwrap().push(Seen {
         credential: credential.clone(),
@@ -68,17 +85,20 @@ async fn anthropic(State(up): State<Arc<Upstream>>, uri: Uri, headers: HeaderMap
     if let Some((status, body, extra)) = up.answers.lock().unwrap().get(&credential).cloned() {
         let mut response = (StatusCode::from_u16(status).unwrap(), body).into_response();
         for (k, v) in extra {
-            response
-                .headers_mut()
-                .insert(axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(), v.parse().unwrap());
+            response.headers_mut().insert(
+                axum::http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                v.parse().unwrap(),
+            );
         }
         return response;
     }
     if uri.path().ends_with("/count_tokens") {
         return axum::Json(json!({"input_tokens": 42})).into_response();
     }
-    axum::Json(json!({"id": "msg_1", "type": "message", "model": "claude-x", "content": [],
-                      "usage": {"input_tokens": 3, "output_tokens": 2}}))
+    axum::Json(
+        json!({"id": "msg_1", "type": "message", "model": "claude-x", "content": [],
+                      "usage": {"input_tokens": 3, "output_tokens": 2}}),
+    )
     .into_response()
 }
 
@@ -140,7 +160,13 @@ async fn pool(keys: &[(&str, &str)]) -> Pool {
     };
     let app = Arc::new(App::new(at("config.json"), config, revision, ends).unwrap());
     let proxy = serve(broadcom_proxy::router(app.clone())).await;
-    Pool { app, proxy, up, dir, http: reqwest::Client::new() }
+    Pool {
+        app,
+        proxy,
+        up,
+        dir,
+        http: reqwest::Client::new(),
+    }
 }
 
 fn login(dir: &Path, name: &str, token: &str) -> PathBuf {
@@ -164,7 +190,10 @@ impl Pool {
             request = request.header("x-claude-code-session-id", s);
         }
         let response = request.send().await.unwrap();
-        (response.status().as_u16(), response.json().await.unwrap_or_default())
+        (
+            response.status().as_u16(),
+            response.json().await.unwrap_or_default(),
+        )
     }
 
     /// Turns extra usage on for plan account `id`, as its usage endpoint would report it.
@@ -174,9 +203,15 @@ impl Pool {
 
     /// Plan account `id` has used its week, so Anthropic serves it only as extra usage.
     fn spent(&self, id: &str) {
-        let week = broadcom_proxy::pool::Window { used: 100.0, resets_at: i64::MAX / 2 };
-        self.app.state().account_mut(id).unwrap().reading =
-            broadcom_proxy::pool::Reading { five_hour: None, week: Some(week), at: 1 };
+        let week = broadcom_proxy::pool::Window {
+            used: 100.0,
+            resets_at: i64::MAX / 2,
+        };
+        self.app.state().account_mut(id).unwrap().reading = broadcom_proxy::pool::Reading {
+            five_hour: None,
+            week: Some(week),
+            at: 1,
+        };
     }
 
     /// Every plan account sits out, as if each had hit its limit.
@@ -196,7 +231,11 @@ async fn plans_then_free_credit_then_paid_extra_usage() {
     let p = pool(&[("paid", "a@example.com"), ("free", "free")]).await;
     p.extra_usage("a");
     p.spent("a");
-    p.up.answer("token-b", 529, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
+    p.up.answer(
+        "token-b",
+        529,
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+    );
     p.up.answer("free", 400, CREDIT_LOW);
     assert_eq!(p.send("claude-x", None).await.0, 200);
     assert_eq!(
@@ -204,9 +243,17 @@ async fn plans_then_free_credit_then_paid_extra_usage() {
         ["token-b", "free", "token-a"],
         "the plan with room, then free credit, then the spent plan's paid extra usage"
     );
-    p.up.answer("token-a", 529, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
+    p.up.answer(
+        "token-a",
+        529,
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+    );
     p.send("claude-x", None).await;
-    assert_eq!(p.up.served(), ["token-b", "token-a", "paid"], "a paid key comes last");
+    assert_eq!(
+        p.up.served(),
+        ["token-b", "token-a", "paid"],
+        "a paid key comes last"
+    );
 }
 
 #[tokio::test]
@@ -221,28 +268,43 @@ async fn a_free_key_needs_no_extra_usage() {
 async fn plans_go_first_and_a_paid_key_waits_for_its_accounts_extra_usage() {
     let p = pool(&[("key-a", "a@example.com"), ("key-b", "B@example.com")]).await;
     assert_eq!(p.send("claude-x", None).await.0, 200);
-    assert!(p.up.served()[0].starts_with("token-"), "a plan serves while one has room");
+    assert!(
+        p.up.served()[0].starts_with("token-"),
+        "a plan serves while one has room"
+    );
 
     p.plans_out();
     let (status, _) = p.send("claude-x", None).await;
-    assert_eq!(status, 429, "with extra usage off everywhere, no paid key is spent");
+    assert_eq!(
+        status, 429,
+        "with extra usage off everywhere, no paid key is spent"
+    );
     assert_eq!(p.up.served(), Vec::<String>::new());
 
     p.extra_usage("b");
     assert_eq!(p.send("claude-x", None).await.0, 200);
-    assert_eq!(p.up.served(), ["key-b"], "only the key whose account has extra usage on");
+    assert_eq!(
+        p.up.served(),
+        ["key-b"],
+        "only the key whose account has extra usage on"
+    );
 
     p.extra_usage("a");
     p.up.answer("key-a", 400, CREDIT_LOW);
     assert_eq!(p.send("claude-x", None).await.0, 200);
-    assert_eq!(p.up.served(), ["key-a", "key-b"], "an empty key cools and the next is tried");
+    assert_eq!(
+        p.up.served(),
+        ["key-a", "key-b"],
+        "an empty key cools and the next is tried"
+    );
 }
 
 #[tokio::test]
 async fn a_key_comes_after_every_plan_fails() {
     let p = pool(&[("key-a", "a@example.com")]).await;
     p.extra_usage("a");
-    let overloaded = r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#;
+    let overloaded =
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#;
     p.up.answer("token-a", 529, overloaded);
     p.up.answer("token-b", 529, overloaded);
     assert_eq!(p.send("claude-x", None).await.0, 200);
@@ -278,18 +340,36 @@ async fn keys_get_the_key_and_plans_get_their_token_never_the_clients() {
     let seen = std::mem::take(&mut *p.up.seen.lock().unwrap());
     assert!(seen[0].credential.starts_with("token-") && seen[0].authorization);
     assert_eq!(seen[1].credential, "key-a");
-    assert!(!seen[1].authorization, "a key request carried an Authorization header");
+    assert!(
+        !seen[1].authorization,
+        "a key request carried an Authorization header"
+    );
     assert!(seen.iter().all(|s| s.credential != "the-clients-own-claude-token" && s.credential != "client-key"));
-    assert!(seen.iter().all(|s| s.user_agent == "claude-cli/2.1.318 (external, sdk-cli)"), "{seen:?}");
+    assert!(
+        seen.iter()
+            .all(|s| s.user_agent == "claude-cli/2.1.318 (external, sdk-cli)"),
+        "{seen:?}"
+    );
 }
 
 #[tokio::test]
 async fn an_overloaded_account_fails_over_without_cooling() {
     let p = pool(&[]).await;
-    p.up.answer("token-a", 529, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
-    p.up.answer("token-b", 529, r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#);
+    p.up.answer(
+        "token-a",
+        529,
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+    );
+    p.up.answer(
+        "token-b",
+        529,
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#,
+    );
     let (status, _) = p.send("claude-x", None).await;
-    assert_eq!(status, 529, "the client sees the last answer when every account fails");
+    assert_eq!(
+        status, 529,
+        "the client sees the last answer when every account fails"
+    );
     assert_eq!(p.up.served().len(), 2);
     p.up.answers.lock().unwrap().clear();
     assert_eq!(p.send("claude-x", None).await.0, 200);
@@ -300,7 +380,11 @@ async fn a_rejected_limit_cools_the_account_and_the_session_moves() {
     let p = pool(&[]).await;
     assert_eq!(p.send("claude-x", Some(SESSION)).await.0, 200);
     let first = p.up.served().remove(0);
-    let other = if first == "token-a" { "token-b" } else { "token-a" };
+    let other = if first == "token-a" {
+        "token-b"
+    } else {
+        "token-a"
+    };
     let reset = (jiff::Timestamp::now().as_second() + 3600).to_string();
     p.up.answer_with(
         &first,
@@ -315,13 +399,24 @@ async fn a_rejected_limit_cools_the_account_and_the_session_moves() {
     assert_eq!(p.send("claude-x", Some(SESSION)).await.0, 200);
     assert_eq!(p.up.served(), [first.clone(), other.to_string()]);
     assert_eq!(p.send("claude-x", Some(SESSION)).await.0, 200);
-    assert_eq!(p.up.served(), [other.to_string()], "the cooling account is skipped");
+    assert_eq!(
+        p.up.served(),
+        [other.to_string()],
+        "the cooling account is skipped"
+    );
 
-    let seats: Vec<Value> = p.file("attribution.ndjson").lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    let seats: Vec<Value> = p
+        .file("attribution.ndjson")
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
     assert_eq!(seats.len(), 2, "one start and one move: {seats:?}");
     assert_eq!(seats[0]["event"], "start");
     assert_eq!(seats[0]["entrypoint"], "sdk-cli");
-    assert_eq!((seats[1]["event"].as_str(), seats[1]["cause"].as_str()), (Some("failure"), Some("limit")));
+    assert_eq!(
+        (seats[1]["event"].as_str(), seats[1]["cause"].as_str()),
+        (Some("failure"), Some("limit"))
+    );
 }
 
 #[tokio::test]
@@ -339,14 +434,21 @@ async fn a_session_stays_on_its_account_until_it_nears_a_cutoff() {
         &first,
         200,
         r#"{"id":"m","usage":{}}"#,
-        &[("anthropic-ratelimit-unified-5h-utilization", "0.85"), ("anthropic-ratelimit-unified-5h-reset", &reset)],
+        &[
+            ("anthropic-ratelimit-unified-5h-utilization", "0.85"),
+            ("anthropic-ratelimit-unified-5h-reset", &reset),
+        ],
     );
     p.send("claude-x", Some(SESSION)).await;
     p.send("claude-x", Some(SESSION)).await;
     let served = p.up.served();
     assert_eq!(served[0], first);
-    assert_ne!(served[1], first, "an Agent SDK session at 85% moves to the calm account");
-    let last: Value = serde_json::from_str(p.file("attribution.ndjson").lines().last().unwrap()).unwrap();
+    assert_ne!(
+        served[1], first,
+        "an Agent SDK session at 85% moves to the calm account"
+    );
+    let last: Value =
+        serde_json::from_str(p.file("attribution.ndjson").lines().last().unwrap()).unwrap();
     assert_eq!(last["cause"], "early");
     assert!(p.file("usage-history.ndjson").contains("\"fiveHour\":85"));
 }
@@ -375,14 +477,30 @@ async fn a_refused_token_is_reread_from_its_file_when_another_process_owns_the_a
 async fn receipts_record_every_attempt() {
     let p = pool(&[("key-a", "a@example.com")]).await;
     p.extra_usage("a");
-    let overloaded = r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#;
+    let overloaded =
+        r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#;
     p.up.answer("token-a", 529, overloaded);
     p.up.answer("token-b", 529, overloaded);
     p.send("claude-x", Some(SESSION)).await;
-    let receipts: Vec<Value> = p.file("receipts.ndjson").lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    let receipts: Vec<Value> = p
+        .file("receipts.ndjson")
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
     assert_eq!(receipts.len(), 3);
-    assert_eq!((receipts[0]["failed"].as_bool(), receipts[0]["status"].as_u64()), (Some(true), Some(529)));
-    assert!(receipts[2]["accountId"].as_str().unwrap().starts_with("claude:apikey:"));
+    assert_eq!(
+        (
+            receipts[0]["failed"].as_bool(),
+            receipts[0]["status"].as_u64()
+        ),
+        (Some(true), Some(529))
+    );
+    assert!(
+        receipts[2]["accountId"]
+            .as_str()
+            .unwrap()
+            .starts_with("claude:apikey:")
+    );
     assert_eq!(receipts[2]["responseId"], "msg_1");
     assert_eq!(receipts[2]["inputTokens"], 3);
     assert_eq!(receipts[2]["sessionId"], SESSION);
@@ -392,10 +510,21 @@ async fn receipts_record_every_attempt() {
 #[tokio::test]
 async fn a_client_without_a_proxy_key_is_turned_away() {
     let p = pool(&[]).await;
-    let response = p.http.post(format!("{}/v1/messages", p.proxy)).json(&json!({"model": "m"})).send().await.unwrap();
+    let response = p
+        .http
+        .post(format!("{}/v1/messages", p.proxy))
+        .json(&json!({"model": "m"}))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(response.status(), 401);
     assert_eq!(p.up.served(), Vec::<String>::new());
-    let hello = p.http.head(format!("{}/api/hello", p.proxy)).send().await.unwrap();
+    let hello = p
+        .http
+        .head(format!("{}/api/hello", p.proxy))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(hello.status(), 200);
 }
 
@@ -411,10 +540,19 @@ async fn count_tokens_and_models_route_like_messages() {
         .await
         .unwrap();
     assert_eq!(count.json::<Value>().await.unwrap()["input_tokens"], 42);
-    let models = p.http.get(format!("{}/v1/models", p.proxy)).header("x-api-key", "client-key").send().await.unwrap();
+    let models = p
+        .http
+        .get(format!("{}/v1/models", p.proxy))
+        .header("x-api-key", "client-key")
+        .send()
+        .await
+        .unwrap();
     assert_eq!(models.status(), 200);
     assert!(p.up.served().iter().all(|s| s.starts_with("token-")));
-    assert!(p.file("receipts.ndjson").is_empty(), "only messages leave receipts");
+    assert!(
+        p.file("receipts.ndjson").is_empty(),
+        "only messages leave receipts"
+    );
 }
 
 fn keys(v: &Value) -> Vec<&str> {
@@ -431,10 +569,16 @@ async fn the_live_stream_and_history_keep_broadcoms_shapes() {
     tokio::spawn(broadcom_proxy::manage::run_live(p.app.clone()));
     tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
-    let mut events =
-        p.http.get(format!("{}/v8/management/deck/events", p.proxy)).bearer_auth("admin-key").send().await.unwrap();
+    let mut events = p
+        .http
+        .get(format!("{}/v8/management/deck/events", p.proxy))
+        .bearer_auth("admin-key")
+        .send()
+        .await
+        .unwrap();
     let frame = String::from_utf8(events.chunk().await.unwrap().unwrap().to_vec()).unwrap();
-    let snapshot: Value = serde_json::from_str(frame.trim().strip_prefix("data: ").unwrap()).unwrap();
+    let snapshot: Value =
+        serde_json::from_str(frame.trim().strip_prefix("data: ").unwrap()).unwrap();
     assert_eq!(snapshot["type"], "snapshot");
     let live = &snapshot["live"];
     let account = &live["a:a"];
@@ -458,10 +602,22 @@ async fn the_live_stream_and_history_keep_broadcoms_shapes() {
     ];
     want.sort_unstable();
     assert_eq!(keys(account), want);
-    assert_eq!(keys(&account["week"]), ["cutoff", "elapsed", "resetsAt", "sampledAt", "used"]);
-    assert_eq!(keys(&live["pool"]), ["decision", "next", "notes", "order", "policy", "revision"]);
-    assert_eq!(keys(&live["pool"]["policy"]), ["agentsPerAccount", "sessionCutoff", "weeklyCutoff"]);
-    assert!(["next", "open", "tight", "limited", "signed-out"].contains(&account["standing"].as_str().unwrap()));
+    assert_eq!(
+        keys(&account["week"]),
+        ["cutoff", "elapsed", "resetsAt", "sampledAt", "used"]
+    );
+    assert_eq!(
+        keys(&live["pool"]),
+        ["decision", "next", "notes", "order", "policy", "revision"]
+    );
+    assert_eq!(
+        keys(&live["pool"]["policy"]),
+        ["agentsPerAccount", "sessionCutoff", "weeklyCutoff"]
+    );
+    assert!(
+        ["next", "open", "tight", "limited", "signed-out"]
+            .contains(&account["standing"].as_str().unwrap())
+    );
 
     let history: Value = p
         .http
@@ -474,11 +630,19 @@ async fn the_live_stream_and_history_keep_broadcoms_shapes() {
         .await
         .unwrap();
     assert_eq!(keys(&history), ["history", "hosts", "moves"]);
-    assert_eq!(keys(&history["moves"][0]), ["at", "cause", "from", "label", "session", "to"]);
+    assert_eq!(
+        keys(&history["moves"][0]),
+        ["at", "cause", "from", "label", "session", "to"]
+    );
     assert_eq!(history["moves"][0]["cause"], "start");
     assert_eq!(keys(&history["hosts"][0]), ["host", "seats", "seenAt"]);
 
-    let unauthorized = p.http.get(format!("{}/v8/management/deck/accounts", p.proxy)).send().await.unwrap();
+    let unauthorized = p
+        .http
+        .get(format!("{}/v8/management/deck/accounts", p.proxy))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(unauthorized.status(), 401);
 }
 
@@ -493,17 +657,34 @@ async fn a_policy_saves_only_at_the_revision_it_was_read_at() {
             .send()
     };
     let policy = json!({"sessionCutoff": 80, "weeklyCutoff": 95, "agentsPerAccount": 50});
-    let preview: Value = post(json!({"policy": policy, "save": false})).await.unwrap().json().await.unwrap();
+    let preview: Value = post(json!({"policy": policy, "save": false}))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(preview["pool"]["policy"]["sessionCutoff"], 80.0);
     let revision = p.app.state().revision.clone();
-    let stale: Value =
-        post(json!({"policy": policy, "save": true, "revision": "\"old\""})).await.unwrap().json().await.unwrap();
-    assert_eq!((stale["saved"].as_bool(), stale["conflict"].as_bool()), (Some(false), Some(true)));
-    let saved: Value =
-        post(json!({"policy": policy, "save": true, "revision": revision})).await.unwrap().json().await.unwrap();
+    let stale: Value = post(json!({"policy": policy, "save": true, "revision": "\"old\""}))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        (stale["saved"].as_bool(), stale["conflict"].as_bool()),
+        (Some(false), Some(true))
+    );
+    let saved: Value = post(json!({"policy": policy, "save": true, "revision": revision}))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     assert_eq!(saved["saved"], true);
     let config: Value =
-        serde_json::from_str(&std::fs::read_to_string(p.dir.path().join("config.json")).unwrap()).unwrap();
+        serde_json::from_str(&std::fs::read_to_string(p.dir.path().join("config.json")).unwrap())
+            .unwrap();
     assert_eq!(config["policy"]["weeklyCutoff"], 95.0);
     assert_ne!(saved["pool"]["revision"], json!(revision));
     let bad = post(json!({"policy": {"sessionCutoff": 0, "weeklyCutoff": 95, "agentsPerAccount": 50}, "save": false}))
@@ -539,7 +720,11 @@ async fn with_every_credential_sitting_out_the_client_hears_when_the_pool_frees_
         .await
         .unwrap();
     assert_eq!(answer.status(), 429);
-    let wait: i64 = answer.headers()["retry-after"].to_str().unwrap().parse().unwrap();
+    let wait: i64 = answer.headers()["retry-after"]
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
     assert!((1..=60).contains(&wait), "{wait}");
     assert_eq!(p.up.served(), Vec::<String>::new());
 }
