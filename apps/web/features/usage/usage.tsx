@@ -1,7 +1,7 @@
 "use client";
 
 import { SearchIcon, XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { Legend } from "@/components/viz/legend";
@@ -28,6 +28,7 @@ import { useLive } from "@/lib/live/client";
 import { dollars, when } from "@/lib/model/format";
 import { format, isLimit } from "@/lib/model/usage";
 import type { Unit } from "@/lib/model/usage";
+import { useSubscription } from "@/lib/outside";
 import type { SessionState } from "@/lib/proxy/schema";
 import { cn } from "@/lib/utils";
 
@@ -83,7 +84,7 @@ const Search = () => {
     setText(value);
   }
 
-  useEffect(() => {
+  useSubscription(() => {
     const timer = setTimeout(() => {
       if (text !== value) {
         go({ q: text.trim(), rows: null, sel: null });

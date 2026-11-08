@@ -3,10 +3,11 @@
 import type { FileDiffContentsLoader } from "@pierre/diffs";
 import { CodeView } from "@pierre/diffs/react";
 import type { CodeViewHandle } from "@pierre/diffs/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import { loadSides } from "@/features/files/actions";
 import { patchItems, reviewOptions, useDiffStyle } from "@/features/files/code";
+import { useImperative } from "@/lib/outside";
 
 export const Review = ({
   ws,
@@ -36,7 +37,7 @@ export const Review = ({
     return { ...reviewOptions(style), loadDiffFiles };
   }, [style, ws, sha]);
 
-  useEffect(() => {
+  useImperative(() => {
     if (focus !== "") {
       view.current?.scrollTo({ behavior: "smooth", id: focus, type: "item" });
     }

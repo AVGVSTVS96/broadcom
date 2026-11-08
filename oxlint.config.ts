@@ -4,6 +4,13 @@ import core from "ultracite/oxlint/core";
 import next from "ultracite/oxlint/next";
 import react from "ultracite/oxlint/react";
 
+const effectHooks = {
+  importNames: ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+  message:
+    "Derive in render and act in the event handler. To talk to something outside React, use useSubscription or useImperative from @/lib/outside.",
+  name: "react",
+};
+
 export default defineConfig({
   extends: [core, react, next, antiSlop],
   ignorePatterns: [
@@ -17,6 +24,12 @@ export default defineConfig({
     { name: "anti-slop-effect", specifier: "./tools/oxlint/anti-slop-effect/index.ts" },
   ],
   options: { reportUnusedDisableDirectives: "error", typeAware: true },
+  overrides: [
+    {
+      files: ["apps/web/lib/outside.ts"],
+      rules: { "no-restricted-imports": "off", "react/exhaustive-deps": "off" },
+    },
+  ],
   rules: {
     "anti-slop-effect/no-manual-effect-error-tag": "error",
     "anti-slop-effect/no-manual-tag-comparison": "error",
@@ -29,7 +42,9 @@ export default defineConfig({
     "eslint/no-redeclare": "off",
     "import/no-cycle": "error",
     "no-comments/no-comments": "error",
+    "no-restricted-imports": ["error", { paths: [effectHooks] }],
     "oxc/no-accumulating-spread": "error",
+    "react/exhaustive-deps": ["error", { additionalHooks: "^(useSubscription|useImperative)$" }],
     "react/hook-use-state": "off",
     "typescript/consistent-indexed-object-style": "off",
   },
