@@ -6,9 +6,9 @@ import { Problems } from "@/components/viz/problems";
 import { Views } from "@/components/viz/views";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import type { Points } from "@/lib/model/history";
-import { plansOf } from "@/lib/model/pool";
-import type { Daily } from "@/lib/model/weeks";
+import type { Points } from "@/lib/pool/history";
+import { plansOf } from "@/lib/pool/pool";
+import type { Daily } from "@/lib/pool/weeks";
 
 import { ActivityView } from "./activity";
 import { HandOffView } from "./hand-off";

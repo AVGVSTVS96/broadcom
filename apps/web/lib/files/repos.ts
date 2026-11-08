@@ -7,8 +7,8 @@ import path from "node:path";
 import { Schema } from "effect";
 import { cache } from "react";
 
-import { git, tryGit } from "@/lib/git/run";
-import { parseWorktrees, slug } from "@/lib/model/files";
+import { parseWorktrees, slug } from "@/lib/files/files";
+import { git, tryGit } from "@/lib/files/run";
 
 const configFile =
   process.env.BROADCOM_FILES ?? path.join(homedir(), ".config/broadcom/files.json");

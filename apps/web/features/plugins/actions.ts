@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { refresh } from "next/cache";
 
-import { claudeDir, readSetup } from "@/lib/hex/setup";
+import { claudeDir, readSetup } from "@/lib/plugins/read";
 
 export const setPlugin = async (id: string, enabled: boolean) => {
   const { plugins } = await readSetup();

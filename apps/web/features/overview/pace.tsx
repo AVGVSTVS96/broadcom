@@ -8,12 +8,12 @@ import { Legend } from "@/components/viz/legend";
 import { Area, At, Band, Dot, Path, Plot, Strokes, freeSpot } from "@/components/viz/plot";
 import type { Box, XY } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
-import { duration, percent, times, when } from "@/lib/model/format";
-import { valueAt } from "@/lib/model/history";
-import { lockedFor, outcome } from "@/lib/model/pace";
-import type { Pace } from "@/lib/model/pace";
-import { byPace } from "@/lib/model/pool";
-import type { Paced, Plan } from "@/lib/model/pool";
+import { valueAt } from "@/lib/pool/history";
+import { lockedFor, outcome } from "@/lib/pool/pace";
+import type { Pace } from "@/lib/pool/pace";
+import { byPace } from "@/lib/pool/pool";
+import type { Paced, Plan } from "@/lib/pool/pool";
+import { duration, percent, times, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const fraction = (pace: Pace, at: number) =>

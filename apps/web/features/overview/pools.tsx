@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 import { texts } from "@/components/viz/meter";
 import { Segments } from "@/components/viz/segments";
-import { dollars, duration, utcDate, when } from "@/lib/model/format";
-import type { Summary, Column as Totals } from "@/lib/model/pool";
+import type { Summary, Column as Totals } from "@/lib/pool/pool";
+import { dollars, duration, utcDate, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const Column = ({

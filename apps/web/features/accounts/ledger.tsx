@@ -26,13 +26,13 @@ import { hatchStyle } from "@/components/viz/hatch";
 import { fills, texts } from "@/components/viz/meter";
 import { removeCredential, renewCredential, setDisabled } from "@/features/accounts/actions";
 import { SignIn } from "@/features/accounts/sign-in";
-import { endsSoon, needsYou } from "@/lib/model/accounts";
-import type { Login, Row, State } from "@/lib/model/accounts";
-import { ago, dollars, percent, plural, utcDate, when } from "@/lib/model/format";
-import { creditTone, windowTone } from "@/lib/model/tone";
-import type { Tone } from "@/lib/model/tone";
+import { endsSoon, needsYou } from "@/lib/pool/accounts";
+import type { Login, Row, State } from "@/lib/pool/accounts";
+import { creditTone, windowTone } from "@/lib/pool/tone";
+import type { Tone } from "@/lib/pool/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
 import type { LimitWindow } from "@/lib/proxy/schema";
+import { ago, dollars, percent, plural, utcDate, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const dots = {

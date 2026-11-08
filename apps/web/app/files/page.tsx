@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { filesHref } from "@/features/files/urls";
-import { listRepos } from "@/lib/git/repos";
+import { listRepos } from "@/lib/files/repos";
 
 const Files = async () => {
   const [first] = await listRepos();

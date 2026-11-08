@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 
 import { Bench } from "@/features/files/bench";
 import { FilesBar } from "@/features/files/files-bar";
-import { readChanges } from "@/lib/git/read";
-import { findWorkspace, listDrafts, listPlaces } from "@/lib/git/repos";
+import { readChanges } from "@/lib/files/read";
+import { findWorkspace, listDrafts, listPlaces } from "@/lib/files/repos";
 import { RefreshOn } from "@/lib/watch/refresh-on";
 
 const FilesLayout = async ({ params, children }: LayoutProps<"/files/[ws]">) => {

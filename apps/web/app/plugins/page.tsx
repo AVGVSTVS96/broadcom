@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { Section } from "@/components/viz/section";
 import { PluginCard, Skills, SourceLink } from "@/features/plugins/parts";
 import { Wiring } from "@/features/plugins/wiring";
-import { readSetup } from "@/lib/hex/setup";
+import { readSetup } from "@/lib/plugins/read";
 import { cn } from "@/lib/utils";
 import { RefreshOn } from "@/lib/watch/refresh-on";
 

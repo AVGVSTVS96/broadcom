@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Switch } from "@/components/ui/switch";
 import { filesHref } from "@/features/files/urls";
 import { setPlugin } from "@/features/plugins/actions";
-import type { ClaudePlugin, Skill, Source } from "@/lib/model/setup";
+import type { ClaudePlugin, Skill, Source } from "@/lib/plugins/setup";
 
 export const SourceLink = ({ source }: { source: Source | null }) =>
   source === null ? null : (

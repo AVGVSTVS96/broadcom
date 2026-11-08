@@ -1,7 +1,7 @@
-import { addHours, lastDays } from "@/lib/model/calendar";
-import { HOUR, isLocked, lockedSpans, usedBetween } from "@/lib/model/history";
-import type { Points } from "@/lib/model/history";
-import type { Plan as PoolPlan } from "@/lib/model/pool";
+import { HOUR, isLocked, lockedSpans, usedBetween } from "@/lib/pool/history";
+import type { Points } from "@/lib/pool/history";
+import type { Plan as PoolPlan } from "@/lib/pool/pool";
+import { addHours, lastDays } from "@/lib/time/calendar";
 
 export interface Plan {
   readonly id: string;

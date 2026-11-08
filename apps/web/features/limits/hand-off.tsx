@@ -3,12 +3,12 @@ import { Fragment } from "react";
 import { hatchStyle } from "@/components/viz/hatch";
 import { Legend } from "@/components/viz/legend";
 import { Section } from "@/components/viz/section";
-import { activity, activityPlans, gaps } from "@/lib/model/activity";
-import type { Day, Gap, Hour } from "@/lib/model/activity";
-import { addHours } from "@/lib/model/calendar";
-import { clock, duration, hour, weekday } from "@/lib/model/format";
-import type { Points } from "@/lib/model/history";
-import type { Plan } from "@/lib/model/pool";
+import { activity, activityPlans, gaps } from "@/lib/pool/activity";
+import type { Day, Gap, Hour } from "@/lib/pool/activity";
+import type { Points } from "@/lib/pool/history";
+import type { Plan } from "@/lib/pool/pool";
+import { addHours } from "@/lib/time/calendar";
+import { clock, duration, hour, weekday } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { level } from "./cells";

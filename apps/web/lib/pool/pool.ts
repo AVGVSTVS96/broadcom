@@ -1,9 +1,9 @@
-import type { Points } from "@/lib/model/history";
-import { nameOf, namesOf } from "@/lib/model/names";
-import { windowPace } from "@/lib/model/pace";
-import type { Pace } from "@/lib/model/pace";
-import { creditTone, poolTone, windowTone } from "@/lib/model/tone";
-import type { Tone } from "@/lib/model/tone";
+import type { Points } from "@/lib/pool/history";
+import { nameOf, namesOf } from "@/lib/pool/names";
+import { windowPace } from "@/lib/pool/pace";
+import type { Pace } from "@/lib/pool/pace";
+import { creditTone, poolTone, windowTone } from "@/lib/pool/tone";
+import type { Tone } from "@/lib/pool/tone";
 import type { Account, Grant } from "@/lib/proxy/schema";
 
 export interface Login {

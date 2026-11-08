@@ -11,8 +11,8 @@ import { Review } from "@/features/files/review";
 import { StylePills } from "@/features/files/style-pills";
 import { ago, timeOfDay } from "@/features/files/time";
 import { filesHref } from "@/features/files/urls";
-import { dayGroups } from "@/lib/model/files";
-import type { Commit } from "@/lib/model/files";
+import { dayGroups } from "@/lib/files/files";
+import type { Commit } from "@/lib/files/files";
 import { cn } from "@/lib/utils";
 
 export const HistoryView = ({

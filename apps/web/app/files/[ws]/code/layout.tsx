@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { CodeSide } from "@/features/files/code-side";
-import { listFiles, readChanges } from "@/lib/git/read";
-import { findWorkspace } from "@/lib/git/repos";
+import { listFiles, readChanges } from "@/lib/files/read";
+import { findWorkspace } from "@/lib/files/repos";
 
 const CodeLayout = async ({ params, children }: LayoutProps<"/files/[ws]/code">) => {
   const { ws: id } = await params;

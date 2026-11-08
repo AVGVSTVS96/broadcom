@@ -166,6 +166,8 @@ export const History = Schema.Struct({
 
 export type History = typeof History.Type;
 
+export const Moves = Schema.Struct({ moves: History.fields.moves });
+
 export const Credential = Schema.Struct({
   auth_index: Schema.String,
   created_at: Schema.optionalKey(Schema.String),

@@ -3,11 +3,11 @@
 import { Effect, Schema } from "effect";
 import { refresh } from "next/cache";
 
-import { conflicts, fields, patchOf, valuesOf } from "@/lib/model/settings";
-import type { Change } from "@/lib/model/settings";
 import { attempt } from "@/lib/proxy/attempt";
 import { Proxy } from "@/lib/proxy/proxy";
 import { Config } from "@/lib/proxy/schema";
+import { conflicts, fields, patchOf, valuesOf } from "@/lib/settings/settings";
+import type { Change } from "@/lib/settings/settings";
 
 const Saved = Schema.Struct({ status: Schema.String });
 

@@ -13,7 +13,7 @@ import type {
   ExecutorApp,
   ExecutorOverview,
   SourceFile,
-} from "@/lib/model/executor";
+} from "@/lib/executor/executor";
 
 const home = homedir();
 

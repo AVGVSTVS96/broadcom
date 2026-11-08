@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { readPicture } from "@/lib/git/read";
-import { findWorkspace } from "@/lib/git/repos";
+import { readPicture } from "@/lib/files/read";
+import { findWorkspace } from "@/lib/files/repos";
 
 export const GET = async (request: NextRequest) => {
   const params = request.nextUrl.searchParams;

@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 
 import { Schema } from "effect";
 
-import { redact } from "@/lib/model/redact";
-import { changesOf, conflicts, patchOf, valuesOf } from "@/lib/model/settings";
 import { Config } from "@/lib/proxy/schema";
+import { redact } from "@/lib/settings/redact";
+import { changesOf, conflicts, patchOf, valuesOf } from "@/lib/settings/settings";
 
 const config = {
   access: { "api-keys": ["sk-one", "sk-two"] },

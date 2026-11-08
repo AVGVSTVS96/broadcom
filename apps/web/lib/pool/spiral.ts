@@ -1,9 +1,9 @@
-import { addDays } from "@/lib/model/calendar";
-import { HOUR, drops, isLocked, lockedSpans, usedBetween, valueAt } from "@/lib/model/history";
-import type { Point, Points } from "@/lib/model/history";
-import type { Pace } from "@/lib/model/pace";
-import { outlookOf, weeksOf, withHistory } from "@/lib/model/weeks";
-import type { Daily, WeekDay } from "@/lib/model/weeks";
+import { HOUR, drops, isLocked, lockedSpans, usedBetween, valueAt } from "@/lib/pool/history";
+import type { Point, Points } from "@/lib/pool/history";
+import type { Pace } from "@/lib/pool/pace";
+import { outlookOf, weeksOf, withHistory } from "@/lib/pool/weeks";
+import type { Daily, WeekDay } from "@/lib/pool/weeks";
+import { addDays } from "@/lib/time/calendar";
 
 export type Span = readonly [from: number, to: number];
 

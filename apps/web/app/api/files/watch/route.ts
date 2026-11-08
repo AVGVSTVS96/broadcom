@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
-import { findWorkspace } from "@/lib/git/repos";
-import { watchWorkspace } from "@/lib/git/watch";
+import { findWorkspace } from "@/lib/files/repos";
+import { watchWorkspace } from "@/lib/files/watch";
 import { changeStream } from "@/lib/watch/stream";
 
 export const GET = async (request: NextRequest) => {

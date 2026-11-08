@@ -1,4 +1,4 @@
-import { plural, utcDate } from "@/lib/model/format";
+import { plural, utcDate } from "@/lib/time/format";
 
 const planPrices = new Map([
   ["Max 20x", 200],

@@ -1,4 +1,4 @@
-import { DAY, HOUR } from "@/lib/model/history";
+import { DAY, HOUR } from "@/lib/pool/history";
 
 const minute = 60_000;
 

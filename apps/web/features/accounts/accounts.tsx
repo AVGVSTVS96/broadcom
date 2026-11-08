@@ -12,10 +12,10 @@ import { Policy } from "@/features/accounts/policy";
 import { SignIn } from "@/features/accounts/sign-in";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { accountRows, endsSoon, needsYou } from "@/lib/model/accounts";
-import type { Credit, Login, Row, State } from "@/lib/model/accounts";
-import { dollars, plural, when } from "@/lib/model/format";
 import { useImperative } from "@/lib/outside";
+import { accountRows, endsSoon, needsYou } from "@/lib/pool/accounts";
+import type { Credit, Login, Row, State } from "@/lib/pool/accounts";
+import { dollars, plural, when } from "@/lib/time/format";
 
 const needs: Partial<Record<State["is"], string>> = {
   disabled: "is disabled",

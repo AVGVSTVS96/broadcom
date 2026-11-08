@@ -2,10 +2,10 @@ import type { PointerEvent, ReactNode } from "react";
 
 import { HatchPattern, forecastHatchId, hatchId } from "@/components/viz/hatch";
 import { At } from "@/components/viz/plot";
-import { addDays } from "@/lib/model/calendar";
-import { date, weekday } from "@/lib/model/format";
-import { HOUR } from "@/lib/model/history";
-import type { Cell, Span, Spiral, Turn } from "@/lib/model/spiral";
+import { HOUR } from "@/lib/pool/history";
+import type { Cell, Span, Spiral, Turn } from "@/lib/pool/spiral";
+import { addDays } from "@/lib/time/calendar";
+import { date, weekday } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { fillLevel, planSteps } from "./cells";

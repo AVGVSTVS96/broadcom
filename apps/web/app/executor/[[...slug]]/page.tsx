@@ -6,8 +6,8 @@ import { connection } from "next/server";
 import { Section } from "@/components/viz/section";
 import { ConnectButton, DeployButton, SourceFiles } from "@/features/executor/parts";
 import { executorUrl, readOverview, readSource } from "@/lib/executor/api";
-import { needs, releasesBehind, sameSource, shortRelease } from "@/lib/model/executor";
-import type { ExecutorApp, Health } from "@/lib/model/executor";
+import { needs, releasesBehind, sameSource, shortRelease } from "@/lib/executor/executor";
+import type { ExecutorApp, Health } from "@/lib/executor/executor";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Executor" };

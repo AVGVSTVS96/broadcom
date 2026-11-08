@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Side } from "@/features/files/bench";
 import { Tree } from "@/features/files/tree";
 import { filesHref, parseFilesPath } from "@/features/files/urls";
-import type { Change } from "@/lib/model/files";
+import type { Change } from "@/lib/files/files";
 
 export const CodeSide = ({
   ws,

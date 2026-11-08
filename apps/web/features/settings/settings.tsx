@@ -17,9 +17,9 @@ import { Switch } from "@/components/ui/switch";
 import { Section } from "@/components/viz/section";
 import { saveSettings } from "@/features/settings/actions";
 import { useLive } from "@/lib/live/client";
-import { dollars, plural, utcDate } from "@/lib/model/format";
-import { changesOf, groups } from "@/lib/model/settings";
-import type { Field, Values } from "@/lib/model/settings";
+import { changesOf, groups } from "@/lib/settings/settings";
+import type { Field, Values } from "@/lib/settings/settings";
+import { dollars, plural, utcDate } from "@/lib/time/format";
 
 interface Facts {
   readonly server: string | null;

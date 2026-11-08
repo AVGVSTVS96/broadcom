@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
-import { dollars, plural, times, utcDate } from "@/lib/model/format";
-import type { Part, Source, Wallet } from "@/lib/model/wallet";
+import { dollars, plural, times, utcDate } from "@/lib/time/format";
+import type { Part, Source, Wallet } from "@/lib/usage/wallet";
 import { cn } from "@/lib/utils";
 
 const fills = [

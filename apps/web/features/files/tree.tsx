@@ -4,7 +4,7 @@ import type { FileTreeRowDecoration, GitStatusEntry } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import { useMemo, useRef } from "react";
 
-import type { Change } from "@/lib/model/files";
+import type { Change } from "@/lib/files/files";
 import { useImperative } from "@/lib/outside";
 
 const ancestors = (file: string) => {

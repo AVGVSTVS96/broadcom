@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
-import { handoffs, threadHref, waiting } from "@/lib/model/live";
-import type { Move } from "@/lib/model/live";
+import { handoffs, threadHref, waiting } from "@/lib/pool/live";
+import type { Move } from "@/lib/pool/live";
 import type { LiveSession } from "@/lib/proxy/schema";
 
 const hour = 3_600_000;

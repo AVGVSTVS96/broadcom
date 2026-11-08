@@ -1,5 +1,5 @@
-import type { Grouping, Range, Unit } from "@/lib/model/usage";
 import type { BucketSize } from "@/lib/proxy/schema";
+import type { Grouping, Range, Unit } from "@/lib/usage/usage";
 
 export const rangeNames = [
   ["today", "Today"],
