@@ -25,8 +25,8 @@ fn link(kind: u8, value: &str) -> Link {
     let hash = [kind]
         .iter()
         .chain(value.as_bytes())
-        .fold(0xcbf29ce484222325u64, |h, &b| {
-            (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
+        .fold(0xcbf2_9ce4_8422_2325_u64, |h, &b| {
+            (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
         });
     hash as i64
 }

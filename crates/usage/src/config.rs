@@ -1,5 +1,6 @@
 //! The service's settings: one JSON file, every field optional.
 
+use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -144,14 +145,17 @@ impl Config {
             return Ok(id.to_string());
         }
         let path = self.state_dir.join("device-id");
-        if let Ok(id) = std::fs::read_to_string(&path) {
-            if !id.trim().is_empty() {
-                return Ok(id.trim().to_string());
-            }
+        if let Ok(id) = std::fs::read_to_string(&path)
+            && !id.trim().is_empty()
+        {
+            return Ok(id.trim().to_string());
         }
         let mut bytes = [0u8; 16];
         std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-        let id: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        let id = bytes.iter().fold(String::with_capacity(32), |mut id, b| {
+            let _ = write!(id, "{b:02x}");
+            id
+        });
         std::fs::write(&path, format!("{id}\n"))?;
         Ok(id)
     }
@@ -159,8 +163,7 @@ impl Config {
     pub fn device_label(&self) -> String {
         self.device_label.clone().unwrap_or_else(|| {
             std::fs::read_to_string("/etc/hostname")
-                .map(|h| h.trim().to_string())
-                .unwrap_or_else(|_| "server".into())
+                .map_or_else(|_| "server".into(), |h| h.trim().to_string())
         })
     }
 }

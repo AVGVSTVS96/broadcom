@@ -13,11 +13,11 @@ include = ["src/**", "config.example.json", "README.md", "DESIGN.md", "LICENSE"]
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
-base64 = "0.22"
+base64 = "0.23"
 bytes = "1"
 futures-util = "0.3"
 jiff = "0.2"
-rand = "0.9"
+rand = "0.10"
 reqwest = { workspace = true, features = ["default-tls", "charset", "http2", "system-proxy", "json", "stream", "form", "gzip", "brotli", "zstd"] }
 serde.workspace = true
 serde_json.workspace = true

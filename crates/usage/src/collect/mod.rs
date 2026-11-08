@@ -13,12 +13,12 @@ mod parse;
 mod repository;
 mod t3;
 
+use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::Result;
@@ -168,7 +168,9 @@ impl Collector {
             add(Harness::Muse, under(&root, "sessions"));
         }
         let workers = match sources.max_workers {
-            0 => (std::thread::available_parallelism().map_or(1, |n| n.get()) / 2).max(1),
+            0 => {
+                (std::thread::available_parallelism().map_or(1, std::num::NonZero::get) / 2).max(1)
+            }
             n => n,
         };
         Ok(Collector {
@@ -230,7 +232,7 @@ impl Collector {
             ids.insert(logs[i].key.clone(), id);
             if !cold {
                 seeds.extend(old);
-                seeds.extend(entry.links.iter().cloned());
+                seeds.extend(entry.links.iter().copied());
             }
         }
         let present: HashSet<&str> = logs
@@ -459,16 +461,16 @@ fn parse_all(
         for _ in 0..workers.min(stale.len()) {
             scope.spawn(|| {
                 while let Some(&i) = stale.get(next.fetch_add(1, Ordering::Relaxed)) {
-                    let before = prior.lock().unwrap().remove(&i);
+                    let before = prior.lock().remove(&i);
                     let parsed = parse_file(&logs[i], before);
                     if let Some(entry) = parsed.and_then(|(p, r)| cache::Entry::new(p, r).ok()) {
-                        results.lock().unwrap().insert(i, entry);
+                        results.lock().insert(i, entry);
                     }
                 }
             });
         }
     });
-    results.into_inner().unwrap()
+    results.into_inner()
 }
 
 fn event(u: &Usage) -> Event {
@@ -553,21 +555,21 @@ fn build(
         let mut e = event(&entry.usage);
         let m = metadata(entry.usage.harness, &e.session_id);
         if let Some(title) = titles.get(&e.session_id) {
-            e.session_title = title.clone();
+            e.session_title.clone_from(title);
         } else if let Some(m) = m {
-            e.session_title = m.session_title.clone();
+            e.session_title.clone_from(&m.session_title);
         }
         if let Some(m) = m {
-            e.project_name = m.project_name.clone();
-            e.t3_thread_id = m.t3_thread_id.clone();
-            e.t3_thread_url = m.t3_thread_url.clone();
+            e.project_name.clone_from(&m.project_name);
+            e.t3_thread_id.clone_from(&m.t3_thread_id);
+            e.t3_thread_url.clone_from(&m.t3_thread_url);
         }
         let (cost, known) = policy.estimate_cost(&e, entry.cache_write_1h, &entry.tier);
         if !known {
             unknown.insert(e.model.clone());
         }
         (e.cost_usd, e.cost_known) = (cost, known);
-        e.raw_model = e.model.clone();
+        e.raw_model.clone_from(&e.model);
         e.model = policy.display_model(&e.model);
         e.service_tier = Some(entry.tier.clone());
         e.cache_write_1h_tokens = Some(entry.cache_write_1h);
@@ -658,7 +660,10 @@ mod tests {
         fn pass(&mut self) -> Collection {
             let mut out = Collection::default();
             self.collector
-                .collect(&Policy::bundled(), |c| Ok(out = c))
+                .collect(&Policy::bundled(), |c| {
+                    out = c;
+                    Ok(())
+                })
                 .unwrap();
             out
         }
@@ -692,9 +697,13 @@ mod tests {
         let cold = f.pass();
         assert_eq!(cold.events.len(), 2);
         assert_eq!(cold.retracted_ids, ["claude:message:m1:r9"]);
-        assert!(f.ids().is_empty());
+        assert_eq!(f.ids(), Vec::<String>::new());
         f.collector = Fixture::open(&f.root);
-        assert!(f.ids().is_empty(), "a restart parses nothing new");
+        assert_eq!(
+            f.ids(),
+            Vec::<String>::new(),
+            "a restart parses nothing new"
+        );
 
         f.append(
             "claude/projects/p/s1.jsonl",
@@ -702,7 +711,7 @@ mod tests {
         );
         assert_eq!(f.ids(), ["claude:message:m1:r1", "claude:message:m4:r4"]);
         let warm = f.pass().events;
-        assert!(warm.is_empty());
+        assert_eq!(warm, []);
 
         let fresh_root = f.root.with_extension("fresh");
         let _ = std::fs::remove_dir_all(&fresh_root);
@@ -747,7 +756,7 @@ mod tests {
             .collect(&Policy::bundled(), |_| anyhow::bail!("store is down"));
         assert!(failed.is_err());
         assert_eq!(f.ids(), ["claude:message:m1:r1"]);
-        assert!(f.ids().is_empty());
+        assert_eq!(f.ids(), Vec::<String>::new());
     }
 
     #[test]

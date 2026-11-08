@@ -38,7 +38,7 @@ struct JournalLine {
 }
 
 enum Change {
-    Put(Event),
+    Put(Box<Event>),
     Withdraw(String),
 }
 
@@ -47,9 +47,9 @@ fn parse(line: &[u8], format: Format) -> Option<Change> {
         Format::Receipts => serde_json::from_slice::<Event>(line)
             .ok()
             .filter(|e| !e.id.is_empty())
-            .map(Change::Put),
+            .map(|e| Change::Put(Box::new(e))),
         Format::Journal => match serde_json::from_slice::<JournalLine>(line).ok()? {
-            JournalLine { e: Some(e), .. } => Some(Change::Put(e)),
+            JournalLine { e: Some(e), .. } => Some(Change::Put(Box::new(e))),
             JournalLine { d: Some(id), .. } if !id.is_empty() => Some(Change::Withdraw(id)),
             _ => None,
         },
@@ -134,7 +134,7 @@ fn apply_in_order(store: &Store, device: &Device, changes: Vec<Change>) -> Resul
                     store.apply(&std::mem::take(&mut batch), false)?;
                     batch.device = device.clone();
                 }
-                batch.events.push(e);
+                batch.events.push(*e);
             }
             Change::Withdraw(id) => {
                 if !batch.events.is_empty() {

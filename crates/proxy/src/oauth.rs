@@ -9,7 +9,6 @@ use std::{
 };
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -369,7 +368,7 @@ impl SignIns {
 
 fn random(bytes: usize) -> String {
     let mut buf = vec![0; bytes];
-    rand::rng().fill_bytes(&mut buf);
+    rand::fill(buf.as_mut_slice());
     URL_SAFE_NO_PAD.encode(buf)
 }
 
@@ -628,7 +627,7 @@ async fn exchange(
         login.path = app.config.credentials_dir.join(&name);
         if kind == "claude" {
             let mut device = [0u8; 32];
-            rand::rng().fill_bytes(&mut device);
+            rand::fill(&mut device);
             login.set("claude_device_ids", json!([hex(&device)]));
             login.set("disabled", false);
         }

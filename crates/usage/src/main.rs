@@ -101,10 +101,11 @@ fn dump(app: &App, out: &str) -> Result<()> {
 
 #[tokio::main]
 async fn serve(app: Arc<App>) -> Result<()> {
+    let listen = app.config.listen.clone();
     app::start(app.clone());
-    let router = server::router(app.clone());
+    let router = server::router(app);
     let mut servers = tokio::task::JoinSet::new();
-    for address in app.config.listen.clone() {
+    for address in listen {
         let router = router.clone();
         servers.spawn(async move {
             loop {

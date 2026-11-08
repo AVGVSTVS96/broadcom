@@ -70,11 +70,7 @@ pub fn read(directory: &Path, base_url: &str) -> BTreeMap<String, Metadata> {
 
 fn query(db: &Connection, sql: &str) -> rusqlite::Result<Vec<Row>> {
     let mut statement = db.prepare(sql)?;
-    let names: Vec<String> = statement
-        .column_names()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let names: Vec<String> = statement.column_names().map(str::to_owned).collect();
     let rows = statement.query_map([], |row| {
         let mut out = Row::new();
         for (i, name) in names.iter().enumerate() {
