@@ -1,6 +1,8 @@
 //! What only the account owner does, against a stand-in for Anthropic's and OpenAI's sign-in,
 //! usage and reset endpoints: refreshing tokens, spending held resets and adding logins.
 
+#![allow(clippy::unwrap_used)]
+
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},

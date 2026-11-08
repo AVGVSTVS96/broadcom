@@ -21,6 +21,7 @@ notify = "8"
 postcard = { version = "1", features = ["use-std"] }
 regex = "1"
 reqwest = { workspace = true, features = ["rustls", "json", "gzip"] }
+parking_lot = "0.12"
 rusqlite = { version = "0.37", features = ["bundled"] }
 schemars = { version = "1", features = ["indexmap2"] }
 serde = { workspace = true, features = ["rc"] }

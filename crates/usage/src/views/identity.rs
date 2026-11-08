@@ -60,7 +60,7 @@ impl Serialize for Who {
 #[derive(Debug, Clone, PartialEq)]
 struct Thread {
     app: String,
-    thread: String,
+    id: String,
     name: String,
 }
 
@@ -86,12 +86,14 @@ pub struct SessionRef<'a> {
 }
 
 static JOB_TITLE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^(.+)/([0-9A-Za-z_.@-]+)$").unwrap());
+    LazyLock::new(|| Regex::new(r"^(.+)/([0-9A-Za-z_.@-]+)$").expect("a valid regex"));
 /// tokenhub's GitHub import names each session `github:<run>:<attempt>:…` and titles it `<workflow> #<run>`.
-static RUN_SESSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^github:([0-9]+):").unwrap());
-static RUN_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r" #[0-9]+$").unwrap());
+static RUN_SESSION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^github:([0-9]+):").expect("a valid regex"));
+static RUN_NUMBER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r" #[0-9]+$").expect("a valid regex"));
 static PAST_LOG_NAME: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"-([0-9a-f]{8})\.md$").unwrap());
+    LazyLock::new(|| Regex::new(r"-([0-9a-f]{8})\.md$").expect("a valid regex"));
 
 fn thread_link(app: &str, id: &str) -> Option<String> {
     match app {
@@ -159,9 +161,9 @@ pub fn who_of(names: &Names, s: SessionRef) -> Who {
         return Who {
             kind: "thread".into(),
             app: t.app.clone(),
-            thread: t.thread.clone(),
+            thread: t.id.clone(),
             name: t.name.clone(),
-            href: thread_link(&t.app, &t.thread),
+            href: thread_link(&t.app, &t.id),
             ..Who::default()
         };
     }
@@ -314,10 +316,10 @@ pub fn load_names(hex: &Path, past: &Past) -> Result<Names, String> {
     for row in rows {
         let t = Thread {
             app: row.app.unwrap_or_default(),
-            thread: row.thread.unwrap_or_default(),
+            id: row.thread.unwrap_or_default(),
             name: row.name.unwrap_or_default(),
         };
-        let key = (t.app.clone(), t.thread.clone());
+        let key = (t.app.clone(), t.id.clone());
         if !threads.contains_key(&key) {
             order.push(key.clone());
         }
@@ -338,6 +340,34 @@ pub fn load_names(hex: &Path, past: &Past) -> Result<Names, String> {
     Ok(names)
 }
 
+impl schemars::JsonSchema for Who {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Who".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let text = serde_json::json!({ "type": "string" });
+        let maybe = serde_json::json!({ "type": ["string", "null"] });
+        let kind = |name: &str, fields: &[(&str, &serde_json::Value)]| {
+            let mut properties = serde_json::Map::new();
+            properties.insert("kind".into(), serde_json::json!({ "const": name }));
+            for (field, schema) in fields {
+                properties.insert(field.to_string(), (*schema).clone());
+            }
+            serde_json::json!({ "type": "object", "properties": properties })
+        };
+        schemars::json_schema!({
+            "oneOf": [
+                kind("thread", &[("app", &text), ("thread", &text), ("name", &text), ("href", &maybe)]),
+                kind("job", &[("owner", &maybe), ("unit", &text)]),
+                kind("session", &[("title", &text), ("project", &text), ("href", &maybe)]),
+                kind("action", &[("repo", &text), ("workflow", &text), ("run", &maybe), ("href", &maybe)]),
+                kind("project", &[("project", &text)]),
+            ]
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,7 +385,7 @@ mod tests {
     fn names_sessions_in_order() {
         let thread = |name: &str| Thread {
             app: "telegram".into(),
-            thread: format!("-1001:{name}"),
+            id: format!("-1001:{name}"),
             name: name.into(),
         };
         let mut names = Names::default();
@@ -403,33 +433,5 @@ mod tests {
             serde_json::to_string(&job).unwrap(),
             r#"{"kind":"job","owner":null,"unit":"u"}"#
         );
-    }
-}
-
-impl schemars::JsonSchema for Who {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "Who".into()
-    }
-
-    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        let text = serde_json::json!({ "type": "string" });
-        let maybe = serde_json::json!({ "type": ["string", "null"] });
-        let kind = |name: &str, fields: &[(&str, &serde_json::Value)]| {
-            let mut properties = serde_json::Map::new();
-            properties.insert("kind".into(), serde_json::json!({ "const": name }));
-            for (field, schema) in fields {
-                properties.insert(field.to_string(), (*schema).clone());
-            }
-            serde_json::json!({ "type": "object", "properties": properties })
-        };
-        schemars::json_schema!({
-            "oneOf": [
-                kind("thread", &[("app", &text), ("thread", &text), ("name", &text), ("href", &maybe)]),
-                kind("job", &[("owner", &maybe), ("unit", &text)]),
-                kind("session", &[("title", &text), ("project", &text), ("href", &maybe)]),
-                kind("action", &[("repo", &text), ("workflow", &text), ("run", &maybe), ("href", &maybe)]),
-                kind("project", &[("project", &text)]),
-            ]
-        })
     }
 }

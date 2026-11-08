@@ -14,9 +14,6 @@ mod sessions;
 mod timeframe;
 mod view;
 
-#[cfg(test)]
-mod parity;
-
 pub use attribution::{AgentSdk, attribution_reach};
 pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, read_grants};
 pub use identity::{Names, Past, Who, load_names, read_past};

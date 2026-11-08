@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::event::{Batch, Device, Event};
 use crate::pricing::{Pricing, write_atomic};
 
-const INTERVAL: Duration = Duration::from_secs(5 * 60);
+const INTERVAL: Duration = Duration::from_mins(5);
 
 /// Per repository, the artifact listing a pass read in full (its ETag, so an unchanged
 /// listing costs GitHub nothing) and the artifacts already handed over.
@@ -233,7 +233,7 @@ impl GitHub {
         etag: Option<String>,
     ) -> Result<Option<(String, Vec<Vec<u8>>)>> {
         static NEXT: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r#"<([^>]+)>;\s*rel="next""#).unwrap());
+            LazyLock::new(|| Regex::new(r#"<([^>]+)>;\s*rel="next""#).expect("a valid regex"));
         let first = self.get(token, &url, etag.as_deref()).await?;
         if first.status() == StatusCode::NOT_MODIFIED {
             return Ok(None);

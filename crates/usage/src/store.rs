@@ -7,10 +7,11 @@
 //! upstream response or request is hidden, and the receipt takes its project, title,
 //! thread and device from its session's latest transcript record.
 
+use parking_lot::Mutex;
 use std::collections::{BTreeSet, HashMap};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::{Result, bail};
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
@@ -136,6 +137,9 @@ const COLUMNS: &str = "source, response_id, upstream_request_id, account_id, fai
     reported_cost_usd, cost_known, service_tier, cache_write_1h, requests, device_id, session_title, project_name, \
     t3_thread_id, t3_thread_url, entrypoint";
 
+/// A row from `Store::rows_after`: its rowid, whether the views count it, and the row.
+pub type RowChange = (i64, bool, crate::views::Row);
+
 pub struct Store {
     write: Mutex<Connection>,
     read: Mutex<Connection>,
@@ -186,8 +190,8 @@ impl Store {
         if id.trim().is_empty() || id.len() > 200 {
             bail!("a valid device id is required");
         }
-        let mut db = self.write.lock().unwrap();
-        let policy = self.policy.lock().unwrap().clone();
+        let mut db = self.write.lock();
+        let policy = self.policy.lock().clone();
         let tx = db.transaction()?;
         let mut result = Applied::default();
         let created = !exists(&tx, "SELECT 1 FROM devices WHERE id = ?1", id)?;
@@ -245,7 +249,7 @@ impl Store {
 
     /// Where a followed file was read up to: (inode, offset).
     pub fn cursor(&self, path: &str) -> Result<Option<(u64, u64)>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         Ok(db
             .prepare_cached("SELECT inode, offset FROM cursors WHERE path = ?1")?
             .query_row([path], |r| {
@@ -255,7 +259,7 @@ impl Store {
     }
 
     pub fn set_cursor(&self, path: &str, inode: u64, offset: u64) -> Result<()> {
-        self.write.lock().unwrap().execute(
+        self.write.lock().execute(
             "INSERT OR REPLACE INTO cursors (path, inode, offset) VALUES (?1, ?2, ?3)",
             params![path, inode as i64, offset as i64],
         )?;
@@ -264,8 +268,12 @@ impl Store {
 
     /// Prices every record again under a new policy, from its raw copy, as on write.
     pub fn set_policy(&self, policy: Arc<Policy>) -> Result<()> {
-        let mut db = self.write.lock().unwrap();
-        *self.policy.lock().unwrap() = policy.clone();
+        let mut db = self.write.lock();
+        let policy = {
+            let mut current = self.policy.lock();
+            *current = policy;
+            current.clone()
+        };
         let tx = db.transaction()?;
         let keys = tx
             .prepare("SELECT harness, id FROM events WHERE gone = 0")?
@@ -283,11 +291,10 @@ impl Store {
 
     /// Prices everything again if it was priced with another catalog, rules or code.
     pub fn reprice_if_stale(&self) -> Result<()> {
-        let policy = self.policy.lock().unwrap().clone();
+        let policy = self.policy.lock().clone();
         let stored: Option<String> = self
             .read
             .lock()
-            .unwrap()
             .query_row(
                 "SELECT value FROM meta WHERE key = 'priced_with'",
                 [],
@@ -302,21 +309,20 @@ impl Store {
 
     /// Rows changed since `rev` (all of them for -1) in timestamp and id order, each with
     /// its rowid and whether the views count it, and the store's latest revision.
-    pub fn rows_after(&self, rev: i64) -> Result<(Vec<(i64, bool, crate::views::Row)>, i64)> {
-        let db = self.read.lock().unwrap();
+    pub fn rows_after(&self, rev: i64) -> Result<(Vec<RowChange>, i64)> {
+        let db = self.read.lock();
         let tx = db.unchecked_transaction()?;
         let latest: i64 =
             tx.query_row("SELECT coalesce(max(rev), 0) FROM events", [], |r| r.get(0))?;
         let mut strings: HashMap<String, Arc<str>> = HashMap::new();
         let mut intern = |r: &Row, i: usize| -> rusqlite::Result<Arc<str>> {
             let text = r.get_ref(i)?.as_str()?;
-            Ok(match strings.get(text) {
-                Some(s) => s.clone(),
-                None => {
-                    let s: Arc<str> = Arc::from(text);
-                    strings.insert(text.to_string(), s.clone());
-                    s
-                }
+            Ok(if let Some(s) = strings.get(text) {
+                s.clone()
+            } else {
+                let s: Arc<str> = Arc::from(text);
+                strings.insert(text.to_string(), s.clone());
+                s
             })
         };
         let mut statement = tx.prepare_cached(&format!(
@@ -364,7 +370,7 @@ impl Store {
 
     /// Every resolved record, sorted, as Go's `Store.Events()` returns them.
     pub fn events(&self) -> Result<Vec<Event>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         let mut events: Vec<Event> = db
             .prepare(&format!("SELECT {COLUMNS} FROM events WHERE {VISIBLE}"))?
             .query_map([], read_event)?
@@ -375,7 +381,7 @@ impl Store {
 
     /// Proxy receipts charged to these credentials.
     pub fn receipts(&self, credentials: &[String]) -> Result<Vec<Event>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         let mut statement = db.prepare_cached(&format!(
             "SELECT {COLUMNS} FROM events WHERE source = 'proxy' AND gone = 0 AND account_id = ?1"
         ))?;
@@ -392,7 +398,7 @@ impl Store {
 
     /// When the earliest proxy receipt was made, unix ms.
     pub fn proxy_since(&self) -> Result<Option<i64>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         Ok(db
             .prepare_cached("SELECT min(millis) FROM events WHERE source = 'proxy' AND gone = 0")?
             .query_row([], |r| r.get(0))?)
@@ -400,7 +406,7 @@ impl Store {
 
     /// The server first, synced now, then other devices by label.
     pub fn devices(&self) -> Result<Vec<Device>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         let mut others: Vec<Device> = db
             .prepare_cached(
                 "SELECT id, label, synced_at FROM devices WHERE id <> ?1 ORDER BY label, id",
@@ -423,7 +429,7 @@ impl Store {
 
     /// One device's stored records, as it sent them.
     pub fn device_ids(&self, device: &str) -> Result<Vec<String>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         Ok(db
             .prepare("SELECT id FROM records WHERE device = ?1")?
             .query_map([device], |r| r.get(0))?
@@ -431,7 +437,7 @@ impl Store {
     }
 
     pub fn device_records(&self, device: &str) -> Result<Vec<Event>> {
-        let db = self.read.lock().unwrap();
+        let db = self.read.lock();
         let rows = db
             .prepare("SELECT event FROM records WHERE device = ?1")?
             .query_map([device], |r| r.get::<_, String>(0))?
@@ -468,10 +474,8 @@ pub fn now_millis() -> i64 {
         .map_or(0, |d| d.as_millis() as i64)
 }
 
-fn is_remote(repository: &Option<String>) -> bool {
-    repository
-        .as_deref()
-        .is_some_and(|r| !r.is_empty() && !r.starts_with("local:"))
+fn is_remote(repository: Option<&str>) -> bool {
+    repository.is_some_and(|r| !r.is_empty() && !r.starts_with("local:"))
 }
 
 /// token-tracker's normalization of an uploaded record. A record that names its T3
@@ -484,25 +488,25 @@ pub fn merge(incoming: &Event, previous: Option<&Event>, device: &str) -> Event 
     }
     let Some(previous) = previous else { return e };
     if e.session_title.is_empty() {
-        e.session_title = previous.session_title.clone();
+        e.session_title.clone_from(&previous.session_title);
     }
     if e.project_name.is_empty() {
-        e.project_name = previous.project_name.clone();
+        e.project_name.clone_from(&previous.project_name);
     }
     if e.entrypoint.is_empty() {
-        e.entrypoint = previous.entrypoint.clone();
+        e.entrypoint.clone_from(&previous.entrypoint);
     }
     if incoming.t3_thread_id.is_empty() && incoming.t3_thread_url.is_empty() {
-        e.t3_thread_id = previous.t3_thread_id.clone();
-        e.t3_thread_url = previous.t3_thread_url.clone();
+        e.t3_thread_id.clone_from(&previous.t3_thread_id);
+        e.t3_thread_url.clone_from(&previous.t3_thread_url);
         if !previous.t3_thread_id.is_empty()
-            && is_remote(&previous.repository)
-            && !is_remote(&incoming.repository)
+            && is_remote(previous.repository.as_deref())
+            && !is_remote(incoming.repository.as_deref())
             && incoming.project == previous.project
             && incoming.harness == previous.harness
             && incoming.session_id == previous.session_id
         {
-            e.repository = previous.repository.clone();
+            e.repository.clone_from(&previous.repository);
         }
     }
     e
@@ -532,31 +536,31 @@ fn request_identity(e: &Event) -> Option<String> {
     if !e.upstream_request_id.is_empty() {
         return Some(e.upstream_request_id.clone());
     }
-    if e.harness == "claude" {
-        if let Some(rest) = e.id.strip_prefix("claude:message:") {
-            return rest
-                .split_once(':')
-                .map(|(_, r)| r.to_string())
-                .filter(|s| !s.is_empty());
-        }
+    if e.harness == "claude"
+        && let Some(rest) = e.id.strip_prefix("claude:message:")
+    {
+        return rest
+            .split_once(':')
+            .map(|(_, r)| r.to_string())
+            .filter(|s| !s.is_empty());
     }
     None
 }
 
 /// The wire record, with what its transcript knows about the session.
 fn with_transcript(mut wire: Event, transcript: &Event) -> Event {
-    wire.project = transcript.project.clone();
-    wire.repository = transcript.repository.clone();
-    wire.device_id = transcript.device_id.clone();
-    wire.session_id = transcript.session_id.clone();
+    wire.project.clone_from(&transcript.project);
+    wire.repository.clone_from(&transcript.repository);
+    wire.device_id.clone_from(&transcript.device_id);
+    wire.session_id.clone_from(&transcript.session_id);
     if !transcript.session_title.is_empty() {
-        wire.session_title = transcript.session_title.clone();
+        wire.session_title.clone_from(&transcript.session_title);
     }
-    wire.project_name = transcript.project_name.clone();
-    wire.t3_thread_id = transcript.t3_thread_id.clone();
-    wire.t3_thread_url = transcript.t3_thread_url.clone();
+    wire.project_name.clone_from(&transcript.project_name);
+    wire.t3_thread_id.clone_from(&transcript.t3_thread_id);
+    wire.t3_thread_url.clone_from(&transcript.t3_thread_url);
     if wire.entrypoint.is_empty() {
-        wire.entrypoint = transcript.entrypoint.clone();
+        wire.entrypoint.clone_from(&transcript.entrypoint);
     }
     wire
 }
@@ -799,7 +803,7 @@ fn event_values(e: &Event) -> Vec<rusqlite::types::Value> {
         text(&e.response_id),
         text(&e.upstream_request_id),
         text(&e.account_id),
-        Integer(e.failed as i64),
+        Integer(i64::from(e.failed)),
         text(&e.id),
         text(&e.timestamp),
         text(&e.harness),
@@ -816,7 +820,7 @@ fn event_values(e: &Event) -> Vec<rusqlite::types::Value> {
         Integer(e.reasoning_tokens),
         Real(e.cost_usd),
         e.reported_cost_usd.map_or(Null, Real),
-        Integer(e.cost_known as i64),
+        Integer(i64::from(e.cost_known)),
         e.service_tier.clone().map_or(Null, Text),
         e.cache_write_1h_tokens.map_or(Null, Integer),
         e.requests.map_or(Null, Integer),
@@ -867,7 +871,7 @@ fn read_event(r: &Row) -> rusqlite::Result<Event> {
 
 /// A record timestamp in unix ms, read as JavaScript's Date.parse reads ISO strings.
 pub fn millis_of(timestamp: &str) -> Option<i64> {
-    use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone};
+    use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
     if let Ok(t) = DateTime::parse_from_rfc3339(timestamp) {
         return Some(t.timestamp_millis());
     }
@@ -879,5 +883,5 @@ pub fn millis_of(timestamp: &str) -> Option<i64> {
     }
     NaiveDate::parse_from_str(timestamp, "%Y-%m-%d")
         .ok()
-        .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis())
+        .map(|d| d.and_time(NaiveTime::MIN).and_utc().timestamp_millis())
 }

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Request, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, HeaderName, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -102,10 +102,13 @@ async fn push(State(app): State<Arc<App>>, headers: HeaderMap, body: Bytes) -> R
 async fn events(State(app): State<Arc<App>>) -> Response {
     let frames = ReceiverStream::new(app.deck.stream.subscribe())
         .map(|frame| Ok::<_, Infallible>(Bytes::from(frame)));
-    Response::builder()
-        .header(header::CONTENT_TYPE, "text/event-stream")
-        .header(header::CACHE_CONTROL, "no-cache")
-        .header("X-Accel-Buffering", "no")
-        .body(Body::from_stream(frames))
-        .unwrap()
+    (
+        [
+            (header::CONTENT_TYPE, "text/event-stream"),
+            (header::CACHE_CONTROL, "no-cache"),
+            (HeaderName::from_static("x-accel-buffering"), "no"),
+        ],
+        Body::from_stream(frames),
+    )
+        .into_response()
 }

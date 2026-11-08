@@ -73,7 +73,7 @@ fn query(db: &Connection, sql: &str) -> rusqlite::Result<Vec<Row>> {
     let names: Vec<String> = statement
         .column_names()
         .iter()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
     let rows = statement.query_map([], |row| {
         let mut out = Row::new();

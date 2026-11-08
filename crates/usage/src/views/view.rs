@@ -254,9 +254,13 @@ fn ratio(part: f64, whole: f64) -> f64 {
 
 /// Field by field, the part of `whole` that is both `a` and `b`, assuming they overlap in proportion.
 fn overlap_of(a: &Amount, b: &Amount, whole: &Amount) -> Amount {
-    let (x, y, w) = (a.fields(), b.fields(), whole.fields());
+    let (a, b, whole) = (a.fields(), b.fields(), whole.fields());
     Amount::from_fields(std::array::from_fn(|i| {
-        if w[i] != 0.0 { x[i] * y[i] / w[i] } else { 0.0 }
+        if whole[i] == 0.0 {
+            0.0
+        } else {
+            a[i] * b[i] / whole[i]
+        }
     }))
 }
 
@@ -302,10 +306,10 @@ pub fn parts_of<'a>(s: &'a Session, names: &Names) -> Vec<Part<'a>> {
     }
     let mut parts = Vec::with_capacity(models.len() * accounts.len());
     for (model, model_amount) in &models {
-        let api = if amount.api_usd != 0.0 {
-            ratio(model_amount.api_usd, amount.api_usd)
-        } else {
+        let api = if amount.api_usd == 0.0 {
             ratio(model_amount.tokens, amount.tokens)
+        } else {
+            ratio(model_amount.api_usd, amount.api_usd)
         };
         for account in &accounts {
             let account_amount = amounts.get(*account).copied().unwrap_or_default();
@@ -476,35 +480,34 @@ fn group_parts<'p>(
     let column = series_column(measure);
     for p in parts {
         let key = group_key(by, p);
-        let g = match index.get(&key) {
-            Some(&i) => &mut groups[i],
-            None => {
-                let (label, detail, who) = describe(by, p, labels);
-                index.insert(key.clone(), groups.len());
-                groups.push(Group {
-                    key,
-                    label,
-                    detail,
-                    who,
-                    amount: Amount::default(),
-                    five_hour: 0.0,
-                    week: 0.0,
-                    accounts: Vec::new(),
-                    by_account: HashMap::new(),
-                    seen: HashSet::new(),
-                    sessions: Vec::new(),
-                    last_active_at: 0.0,
-                    series: vec![0.0; buckets],
-                    entrypoint: String::new(),
-                    sdk_api: 0.0,
-                });
-                groups.last_mut().expect("just pushed")
-            }
+        let g = if let Some(&i) = index.get(&key) {
+            &mut groups[i]
+        } else {
+            let (label, detail, who) = describe(by, p, labels);
+            index.insert(key.clone(), groups.len());
+            groups.push(Group {
+                key,
+                label,
+                detail,
+                who,
+                amount: Amount::default(),
+                five_hour: 0.0,
+                week: 0.0,
+                accounts: Vec::new(),
+                by_account: HashMap::new(),
+                seen: HashSet::new(),
+                sessions: Vec::new(),
+                last_active_at: 0.0,
+                series: vec![0.0; buckets],
+                entrypoint: String::new(),
+                sdk_api: 0.0,
+            });
+            groups.last_mut().expect("just pushed")
         };
         g.amount.add(&p.amount);
         let via = &p.session.entrypoint;
         if g.entrypoint.is_empty() || g.entrypoint == *via {
-            g.entrypoint = via.clone();
+            g.entrypoint.clone_from(via);
         } else if !via.is_empty() {
             g.entrypoint = "mixed".into();
         }
@@ -541,12 +544,11 @@ fn top_by_api(all: &[Part], by: &str) -> HashMap<String, usize> {
     let mut api: Vec<(String, f64)> = Vec::new();
     for p in all {
         let key = group_key(by, p);
-        match index.get(&key) {
-            Some(&i) => api[i].1 += p.amount.api_usd,
-            None => {
-                index.insert(key.clone(), api.len());
-                api.push((key, p.amount.api_usd));
-            }
+        if let Some(&i) = index.get(&key) {
+            api[i].1 += p.amount.api_usd;
+        } else {
+            index.insert(key.clone(), api.len());
+            api.push((key, p.amount.api_usd));
         }
     }
     api.sort_by(|a, b| descending(a.1, b.1));
@@ -641,7 +643,7 @@ pub fn usage_view(
             sdk_api += p.amount.api_usd;
             sdk_five += p.five_hour;
         }
-        total_sessions.insert(p.session as *const Session);
+        total_sessions.insert(std::ptr::from_ref::<Session>(p.session));
         total_five += p.five_hour;
         total_week += p.week;
         if p.who.kind != "project" {

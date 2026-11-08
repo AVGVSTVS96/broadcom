@@ -158,7 +158,7 @@ fn filter_pi_replays(files: &mut [Parsed]) {
                 if !inherited && !before_copy {
                     break;
                 }
-                session = owner_parent.clone();
+                session.clone_from(&owner_parent);
                 id = format!("pi:{session}:{native_id}");
                 visited.insert(owner_parent.clone());
                 let Some((parent, forked)) = parents.get(&owner_parent) else {
@@ -177,13 +177,13 @@ fn filter_pi_replays(files: &mut [Parsed]) {
 }
 
 fn filter_codex_replays(files: &mut [Parsed]) {
+    type Replay = (String, i64, i64, i64, i64, i64);
     let mut parents: HashMap<String, usize> = HashMap::new();
     for (i, file) in files.iter().enumerate() {
         if harness(file) == Some(Harness::Codex) {
             parents.insert(file.session_id.clone(), i);
         }
     }
-    type Replay = (String, i64, i64, i64, i64, i64);
     let key = |e: &Usage| -> Replay {
         (
             e.timestamp.clone(),
@@ -299,7 +299,7 @@ fn apply_muse_parent_projects(files: &mut [Parsed]) {
         }
         for entry in &mut file.events {
             if entry.usage.project == "Unknown project" {
-                entry.usage.project = project.clone();
+                entry.usage.project.clone_from(&project);
             }
         }
     }

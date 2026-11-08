@@ -265,6 +265,7 @@ dependencies = [
  "memchr",
  "mimalloc",
  "notify",
+ "parking_lot",
  "postcard",
  "regex",
  "reqwest",

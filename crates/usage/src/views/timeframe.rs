@@ -60,7 +60,7 @@ pub struct Timeframe {
 /// a repeated hour reads as its first pass, a skipped one with the offset after the jump.
 pub(crate) fn at_local(zone: Tz, wall: NaiveDateTime) -> DateTime<Tz> {
     let offset =
-        |utc: &NaiveDateTime| zone.offset_from_utc_datetime(utc).fix().local_minus_utc() as i64;
+        |utc: &NaiveDateTime| i64::from(zone.offset_from_utc_datetime(utc).fix().local_minus_utc());
     let guess = offset(&wall);
     let mut utc = wall - TimeDelta::seconds(guess);
     let actual = offset(&utc);

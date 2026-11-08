@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use broadcom_usage::event::{Batch, Device, Event};
 use broadcom_usage::pricing::Pricing;
 use broadcom_usage::store::Store;
@@ -35,7 +37,10 @@ fn batch(device_id: &str, events: Vec<Event>, deleted: &[&str]) -> Batch {
     Batch {
         device: device(device_id),
         events,
-        deleted_ids: deleted.iter().map(|s| s.to_string()).collect(),
+        deleted_ids: deleted
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect(),
     }
 }
 
