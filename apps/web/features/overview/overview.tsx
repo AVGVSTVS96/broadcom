@@ -46,8 +46,8 @@ export const Overview = ({
                 New work goes to <span className="text-brand">{next.name}</span>
               </>
             )}
-            <span className="block text-muted-foreground sm:inline">
-              <span className="max-sm:hidden"> · </span>
+            <span className="block text-muted-foreground lg:inline">
+              <span className="max-lg:hidden"> · </span>
               {summary.open.length} of {summary.subscriptions.length} plans{" "}
               {summary.open.length === 1 ? "has" : "have"} room
             </span>

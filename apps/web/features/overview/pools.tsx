@@ -21,11 +21,11 @@ const Column = ({
 }) => (
   <div className="min-w-0 space-y-3 py-5 sm:px-6 sm:first:pl-0 sm:last:pr-0">
     <div className="text-sm">{label}</div>
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-1.5 sm:max-wide:flex-col sm:max-wide:items-start sm:max-wide:gap-0">
       <span className={cn("text-5xl font-light tracking-tight tabular-nums", texts[totals.tone])}>
         {value}
       </span>
-      <span className="text-sm text-muted-foreground">{unit}</span>
+      <span className="text-sm whitespace-nowrap text-muted-foreground">{unit}</span>
     </div>
     <Segments parts={totals.parts} />
     <p className="text-sm text-muted-foreground">{children}</p>
@@ -50,21 +50,32 @@ export const Pools = ({
   const { credit, firstBack, open, session, sessionReset, subscriptions } = summary;
 
   return (
-    <div className="grid border-y max-sm:divide-y sm:grid-cols-3 sm:divide-x">
+    <div className="grid divide-y border-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
       <Column
         label="Weekly"
         value={percentOf(summary.week)}
         unit={unitOf(summary.week)}
         totals={summary.week}
       >
-        {firstBack === undefined
-          ? `All ${subscriptions.length} plans have room`
-          : `${firstBack.name} is back first, ${when(firstBack.account.week.resetsAt ?? 0, now)}`}
+        {firstBack === undefined ? (
+          `All ${subscriptions.length} plans have room`
+        ) : (
+          <>
+            {firstBack.name} is back first,{" "}
+            <span className="whitespace-nowrap">
+              {when(firstBack.account.week.resetsAt ?? 0, now)}
+            </span>
+          </>
+        )}
       </Column>
       <Column label="Session" value={percentOf(session)} unit={unitOf(session)} totals={session}>
-        {sessionReset === undefined
-          ? `${open.length} of ${subscriptions.length} plans open`
-          : `Next reset in ${duration(sessionReset - now)}`}
+        {sessionReset === undefined ? (
+          `${open.length} of ${subscriptions.length} plans open`
+        ) : (
+          <>
+            Next reset in <span className="whitespace-nowrap">{duration(sessionReset - now)}</span>
+          </>
+        )}
       </Column>
       <Column
         label="Free credit"
@@ -73,9 +84,14 @@ export const Pools = ({
         totals={credit}
       >
         {creditProblem ??
-          (credit.endsAt === null
-            ? "No API keys"
-            : `${credit.empty} of ${credit.parts.length} keys empty · ends ${when(credit.endsAt, now)}`)}
+          (credit.endsAt === null ? (
+            "No API keys"
+          ) : (
+            <>
+              {credit.empty} of {credit.parts.length} keys empty · ends{" "}
+              <span className="whitespace-nowrap">{when(credit.endsAt, now)}</span>
+            </>
+          ))}
       </Column>
     </div>
   );
