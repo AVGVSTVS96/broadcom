@@ -6,7 +6,8 @@ import { connection } from "next/server";
 import { handoffs } from "@/lib/pool/live";
 import type { Handoffs } from "@/lib/pool/live";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { Credits, Moves } from "@/lib/proxy/schema";
+import { readGrants } from "@/lib/proxy/read";
+import { Moves } from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
 
 export interface LiveData {
@@ -31,22 +32,10 @@ const readHandoffs = async () => {
   );
 };
 
-const readGrants = async () =>
-  await runtime.runPromise(
-    Effect.gen(function* () {
-      const credits = yield* (yield* Proxy).get("/deck/credits", Credits);
-
-      return credits.api.map((grant) => ({
-        account: grant.account,
-        credentialId: grant.credentialId,
-      }));
-    }).pipe(Effect.orElseSucceed(() => [])),
-  );
-
 export const readLiveData = async (): Promise<LiveData> => {
   await connection();
 
-  const [moves, grants] = await Promise.all([readHandoffs().catch(() => null), readGrants()]);
+  const [moves, read] = await Promise.all([readHandoffs().catch(() => null), readGrants()]);
 
-  return { grants, handoffs: moves, now: Date.now() };
+  return { grants: read.ok ? read.value : [], handoffs: moves, now: Date.now() };
 };

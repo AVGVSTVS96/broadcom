@@ -9,7 +9,6 @@ import type { Daily } from "@/lib/pool/weeks";
 import { attempt, attemptCached } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
 import { Config, Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
-import type { Grant } from "@/lib/proxy/schema";
 import { redact } from "@/lib/settings/redact";
 import { valuesOf } from "@/lib/settings/settings";
 
@@ -26,19 +25,6 @@ const weekHistory = async (): Promise<Readonly<Record<string, Points>>> => {
           .filter((series) => series.kind === "week")
           .map((series) => [series.account, compact(series.points)]),
       );
-    }),
-  );
-};
-
-const grants = async (): Promise<readonly Grant[]> => {
-  "use cache";
-  cacheLife("minutes");
-
-  return await runtime.runPromise(
-    Effect.gen(function* () {
-      const credits = yield* (yield* Proxy).get("/deck/credits", Credits);
-
-      return credits.api;
     }),
   );
 };
@@ -70,8 +56,6 @@ const dailyLimits = async (): Promise<{
 
 export const readWeekHistory = async () => await attemptCached("/deck/accounts", weekHistory);
 
-export const readGrants = async () => await attemptCached("/deck/credits", grants);
-
 export const readDailyLimits = async () => await attemptCached("/deck/usage", dailyLimits);
 
 export const readLogins = async () =>
@@ -83,14 +67,19 @@ export const readLogins = async () =>
     }),
   );
 
-export const readCredits = async () =>
-  await attempt(
-    Effect.gen(function* () {
-      const view = yield* (yield* Proxy).get("/deck/credits", Credits);
+export const grants = Effect.gen(function* () {
+  const view = yield* (yield* Proxy).get("/deck/credits", Credits);
 
-      return view.api.map(creditOf);
-    }),
-  );
+  return view.api;
+});
+
+export const readGrants = async () => await attempt(grants);
+
+export const readCredits = async () => {
+  const read = await readGrants();
+
+  return read.ok ? { ok: true as const, value: read.value.map(creditOf) } : read;
+};
 
 export const readSettings = async () =>
   await attempt(
