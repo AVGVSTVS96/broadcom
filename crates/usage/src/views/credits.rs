@@ -53,26 +53,36 @@ pub fn read_grants(path: &Path) -> Result<Vec<ApiCredit>, String> {
     }
 }
 
-/// Once `renews_at` has passed, the grant is a fresh period: the allowance is back,
-/// read as of the renewal, and `renews_at` rolls to the next monthly renewal after `now`.
+/// Once `renews_at` has passed (and before `expires_at`), the grant is a fresh period: the
+/// allowance is back as of the renewal, unless a Console reading came after it, and `renews_at`
+/// moves to the next monthly renewal, or to none when that falls at or past expiry.
 fn renew(g: &mut ApiCredit, now: i64) {
     let at = |ms: i64| chrono::DateTime::from_timestamp_millis(ms);
-    if g.renews_at <= 0 || g.renews_at > now {
+    if g.renews_at <= 0 || g.renews_at > now || g.renews_at >= g.expires_at {
         return;
     }
-    let Some(mut start) = at(g.renews_at) else {
+    let Some(anchor) = at(g.renews_at) else {
         return;
     };
-    while let Some(next) = start.checked_add_months(chrono::Months::new(1)) {
-        if next.timestamp_millis() > now {
+    let boundary = |k: u32| anchor.checked_add_months(chrono::Months::new(k));
+    let mut k = 0;
+    while let Some(next) = boundary(k + 1) {
+        if next.timestamp_millis() > now || next.timestamp_millis() >= g.expires_at {
             break;
         }
-        start = next;
+        k += 1;
     }
-    let next = start.checked_add_months(chrono::Months::new(1));
-    g.remaining = g.allowance;
-    g.observed_at = start.timestamp_millis();
-    g.renews_at = next.map_or(0, |n| n.timestamp_millis());
+    let Some(start) = boundary(k).map(|t| t.timestamp_millis()) else {
+        return;
+    };
+    if g.observed_at < start {
+        g.remaining = g.allowance;
+        g.observed_at = start;
+    }
+    g.renews_at = boundary(k + 1)
+        .map(|t| t.timestamp_millis())
+        .filter(|next| *next < g.expires_at)
+        .unwrap_or(0);
 }
 
 /// Counts only matching proxy receipts during each grant; failed requests are not
@@ -138,6 +148,7 @@ pub fn credits(grants: &[ApiCredit], events: &[Event], now: i64) -> Result<Credi
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     #[test]
     fn remaining_follows_proxy_spend_after_the_console_reading() {
@@ -225,5 +236,63 @@ mod tests {
         assert_eq!(got.grant.remaining, 185.0);
         assert_eq!(got.recorded, 200.0);
         assert!(got.grant.renews_at > now);
+    }
+
+    fn renewal_grant(now: i64) -> ApiCredit {
+        let hour = 3_600_000;
+        ApiCredit {
+            account: "a".into(),
+            organization: "o".into(),
+            credential_id: "key".into(),
+            remaining: 0.0,
+            allowance: 200.0,
+            monthly_cap: 200.0,
+            starts_at: now - 5 * hour,
+            observed_at: now - 4 * hour,
+            expires_at: now + 24 * 40 * hour,
+            renews_at: now - hour,
+        }
+    }
+
+    #[test]
+    fn a_reading_after_the_renewal_is_kept() {
+        let now = 1_800_000_000_000;
+        let mut g = renewal_grant(now);
+        g.observed_at = g.renews_at + 1000;
+        g.remaining = 70.0;
+        let got = &credits(&[g], &[], now).unwrap().api[0];
+        assert_eq!(got.grant.remaining, 70.0);
+    }
+
+    #[test]
+    fn nothing_renews_at_or_past_expiry() {
+        let now = 1_800_000_000_000;
+        let mut g = renewal_grant(now);
+        g.expires_at = g.renews_at;
+        let got = &credits(&[g.clone()], &[], now).unwrap().api[0];
+        assert_eq!(
+            (got.grant.remaining, got.grant.renews_at),
+            (0.0, g.renews_at)
+        );
+        g.expires_at = now + 1000;
+        let got = &credits(&[g], &[], now).unwrap().api[0];
+        assert_eq!((got.grant.remaining, got.grant.renews_at), (200.0, 0));
+    }
+
+    #[test]
+    fn renewal_dates_do_not_drift_on_short_months() {
+        let at = |y, m, d| {
+            chrono::Utc
+                .with_ymd_and_hms(y, m, d, 0, 0, 0)
+                .unwrap()
+                .timestamp_millis()
+        };
+        let mut g = renewal_grant(at(2026, 3, 29));
+        g.renews_at = at(2026, 1, 31);
+        g.starts_at = at(2026, 1, 1);
+        g.observed_at = at(2026, 1, 2);
+        g.expires_at = at(2027, 1, 1);
+        let got = &credits(&[g], &[], at(2026, 3, 29)).unwrap().api[0];
+        assert_eq!(got.grant.renews_at, at(2026, 3, 31));
     }
 }
