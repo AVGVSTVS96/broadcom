@@ -14,6 +14,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{Result, bail};
+use rusqlite::config::DbConfig;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 use tokio::sync::watch;
 
@@ -130,7 +131,9 @@ static REWRITE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
 });
 
 /// Room for every statement the store runs, so none is parsed again: rusqlite keeps 16
-/// by default, fewer than an apply cycles through.
+/// by default, fewer than an apply cycles through. The connections also keep each plan
+/// (QPSG): without it, SQLite parsed the session and winner lookups again on every call
+/// with new values.
 const STATEMENTS: usize = 64;
 
 /// A row the views count.
@@ -162,6 +165,7 @@ impl Store {
         read.busy_timeout(std::time::Duration::from_secs(30))?;
         for db in [&write, &read] {
             db.set_prepared_statement_cache_capacity(STATEMENTS);
+            db.set_db_config(DbConfig::SQLITE_DBCONFIG_ENABLE_QPSG, true)?;
         }
         write.execute(
             "INSERT INTO devices (id, label) VALUES (?1, ?2) ON CONFLICT (id) DO UPDATE SET label = excluded.label",
