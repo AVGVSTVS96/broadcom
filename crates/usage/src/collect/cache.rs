@@ -112,8 +112,9 @@ pub fn files(db: &Connection) -> Result<HashMap<String, Cached>> {
 }
 
 pub fn parsed(db: &Connection, id: i64) -> Result<Parsed> {
-    let blob: Vec<u8> =
-        db.query_row("SELECT blob FROM parsed WHERE file = ?", [id], |r| r.get(0))?;
+    let blob: Vec<u8> = db
+        .prepare_cached("SELECT blob FROM parsed WHERE file = ?")?
+        .query_row([id], |r| r.get(0))?;
     let mut bytes = Vec::new();
     DeflateDecoder::new(&blob[..]).read_to_end(&mut bytes)?;
     Ok(postcard::from_bytes(&bytes)?)

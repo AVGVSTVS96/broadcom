@@ -100,11 +100,17 @@ pub fn start(app: Arc<App>) {
             tokio::task::block_in_place(|| store.apply(&batch, true).map(|_| ()))
         }));
     }
+    let limits_changed = Arc::new(tokio::sync::Notify::new());
     tokio::spawn({
         let deck = deck.clone();
+        let limits_changed = limits_changed.clone();
         let mut revision = app.store.subscribe();
         async move {
-            while revision.changed().await.is_ok() {
+            loop {
+                tokio::select! {
+                    changed = revision.changed() => if changed.is_err() { return },
+                    () = limits_changed.notified() => {}
+                }
                 tokio::time::sleep(Duration::from_secs(15)).await;
                 revision.mark_unchanged();
                 deck.usage_changed();
@@ -112,26 +118,41 @@ pub fn start(app: Arc<App>) {
         }
     });
     let pool = app.config.pool_dir.clone();
+    let receipts = app.config.receipts.clone();
     spawn_watch(
         &[(pool.clone(), false), (pool.join("plans"), false)],
         Duration::from_secs(1),
+        move |path| receipts.as_deref() != Some(path),
         {
             let deck = deck.clone();
             move || {
-                deck.usage_changed();
+                limits_changed.notify_one();
                 deck.publish();
             }
         },
     );
     let claude = &app.config.claude;
+    let (sessions, jobs) = (claude.join("sessions"), claude.join("jobs"));
     let hex_state = app.config.hex.join("state");
     spawn_watch(
         &[
-            (claude.join("sessions"), false),
-            (claude.join("jobs"), true),
-            (hex_state, true),
+            (sessions.clone(), false),
+            (jobs.clone(), true),
+            (hex_state.clone(), true),
         ],
         Duration::from_millis(250),
+        move |path| {
+            let named = |root: &Path, names: &[&str]| {
+                path.strip_prefix(root)
+                    .is_ok_and(|rest| rest.components().count() == 2)
+                    && path
+                        .file_name()
+                        .is_some_and(|n| names.iter().any(|x| n == *x))
+            };
+            path.starts_with(&sessions)
+                || named(&jobs, &["state.json"])
+                || named(&hex_state, &["sessions", "hub.sock"])
+        },
         {
             let deck = deck.clone();
             move || {
@@ -157,7 +178,7 @@ pub fn start(app: Arc<App>) {
                         let _ = tokio::task::spawn_blocking(move || { deck.refresh_processes(); deck.publish(); }).await;
                     }
                     _ = beat.tick() => deck.stream.heartbeat(),
-                    _ = five.tick() => if deck.stream.listeners() > 0 { deck.usage_changed() },
+                    _ = five.tick() => deck.reload(true),
                 }
             }
         }
@@ -191,9 +212,13 @@ fn collect(app: &App) {
         };
     let (tx, rx) = std::sync::mpsc::channel();
     let Ok(mut watcher) =
-        notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            if event.is_ok_and(|e| !matches!(e.kind, notify::EventKind::Access(_))) {
-                let _ = tx.send(());
+        notify::recommended_watcher(move |event: notify::Result<notify::Event>| match event {
+            Ok(e) if matches!(e.kind, notify::EventKind::Access(_)) => {}
+            Ok(e) if !e.need_rescan() => {
+                let _ = tx.send(Some(e.paths));
+            }
+            _ => {
+                let _ = tx.send(None);
             }
         })
     else {
@@ -225,33 +250,45 @@ fn collect(app: &App) {
         if let Err(e) = result {
             tracing::warn!("collecting: {e:#}");
         }
-        if rx.recv().is_err() {
+        let Ok(first) = rx.recv() else {
             return;
-        }
+        };
+        let mut note = |paths: Option<Vec<PathBuf>>| match paths {
+            Some(paths) => collector.changed(paths),
+            None => collector.rescan(),
+        };
+        note(first);
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        while let Ok(()) = rx.recv_timeout(
+        while let Ok(paths) = rx.recv_timeout(
             Duration::from_secs(1)
                 .min(deadline.saturating_duration_since(std::time::Instant::now())),
         ) {
+            note(paths);
             if std::time::Instant::now() >= deadline {
                 break;
             }
         }
-        while rx.try_recv().is_ok() {}
+        while let Ok(paths) = rx.try_recv() {
+            note(paths);
+        }
     }
 }
 
-/// Calls `changed` once things go quiet for `wait` after a burst of changes under
-/// `paths` (each watched alone, or with its direct subfolders).
+/// Calls `changed` once things go quiet for `wait` after a burst of changes to
+/// `relevant` paths under `paths` (each watched alone, or with everything below it).
 fn spawn_watch(
     paths: &[(PathBuf, bool)],
     wait: Duration,
+    relevant: impl Fn(&Path) -> bool + Send + 'static,
     changed: impl Fn() + Send + Sync + 'static,
 ) {
     let changed = Arc::new(changed);
     let (tx, mut rx) = mpsc::unbounded_channel();
     let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-        if event.is_ok_and(|e| !matches!(e.kind, notify::EventKind::Access(_))) {
+        if let Ok(e) = event
+            && !matches!(e.kind, notify::EventKind::Access(_))
+            && (e.need_rescan() || e.paths.iter().any(|p| relevant(p)))
+        {
             let _ = tx.send(());
         }
     });

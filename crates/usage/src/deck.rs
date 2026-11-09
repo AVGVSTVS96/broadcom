@@ -20,7 +20,8 @@ use crate::views::{
 
 /// A range older than this reloads behind the request that finds it.
 const FRESH_FOR: Duration = Duration::from_mins(5);
-/// Ranges asked for this recently reload when usage changes.
+/// Ranges and credits asked for this recently reload when usage changes; the rest wait
+/// for their next request.
 const VIEWED_FOR: Duration = Duration::from_mins(10);
 const MAX_VIEWS: usize = 64;
 
@@ -95,6 +96,12 @@ struct State {
     live: Live,
     first_seen: foldhash::HashMap<String, f64>,
     credits: Option<Arc<Result<CreditsView, String>>>,
+    credits_viewed: Option<Instant>,
+    changed_at: Option<Instant>,
+}
+
+fn recent(at: Option<Instant>) -> bool {
+    at.is_some_and(|at| at.elapsed() < VIEWED_FOR)
 }
 
 pub struct Deck {
@@ -254,18 +261,20 @@ impl Deck {
         Ok(())
     }
 
-    /// A range's session usage: a request never waits on a loaded range, and one older
-    /// than FRESH_FOR reloads behind it.
+    /// A range's session usage: a request never waits on a loaded range, and one that
+    /// missed a change or is older than FRESH_FOR reloads behind it.
     pub async fn sessions(self: &Arc<Self>, r: Range) -> Result<Arc<SessionUsage>> {
         loop {
-            let (value, at) = {
+            let (value, at, changed_at) = {
                 let mut state = self.state.lock();
+                let changed_at = state.changed_at;
                 let cache = state.ranges.entry(r).or_default();
                 cache.viewed = Some(Instant::now());
-                (cache.value.clone(), cache.at)
+                (cache.value.clone(), cache.at, changed_at)
             };
             if let Some(value) = value {
-                if at.is_none_or(|at| at.elapsed() > FRESH_FOR) {
+                let missed = changed_at.is_some_and(|c| at.is_none_or(|at| at < c));
+                if missed || at.is_none_or(|at| at.elapsed() > FRESH_FOR) {
                     let deck = self.clone();
                     tokio::spawn(async move { deck.warm(vec![r]).await });
                 }
@@ -349,10 +358,15 @@ impl Deck {
 
     /// The API-credit grants, carried forward by the proxy's receipts since their reading.
     pub async fn credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
-        if let Some(view) = self.state.lock().credits.clone() {
-            return view;
+        let cached = {
+            let mut state = self.state.lock();
+            state.credits_viewed = Some(Instant::now());
+            state.credits.clone()
+        };
+        match cached {
+            Some(view) => view,
+            None => self.refresh_credits().await,
         }
-        self.refresh_credits().await
     }
 
     pub async fn refresh_credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
@@ -380,24 +394,37 @@ impl Deck {
         view
     }
 
-    /// Reloads the ranges in view after the store, limits or plans change.
+    /// After the store, limits or plans change: reloads what was asked for lately, and
+    /// leaves the rest to reload behind their next request.
     pub fn usage_changed(self: &Arc<Self>) {
-        let listening = self.stream.listeners() > 0;
-        let due: Vec<Range> = {
+        {
             let mut state = self.state.lock();
+            state.changed_at = Some(Instant::now());
             state.credits = None;
-            state
+        }
+        self.reload(false);
+    }
+
+    /// Reloads the ranges and credits asked for lately, and with `week` the 7d range the
+    /// live sessions take their titles from, if it missed a change.
+    pub fn reload(self: &Arc<Self>, week: bool) {
+        let (due, credits) = {
+            let state = self.state.lock();
+            let due: Vec<Range> = state
                 .ranges
                 .iter()
                 .filter(|(r, c)| {
+                    let missed = state
+                        .changed_at
+                        .is_some_and(|changed| c.at.is_none_or(|at| at < changed));
                     c.value.is_some()
-                        && (c.viewed.is_some_and(|v| v.elapsed() < VIEWED_FOR)
-                            || (**r == Range::Week && listening))
+                        && (recent(c.viewed) || (week && **r == Range::Week && missed))
                 })
                 .map(|(r, _)| *r)
-                .collect()
+                .collect();
+            (due, recent(state.credits_viewed))
         };
-        if listening {
+        if credits {
             let deck = self.clone();
             tokio::spawn(async move { deck.refresh_credits().await });
         }
@@ -448,7 +475,7 @@ impl Deck {
 
     /// Sends the live keys that changed.
     pub fn publish(&self) {
-        let seats = views::seats_of(&self.bindings(), now_millis());
+        let seats = views::seats_of(self.bindings.lock().read().0, now_millis());
         let entries = {
             let mut state = self.state.lock();
             let tracked = [Range::Week, Range::Today]

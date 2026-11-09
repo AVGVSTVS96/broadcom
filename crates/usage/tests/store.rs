@@ -321,6 +321,97 @@ fn only_exact_request_identity_reconciles() {
     }
 }
 
+/// Transcripts to write, ids to withdraw, and the title and project every receipt then shows.
+type Step<'a> = (Vec<Event>, Vec<&'a str>, (&'a str, &'a str));
+
+#[test]
+fn session_metadata_reaches_every_receipt() {
+    let receipt = |id: &str, entrypoint: &str| Event {
+        source: "proxy".into(),
+        id: id.into(),
+        upstream_request_id: format!("req_{id}"),
+        timestamp: "2026-11-03T00:00:00Z".into(),
+        harness: "claude".into(),
+        model: "claude-opus-4-5-20251101".into(),
+        session_id: "session".into(),
+        entrypoint: entrypoint.into(),
+        output_tokens: 20,
+        ..Default::default()
+    };
+    let transcript = |id: &str, at: &str, title: &str, project: &str| Event {
+        timestamp: at.into(),
+        session_title: title.into(),
+        project: project.into(),
+        entrypoint: "cli".into(),
+        ..record(id, 5)
+    };
+    let receipts = || vec![receipt("p1", ""), receipt("p2", "sdk"), receipt("p3", "")];
+    let rows = |store: &Store| {
+        let mut got: Vec<_> = store
+            .events()
+            .unwrap()
+            .into_iter()
+            .filter(Event::is_proxy)
+            .map(|e| (e.id, e.session_title, e.project, e.entrypoint))
+            .collect();
+        got.sort();
+        got
+    };
+    let t = transcript;
+    let steps: Vec<Step> = vec![
+        (
+            vec![t("t1", "2026-11-03T00:00:01Z", "First", "/a")],
+            vec![],
+            ("First", "/a"),
+        ),
+        (
+            vec![t("t2", "2026-11-03T00:00:02Z", "Second", "/b")],
+            vec![],
+            ("Second", "/b"),
+        ),
+        (
+            vec![t("t2", "2026-11-03T00:00:02Z", "Second", "/c")],
+            vec![],
+            ("Second", "/c"),
+        ),
+        (
+            vec![t("t3", "2026-11-03T00:00:03Z", "", "/d")],
+            vec![],
+            ("", "/d"),
+        ),
+        (vec![], vec!["t3"], ("Second", "/c")),
+        (vec![], vec!["t2"], ("First", "/a")),
+        (vec![], vec!["t1"], ("", "")),
+    ];
+    let dir = tempdir();
+    let store = open(&dir);
+    store
+        .apply(&batch("server", receipts(), &[]), false)
+        .unwrap();
+    let mut held: Vec<Event> = Vec::new();
+    for (events, deleted, (title, project)) in steps {
+        held.retain(|e| !deleted.contains(&e.id.as_str()) && !events.iter().any(|n| n.id == e.id));
+        held.extend(events.iter().cloned());
+        store.apply(&batch("mac", events, &deleted), false).unwrap();
+        let after = held.iter().map(|e| e.id.as_str()).collect::<Vec<_>>();
+        let got = rows(&store);
+        assert!(
+            got.iter()
+                .all(|r| (r.1.as_str(), r.2.as_str()) == (title, project)),
+            "{after:?}: {got:?}"
+        );
+        let fresh_dir = tempdir();
+        let fresh = open(&fresh_dir);
+        fresh
+            .apply(&batch("server", receipts(), &[]), false)
+            .unwrap();
+        fresh
+            .apply(&batch("mac", held.clone(), &[]), false)
+            .unwrap();
+        assert_eq!(got, rows(&fresh), "{after:?}");
+    }
+}
+
 fn tempdir() -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "broadcom-usage-test-{}-{}",

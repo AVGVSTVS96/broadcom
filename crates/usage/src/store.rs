@@ -8,7 +8,7 @@
 //! thread and device from its session's latest transcript record.
 
 use parking_lot::Mutex;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::Arc;
@@ -129,6 +129,10 @@ static REWRITE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
     )
 });
 
+/// Room for every statement the store runs, so none is parsed again: rusqlite keeps 16
+/// by default, fewer than an apply cycles through.
+const STATEMENTS: usize = 64;
+
 /// A row the views count.
 const VISIBLE: &str = "hidden = 0 AND gone = 0";
 
@@ -156,6 +160,9 @@ impl Store {
         write.busy_timeout(std::time::Duration::from_secs(30))?;
         let read = Connection::open(path)?;
         read.busy_timeout(std::time::Duration::from_secs(30))?;
+        for db in [&write, &read] {
+            db.set_prepared_statement_cache_capacity(STATEMENTS);
+        }
         write.execute(
             "INSERT INTO devices (id, label) VALUES (?1, ?2) ON CONFLICT (id) DO UPDATE SET label = excluded.label",
             params![local.id, local.label],
@@ -221,10 +228,10 @@ impl Store {
             } else {
                 result.accepted += 1;
             }
-            tx.execute(
+            tx.prepare_cached(
                 "INSERT OR REPLACE INTO records (device, id, harness, total, event) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![id, merged.id, merged.harness, merged.token_total(), serde_json::to_string(&merged)?],
-            )?;
+            )?
+            .execute(params![id, merged.id, merged.harness, merged.token_total(), serde_json::to_string(&merged)?])?;
             touched.insert((merged.harness.clone(), merged.id.clone()));
         }
         if !fill {
@@ -595,24 +602,30 @@ impl<'a> Resolver<'a> {
 
     fn resolve(&self, keys: &BTreeSet<(String, String)>) -> Result<()> {
         let mut identities: BTreeSet<Identity> = BTreeSet::new();
-        let mut sessions: BTreeSet<(String, String)> = BTreeSet::new();
-        let mut note = |e: &Event| {
+        let mut sessions: BTreeMap<(String, String), Option<Event>> = BTreeMap::new();
+        let mut note = |e: &Event| -> Result<()> {
             if let Some(r) = response_identity(e) {
                 identities.insert((e.harness.clone(), r, None));
             }
             if let Some(r) = request_identity(e) {
                 identities.insert((e.harness.clone(), r, Some(raw_model(e).to_string())));
             }
-            sessions.insert((e.harness.clone(), e.session_id.clone()));
+            if let std::collections::btree_map::Entry::Vacant(v) =
+                sessions.entry((e.harness.clone(), e.session_id.clone()))
+            {
+                let before = self.lent(&v.key().0, &v.key().1)?;
+                v.insert(before);
+            }
+            Ok(())
         };
         let mut proxies = BTreeSet::new();
         for (harness, id) in keys {
             if let Some(old) = self.resolved(harness, id)? {
-                note(&old);
+                note(&old)?;
             }
             match self.winner(harness, id)? {
                 Some(winner) => {
-                    note(&winner);
+                    note(&winner)?;
                     if winner.is_proxy() {
                         proxies.insert((harness.clone(), id.clone()));
                     }
@@ -645,12 +658,14 @@ impl<'a> Resolver<'a> {
                 &mut proxies,
             )?;
         }
-        for (harness, session) in &sessions {
-            self.collect(
-                "SELECT harness, id FROM events WHERE source = 'proxy' AND gone = 0 AND harness = ?1 AND session_id = ?2",
-                params![harness, session],
-                &mut proxies,
-            )?;
+        for ((harness, session), before) in &sessions {
+            if self.lent(harness, session)? != *before {
+                self.collect(
+                    "SELECT harness, id FROM events WHERE source = 'proxy' AND gone = 0 AND harness = ?1 AND session_id = ?2",
+                    params![harness, session],
+                    &mut proxies,
+                )?;
+            }
         }
         for (harness, id) in &proxies {
             self.reconcile(harness, id)?;
@@ -672,6 +687,26 @@ impl<'a> Resolver<'a> {
             into.insert(row?);
         }
         Ok(())
+    }
+
+    /// What the session's newest transcript lends each of its receipts; they need
+    /// rewriting only when this changes.
+    fn lent(&self, harness: &str, session: &str) -> Result<Option<Event>> {
+        Ok(self
+            .latest(harness, session)?
+            .map(|t| with_transcript(Event::default(), &t)))
+    }
+
+    /// The session's newest transcript row, whose metadata its receipts carry.
+    fn latest(&self, harness: &str, session: &str) -> Result<Option<Event>> {
+        Ok(self
+            .tx
+            .prepare_cached(&format!(
+                "SELECT {COLUMNS} FROM events INDEXED BY events_session WHERE source <> 'proxy' AND gone = 0 AND harness = ?1 AND session_id = ?2 \
+                 ORDER BY ts DESC, device_id = ?3 ASC, device_id ASC, id ASC LIMIT 1"
+            ))?
+            .query_row(params![harness, session, self.local], read_event)
+            .optional()?)
     }
 
     fn resolved(&self, harness: &str, id: &str) -> Result<Option<Event>> {
@@ -766,14 +801,7 @@ impl<'a> Resolver<'a> {
         if let Some(t) = &matched {
             resolved = with_transcript(resolved, t);
         }
-        let latest = transcript(
-            &format!(
-                "SELECT {COLUMNS} FROM events INDEXED BY events_session WHERE source <> 'proxy' AND gone = 0 AND harness = ?1 AND session_id = ?2 \
-                 ORDER BY ts DESC, device_id = ?3 ASC, device_id ASC, id ASC LIMIT 1"
-            ),
-            &[&harness, &resolved.session_id, &self.local],
-        )?;
-        if let Some(t) = &latest {
+        if let Some(t) = &self.latest(harness, &resolved.session_id)? {
             resolved = with_transcript(resolved, t);
         }
         let priced = self.policy.reprice(&resolved).unwrap_or(resolved);
