@@ -83,9 +83,7 @@ const Cell = ({
       {value === undefined ? null : <span className="text-sm tabular-nums">{value}</span>}
     </div>
     {children}
-    {note === undefined ? null : (
-      <div className="truncate text-xs text-muted-foreground">{note}</div>
-    )}
+    {note === undefined ? null : <div className="text-xs text-muted-foreground">{note}</div>}
   </div>
 );
 
@@ -124,9 +122,9 @@ const Line = ({
 }) => (
   <div
     id={id}
-    className="grid scroll-mt-6 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-start gap-x-5 gap-y-3 py-4 target:-mx-3 target:rounded-lg target:bg-muted/50 target:px-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_2rem] sm:gap-x-6"
+    className="grid scroll-mt-6 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-start gap-x-5 gap-y-3 py-4 target:-mx-3 target:rounded-lg target:bg-muted/50 target:px-3 wide:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_2rem] wide:gap-x-6"
   >
-    <div className="col-span-2 min-w-0 sm:col-span-1">
+    <div className="col-span-2 min-w-0 wide:col-span-1">
       <div className="flex items-center gap-2">
         <span className={cn("size-2 shrink-0 rounded-full", dots[state.is])} />
         <span className={cn("truncate", state.is === "next" && "text-brand")}>{name}</span>
@@ -134,13 +132,13 @@ const Line = ({
           <span className="shrink-0 text-sm text-muted-foreground">{plan}</span>
         )}
       </div>
-      <div className="truncate pl-4 text-sm text-muted-foreground">
+      <div className="pl-4 text-sm text-pretty text-muted-foreground">
         {[labelOf(state), note].filter(Boolean).join(" · ")}
       </div>
     </div>
     <div className="col-span-3 min-w-0 sm:col-span-1">{first}</div>
-    <div className="col-span-3 min-w-0 sm:col-span-1">{second}</div>
-    <div className="col-start-3 row-start-1 -mt-1 flex justify-end sm:col-start-4">{actions}</div>
+    <div className="col-span-3 min-w-0 sm:max-wide:col-span-2 wide:col-span-1">{second}</div>
+    <div className="col-start-3 row-start-1 -mt-1 flex justify-end wide:col-start-4">{actions}</div>
   </div>
 );
 
