@@ -9,7 +9,7 @@ import type { Daily } from "@/lib/pool/weeks";
 import { attempt, attemptCached, outcome } from "@/lib/proxy/attempt";
 import type { Outcome } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
-import { Config, Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
+import { Config, Credentials, Credits, History, LimitUsage, TokensView } from "@/lib/proxy/schema";
 import { redact } from "@/lib/settings/redact";
 import { valuesOf } from "@/lib/settings/settings";
 
@@ -77,6 +77,13 @@ const grants = Effect.gen(function* () {
 export const grantsOutcome = outcome(grants);
 
 export const readGrants = async () => await attempt(grants);
+
+export const readTokens = async () =>
+  await attempt(
+    Effect.gen(function* () {
+      return yield* (yield* Proxy).get("/deck/tokens", TokensView);
+    }),
+  );
 
 export const creditFailure = (reason: string) => `API credit didn't load: ${reason}`;
 

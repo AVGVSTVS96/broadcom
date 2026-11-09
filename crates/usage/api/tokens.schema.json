@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TokensView",
+  "description": "Every day with tokens since the first record, and each model's share of them.",
+  "type": "object",
+  "properties": {
+    "timezone": {
+      "type": "string"
+    },
+    "days": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TokenDay"
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelTokens"
+      }
+    }
+  },
+  "required": [
+    "timezone",
+    "days",
+    "models"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "TokenDay": {
+      "description": "Tokens on one calendar day in the zone.",
+      "type": "object",
+      "properties": {
+        "day": {
+          "description": "The day as YYYY-MM-DD.",
+          "type": "string"
+        },
+        "tokens": {
+          "type": "number",
+          "format": "double"
+        },
+        "input": {
+          "type": "number",
+          "format": "double"
+        },
+        "output": {
+          "type": "number",
+          "format": "double"
+        },
+        "cacheRead": {
+          "type": "number",
+          "format": "double"
+        },
+        "cacheWrite": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "day",
+        "tokens",
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite"
+      ],
+      "additionalProperties": false
+    },
+    "ModelTokens": {
+      "description": "One model's tokens over all history.",
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "model",
+        "tokens"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -480,6 +480,16 @@ pub async fn sessions(State(app): State<Arc<App>>, RawQuery(query): RawQuery) ->
     reply(app.deck.sessions(range).await.map_err(|e| e.to_string()))
 }
 
+pub async fn tokens(State(app): State<Arc<App>>) -> Response {
+    reply(
+        app.deck
+            .tokens()
+            .await
+            .map(|view| view.as_ref().clone())
+            .map_err(|e| e.to_string()),
+    )
+}
+
 pub async fn credits(State(app): State<Arc<App>>) -> Response {
     reply(app.deck.credits().await.as_ref().clone())
 }

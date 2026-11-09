@@ -22,6 +22,7 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/usage", get(crate::app::usage))
         .route("/sessions", get(crate::app::sessions))
         .route("/credits", get(crate::app::credits))
+        .route("/tokens", get(crate::app::tokens))
         .route("/events", get(events));
     Router::new()
         .nest("/v8/management/deck", deck)

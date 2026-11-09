@@ -7,6 +7,7 @@ Base `/v8/management`, `Authorization: Bearer <management key>`. Shapes are the 
 | `GET /deck/usage?range&by&measure&w.<dim>&q&limit&within` | [usage](usage.schema.json) | [usage.json](examples/usage.json) |
 | `GET /deck/sessions?range` | [sessions](sessions.schema.json) | [sessions.json](examples/sessions.json) |
 | `GET /deck/credits` | [credits](credits.schema.json) | [credits.json](examples/credits.json) |
+| `GET /deck/tokens` | [tokens](tokens.schema.json) | [tokens.json](examples/tokens.json) |
 | `GET /deck/events` (SSE `data:` frames) | [live-session](live-session.schema.json) (each `s:` value) | [snapshot](examples/events-snapshot.json), [patch](examples/events-patch.json), [stale](examples/events-stale.json) |
 | `POST /v0/management/usage/events` (gzip JSON batch from other machines) | | [batch.json](examples/batch.json) |
 
