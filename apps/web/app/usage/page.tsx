@@ -15,6 +15,13 @@ const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
   const view = viewOf(params.view);
   const read = view === "wallet" ? await readWallet() : await readUsage(queryOf(params));
 
+  const body =
+    "wallet" in read ? (
+      read.wallet && <WalletView wallet={read.wallet} now={read.now} />
+    ) : (
+      <UsageView usage={read} />
+    );
+
   return (
     <>
       <RefreshOnStale tags={["usage"]} />
@@ -22,11 +29,7 @@ const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
         <Views views={views} current={view} />
         <div className="space-y-5 transition-opacity delay-150 duration-300 group-has-[nav[aria-busy=true]]/page:opacity-60">
           <Problems problems={read.problems} />
-          {"wallet" in read ? (
-            <WalletView wallet={read.wallet} now={read.now} />
-          ) : (
-            <UsageView usage={read} />
-          )}
+          {body}
         </div>
       </div>
     </>
