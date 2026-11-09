@@ -98,16 +98,23 @@ export const poolOf = (plans: readonly Plan[]) => {
     value: left(plan.account.week.used) ?? 0,
   }));
 
-  const session = subscriptions.map((plan): Part => {
+  const session = subscriptions.flatMap((plan): Part[] => {
     const room = hasRoom(plan.account);
+    const { used } = plan.account.fiveHour;
 
-    return {
-      id: plan.id,
-      label: plan.name,
-      locked: !room,
-      tone: room ? windowTone(plan.account.fiveHour) : "bad",
-      value: room ? (left(plan.account.fiveHour.used) ?? 0) : 0,
-    };
+    if (room && used === null) {
+      return [];
+    }
+
+    return [
+      {
+        id: plan.id,
+        label: plan.name,
+        locked: !room,
+        tone: room ? windowTone(plan.account.fiveHour) : "bad",
+        value: room ? (left(used) ?? 0) : 0,
+      },
+    ];
   });
 
   const credit = grants.map((grant): Part => ({
