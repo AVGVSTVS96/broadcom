@@ -193,6 +193,20 @@ const useSize = () => {
   return [ref, size] as const;
 };
 
+const pillGap = 24;
+
+const stacked = (ends: readonly (readonly [string, number])[]) => {
+  const tops = new Map<string, number>();
+  let floor = Number.NEGATIVE_INFINITY;
+
+  for (const [id, top] of ends.toSorted((a, b) => a[1] - b[1])) {
+    floor = Math.max(top, floor + pillGap);
+    tops.set(id, floor);
+  }
+
+  return tops;
+};
+
 const steps = [2, 12, 22, 32, 42] as const;
 
 const grid = (at: (across: number, down: number) => Box) =>
@@ -267,6 +281,16 @@ export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: numbe
 
   const place = (candidates: readonly Box[], fallback: Box) =>
     size.width === 0 ? fallback : (freeSpot(candidates, drawn) ?? fallback);
+
+  const pillTops = stacked(
+    ranked.flatMap((plan) => {
+      const end = lineOf(plan.pace, now).at(-1);
+
+      return end === undefined || plan.pace.locked
+        ? []
+        : [[plan.id, ((100 - end[1]) / 100) * size.height] as const];
+    }),
+  );
 
   const lockFrom = focus.pace.ranOut ?? focus.pace.runsOut;
 
@@ -451,6 +475,9 @@ export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: numbe
                           x={end[0]}
                           y={end[1]}
                           className="translate-x-3 rounded-full border bg-card px-2 py-0.5 text-xs whitespace-nowrap"
+                          {...(size.height === 0
+                            ? {}
+                            : { style: { top: `${pillTops.get(plan.id) ?? 0}px` } })}
                         >
                           {percent(plan.pace.used)} {plan.name}
                         </At>
