@@ -244,12 +244,16 @@ pub fn app_of(who: &Who) -> &str {
     }
 }
 
-/// Runs `hex <command> --json`, so the views never read hex.db's tables.
-fn hex_json<T: for<'de> Deserialize<'de>>(hex: &Path, command: &str) -> Result<T, String> {
-    let output = Command::new(hex.join(".hex/bin/hex"))
+/// Runs `hex <command> --json`, so the views never read hex.db's tables. A machine without
+/// hex has no threads.
+fn hex_json<T: for<'de> Deserialize<'de>>(hex: &Path, command: &str) -> Result<Vec<T>, String> {
+    let output = match Command::new(hex.join(".hex/bin/hex"))
         .args([command, "--json"])
         .output()
-        .map_err(|err| format!("hex {command}: {err}"))?;
+    {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        run => run.map_err(|err| format!("hex {command}: {err}"))?,
+    };
     if !output.status.success() {
         let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(format!(
@@ -379,6 +383,13 @@ mod tests {
             project: "/home/me/hex",
             repository: None,
         }
+    }
+
+    #[test]
+    fn a_machine_without_hex_has_no_threads() {
+        let nowhere = Path::new("/nonexistent/hex");
+        let names = load_names(nowhere, &read_past(nowhere).unwrap()).unwrap();
+        assert!(names.current.is_empty() && names.logged.is_empty());
     }
 
     #[test]
