@@ -222,31 +222,34 @@ impl Roots {
     /// Returns whether a folder was newly watched, so the files already in it get read.
     fn arm(&mut self, watcher: &mut impl Watcher) -> bool {
         let mut armed = false;
+        let mut above = std::collections::HashSet::new();
         for root in &self.wanted {
             if self.watching.contains(root) {
                 continue;
             }
             if root.is_dir() {
+                // Tried once: a root that fails to watch is not retried on every pass.
+                self.watching.insert(root.clone());
                 match watcher.watch(root, RecursiveMode::Recursive) {
-                    Ok(()) => {
-                        armed = true;
-                        self.watching.insert(root.clone());
-                    }
+                    Ok(()) => armed = true,
                     Err(e) => tracing::warn!("watching {}: {e}", root.display()),
                 }
-            } else if let Some(above) = root.ancestors().skip(1).find(|p| p.is_dir())
-                && self.waiting_on.insert(above.to_path_buf())
-            {
-                tracing::info!(
-                    "{} not there yet; watching {}",
-                    root.display(),
-                    above.display()
-                );
-                if let Err(e) = watcher.watch(above, RecursiveMode::NonRecursive) {
-                    tracing::warn!("watching {}: {e}", above.display());
+            } else if let Some(near) = root.ancestors().skip(1).find(|p| p.is_dir()) {
+                above.insert(near.to_path_buf());
+            }
+        }
+        for near in self.waiting_on.difference(&above) {
+            let _ = watcher.unwatch(near);
+        }
+        for near in &above {
+            if !self.waiting_on.contains(near) {
+                tracing::info!("transcripts not there yet; watching {}", near.display());
+                if let Err(e) = watcher.watch(near, RecursiveMode::NonRecursive) {
+                    tracing::warn!("watching {}: {e}", near.display());
                 }
             }
         }
+        self.waiting_on = above;
         armed
     }
 }
