@@ -62,6 +62,6 @@ Point Claude Code at the pool:
 
 EOF
 
-PORT=$port HOSTNAME=127.0.0.1 \
+PORT=$port HOSTNAME=127.0.0.1 NEXT_MANUAL_SIG_HANDLE=1 \
   BROADCOM_KEY_FILE=$HOME/.config/broadcom-proxy/management-key \
   "$root/runtime/bun" "$root/dashboard/apps/web/server.js"
