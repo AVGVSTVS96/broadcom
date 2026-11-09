@@ -5,7 +5,7 @@ After=network-online.target tailscaled.service cliproxyapi.service
 [Service]
 WorkingDirectory=%h/Developer/broadcom/apps/web
 ExecStart=%h/Developer/broadcom/apps/web/node_modules/.bin/next start -H ${BROADCOM_HOST} -p 4840
-Environment=NODE_ENV=production
+Environment=NODE_ENV=production NEXT_MANUAL_SIG_HANDLE=1
 EnvironmentFile=%h/.config/broadcom/env
 EnvironmentFile=-%h/.config/broadcom/slot
 Restart=on-failure
