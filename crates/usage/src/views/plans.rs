@@ -163,6 +163,11 @@ fn seat_fees(seat: &Seat, m: Month, from: f64, to: f64) -> f64 {
     seat.monthly_usd * overlap(m.start, m.end, go_max(from, seat.since), to) / (m.end - m.start)
 }
 
+/// Requests on an API-key credential run on free credit, not on a plan seat.
+fn is_free_credit(event: &Prepared) -> bool {
+    event.account_id.contains(":apikey:")
+}
+
 /// Spreads each plan's monthly fees over the API value its usage had that calendar
 /// month, so a request's plan $ is its API $ times that month's rate. It needs every
 /// event of each month it prices, and every event after now.
@@ -211,7 +216,7 @@ impl PlanPricing {
         };
         let mut api = vec![vec![0.0; pricing.months.len()]; pricing.active.len()];
         for event in events {
-            if !event.cost_known || event.cost_usd <= 0.0 {
+            if !event.cost_known || event.cost_usd <= 0.0 || is_free_credit(event) {
                 continue;
             }
             if let (Some(plan), Some(m)) = (pricing.plan_of(event), pricing.month_of(event.millis))
@@ -261,19 +266,19 @@ impl PlanPricing {
         }
     }
 
-    /// The plan covering a request; API-key credit requests are no seat's.
+    /// The plan covering a request.
     fn plan_of(&self, event: &Prepared) -> Option<usize> {
-        if event.account_id.contains(":apikey:") {
-            return None;
-        }
         (0..self.active.len()).find(|&i| {
             self.active[i].providers.iter().any(|p| p == event.provider)
                 && event.millis >= self.covers[i]
         })
     }
 
-    /// A request's plan $.
+    /// A request's plan $; free API credit costs nothing.
     pub fn price(&self, event: &Prepared) -> f64 {
+        if is_free_credit(event) {
+            return 0.0;
+        }
         match (self.plan_of(event), self.month_of(event.millis)) {
             (Some(plan), Some(m)) => event.cost_usd * self.rate[plan][m],
             _ => event.cost_usd,
@@ -358,6 +363,6 @@ mod tests {
         let prepared = prepare(&rows);
         let p = PlanPricing::new(&plans, &prepared, utc, now.timestamp_millis());
         assert!((p.price(&prepared[0]) - 300.0).abs() < 1e-9);
-        assert_eq!(p.price(&prepared[1]), 200.0);
+        assert_eq!(p.price(&prepared[1]), 0.0);
     }
 }
