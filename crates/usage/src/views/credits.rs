@@ -139,7 +139,11 @@ pub fn credits(grants: &[ApiCredit], events: &[Event], now: i64) -> Result<Credi
                 item.last_request_at = Some(at as i64);
             }
         }
-        item.grant.remaining = item.grant.remaining.max(0.0);
+        item.grant.remaining = if now >= g.expires_at {
+            0.0
+        } else {
+            item.grant.remaining.max(0.0)
+        };
         view.api.push(item);
     }
     Ok(view)
@@ -294,5 +298,16 @@ mod tests {
         g.expires_at = at(2027, 1, 1);
         let got = &credits(&[g], &[], at(2026, 3, 29)).unwrap().api[0];
         assert_eq!(got.grant.renews_at, at(2026, 3, 31));
+    }
+
+    #[test]
+    fn an_expired_grant_has_nothing_left() {
+        let now = 1_800_000_000_000;
+        let mut g = renewal_grant(now);
+        g.renews_at = 0;
+        g.remaining = 5.0;
+        g.expires_at = now;
+        let got = &credits(&[g], &[], now).unwrap().api[0];
+        assert_eq!(got.grant.remaining, 0.0);
     }
 }
