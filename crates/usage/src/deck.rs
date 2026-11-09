@@ -96,6 +96,7 @@ struct State {
     live: Live,
     first_seen: foldhash::HashMap<String, f64>,
     credits: Option<Arc<Result<CreditsView, String>>>,
+    credits_at: Option<Instant>,
     credits_viewed: Option<Instant>,
     changed_at: Option<Instant>,
 }
@@ -361,7 +362,10 @@ impl Deck {
         let cached = {
             let mut state = self.state.lock();
             state.credits_viewed = Some(Instant::now());
-            state.credits.clone()
+            let fresh = state
+                .credits_at
+                .is_some_and(|at| state.changed_at.is_none_or(|changed| at >= changed));
+            state.credits.clone().filter(|_| fresh)
         };
         match cached {
             Some(view) => view,
@@ -370,6 +374,7 @@ impl Deck {
     }
 
     pub async fn refresh_credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
+        let started = Instant::now();
         let deck = self.clone();
         let view = tokio::task::spawn_blocking(move || {
             let path = deck.config.pool_dir.join("credits.json");
@@ -377,17 +382,17 @@ impl Deck {
                 Ok(grants) => grants,
                 Err(e) => return Err(e),
             };
-            let credentials: Vec<String> = grants.iter().map(|g| g.credential_id.clone()).collect();
-            let receipts = deck
-                .store
-                .receipts(&credentials)
-                .map_err(|e| e.to_string())?;
+            let receipts = deck.store.receipts(&grants).map_err(|e| e.to_string())?;
             views::credits(&grants, &receipts, now_millis())
         })
         .await
         .unwrap_or_else(|e| Err(e.to_string()));
         let view = Arc::new(view);
-        let previous = self.state.lock().credits.replace(view.clone());
+        let previous = {
+            let mut state = self.state.lock();
+            state.credits_at = Some(started);
+            state.credits.replace(view.clone())
+        };
         if previous.is_none_or(|p| p != view) {
             self.stream.stale(&["credits"]);
         }
@@ -400,7 +405,6 @@ impl Deck {
         {
             let mut state = self.state.lock();
             state.changed_at = Some(Instant::now());
-            state.credits = None;
         }
         self.reload(false);
     }
@@ -616,6 +620,88 @@ mod tests {
             &[],
         );
         check(&mut rows, &[4, 20, 9]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    fn credits_deck(name: &str, starts_at: &str) -> (Arc<Deck>, std::path::PathBuf) {
+        let dir =
+            std::env::temp_dir().join(format!("broadcom-usage-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let start = crate::store::millis_of(starts_at).unwrap();
+        let grant = serde_json::json!([{
+            "startsAt": start, "account": "a", "organization": "o", "credentialId": "key",
+            "remaining": 100.0, "allowance": 200.0, "monthlyCap": 200.0,
+            "observedAt": start + 1000, "expiresAt": start + 86_400_000_000i64, "renewsAt": 0
+        }]);
+        std::fs::write(dir.join("credits.json"), grant.to_string()).unwrap();
+        let local = Device {
+            id: "server".into(),
+            label: "server".into(),
+            synced_at: None,
+        };
+        let store = Arc::new(
+            Store::open(&dir.join("usage.db"), local, Arc::new(Policy::bundled())).unwrap(),
+        );
+        let config = Config {
+            pool_dir: dir.clone(),
+            ..Default::default()
+        };
+        (Arc::new(Deck::new(config, store)), dir)
+    }
+
+    fn receipt(id: &str, at: &str) -> Event {
+        Event {
+            source: "proxy".into(),
+            upstream_request_id: id.into(),
+            account_id: "key".into(),
+            ..record(id, at, 1)
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unchanged_credits_view_sends_no_stale_event() {
+        let (deck, dir) = credits_deck("stale", "2026-11-03T00:00:00Z");
+        deck.refresh_credits().await;
+        let mut rx = deck.stream.subscribe();
+        rx.try_recv().unwrap();
+        deck.usage_changed();
+        deck.refresh_credits().await;
+        assert!(rx.try_recv().is_err(), "nothing changed, nothing sent");
+        apply(
+            &deck.store,
+            "server",
+            vec![receipt("a", "2026-11-04T00:00:00Z")],
+            &[],
+        );
+        deck.usage_changed();
+        deck.refresh_credits().await;
+        assert!(rx.try_recv().unwrap().contains("credits"));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn credits_after_a_change_are_read_again() {
+        let (deck, dir) = credits_deck("fresh", "2026-11-03T00:00:00Z");
+        let before = deck.credits().await;
+        apply(
+            &deck.store,
+            "server",
+            vec![receipt("a", "2026-11-04T00:00:00Z")],
+            &[],
+        );
+        deck.usage_changed();
+        let after = deck.credits().await;
+        assert_ne!(before, after);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn receipts_before_a_grant_starts_are_not_summed_into_it() {
+        let (deck, dir) = credits_deck("since", "2026-11-03T00:00:00Z");
+        let old = receipt("old", "2026-11-01T00:00:00Z");
+        apply(&deck.store, "server", vec![old], &[]);
+        let grants = views::read_grants(&dir.join("credits.json")).unwrap();
+        assert_eq!(deck.store.receipts(&grants).unwrap().len(), 0);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
