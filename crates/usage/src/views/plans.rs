@@ -214,10 +214,8 @@ impl PlanPricing {
             if !event.cost_known || event.cost_usd <= 0.0 {
                 continue;
             }
-            if let (Some(plan), Some(m)) = (
-                pricing.plan_of(event.provider, event.millis),
-                pricing.month_of(event.millis),
-            ) {
+            if let (Some(plan), Some(m)) = (pricing.plan_of(event), pricing.month_of(event.millis))
+            {
                 api[plan][m] += event.cost_usd;
             }
         }
@@ -263,18 +261,20 @@ impl PlanPricing {
         }
     }
 
-    fn plan_of(&self, provider: &str, millis: f64) -> Option<usize> {
+    /// The plan covering a request; API-key credit requests are no seat's.
+    fn plan_of(&self, event: &Prepared) -> Option<usize> {
+        if event.account_id.contains(":apikey:") {
+            return None;
+        }
         (0..self.active.len()).find(|&i| {
-            self.active[i].providers.iter().any(|p| p == provider) && millis >= self.covers[i]
+            self.active[i].providers.iter().any(|p| p == event.provider)
+                && event.millis >= self.covers[i]
         })
     }
 
     /// A request's plan $.
     pub fn price(&self, event: &Prepared) -> f64 {
-        match (
-            self.plan_of(event.provider, event.millis),
-            self.month_of(event.millis),
-        ) {
+        match (self.plan_of(event), self.month_of(event.millis)) {
             (Some(plan), Some(m)) => event.cost_usd * self.rate[plan][m],
             _ => event.cost_usd,
         }
@@ -325,5 +325,39 @@ mod tests {
         assert!((p.price(&prepared[0]) - 310.0).abs() < 1e-9);
         assert!((p.price(&prepared[1]) - 150.0).abs() < 1e-9);
         assert_eq!(p.price(&prepared[2]), 70.0);
+    }
+
+    #[test]
+    fn api_key_requests_do_not_take_the_plan_rate() {
+        let utc: Tz = "UTC".parse().unwrap();
+        let now = utc.with_ymd_and_hms(2026, 10, 16, 0, 0, 0).unwrap();
+        let since = utc
+            .with_ymd_and_hms(2026, 9, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_millis() as f64;
+        let plans = [Plan {
+            name: "Claude".into(),
+            providers: vec!["anthropic".into()],
+            seats: vec![Seat {
+                label: String::new(),
+                tier: String::new(),
+                monthly_usd: 300.0,
+                since,
+            }],
+        }];
+        let event = |account: &str, cost: f64| Event {
+            model: "claude-opus-4-5".into(),
+            timestamp: "2026-09-10T00:00:00Z".into(),
+            cost_usd: cost,
+            cost_known: true,
+            account_id: account.into(),
+            ..Default::default()
+        };
+        let events = [event("", 300.0), event("claude:apikey:f8bd1a2f93d9", 200.0)];
+        let rows = events.map(|e| Row::from(&e));
+        let prepared = prepare(&rows);
+        let p = PlanPricing::new(&plans, &prepared, utc, now.timestamp_millis());
+        assert!((p.price(&prepared[0]) - 300.0).abs() < 1e-9);
+        assert_eq!(p.price(&prepared[1]), 200.0);
     }
 }
