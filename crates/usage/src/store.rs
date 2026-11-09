@@ -20,6 +20,7 @@ use tokio::sync::watch;
 
 use crate::event::{Applied, Batch, Device, Event};
 use crate::pricing::{Policy, raw_model};
+use crate::views::ApiCredit;
 
 const SCHEMA: &str = "
 PRAGMA journal_mode = WAL;
@@ -390,17 +391,17 @@ impl Store {
         Ok(events)
     }
 
-    /// Proxy receipts charged to these credentials.
-    pub fn receipts(&self, credentials: &[String]) -> Result<Vec<Event>> {
+    /// Proxy receipts charged to each grant's credential since it started.
+    pub fn receipts(&self, grants: &[ApiCredit]) -> Result<Vec<Event>> {
         let db = self.read.lock();
         let mut statement = db.prepare_cached(&format!(
-            "SELECT {COLUMNS} FROM events WHERE source = 'proxy' AND gone = 0 AND account_id = ?1"
+            "SELECT {COLUMNS} FROM events WHERE source = 'proxy' AND gone = 0 AND account_id = ?1 AND millis >= ?2"
         ))?;
         let mut out = Vec::new();
-        for credential in credentials {
+        for grant in grants {
             out.extend(
                 statement
-                    .query_map([credential], read_event)?
+                    .query_map(params![grant.credential_id, grant.starts_at], read_event)?
                     .collect::<rusqlite::Result<Vec<_>>>()?,
             );
         }
