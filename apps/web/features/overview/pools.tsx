@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { texts } from "@/components/viz/meter";
 import { Segments } from "@/components/viz/segments";
 import type { Summary, Column as Totals } from "@/lib/pool/pool";
-import { dollars, duration, utcDate, when } from "@/lib/time/format";
+import { dollars, duration, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const Column = ({
@@ -75,7 +75,7 @@ export const Pools = ({
         {creditProblem ??
           (credit.endsAt === null
             ? "No API keys"
-            : `${credit.empty} of ${credit.parts.length} keys empty · ends ${utcDate(credit.endsAt)}`)}
+            : `${credit.empty} of ${credit.parts.length} keys empty · ends ${when(credit.endsAt, now)}`)}
       </Column>
     </div>
   );

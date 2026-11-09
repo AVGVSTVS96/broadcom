@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
-import { dollars, plural, times, utcDate } from "@/lib/time/format";
+import { clock, dollars, plural, times } from "@/lib/time/format";
 import type { Part, Source, Wallet } from "@/lib/usage/wallet";
 import { cn } from "@/lib/utils";
 
@@ -70,7 +70,7 @@ const Tiles = ({ wallet }: { wallet: Wallet }) => {
           }
           unit="left"
         >
-          Of {dollars(credit.granted)}, ends {utcDate(credit.ends)}
+          Of {dollars(credit.granted)}, ends {clock(credit.ends)}
         </Tile>
       )}
     </div>

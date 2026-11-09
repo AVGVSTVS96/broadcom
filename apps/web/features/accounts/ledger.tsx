@@ -34,7 +34,7 @@ import { creditTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
 import type { LimitWindow } from "@/lib/proxy/schema";
-import { ago, dollars, percent, plural, utcDate, when } from "@/lib/time/format";
+import { ago, dollars, percent, plural, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const dots = {
@@ -369,10 +369,7 @@ export const CreditLine = ({ row, now }: { row: Row; now: number }) => {
               : `Last used ${ago(credit.lastRequestAt, now)}`
           }
         >
-          <div className="text-sm tabular-nums">
-            {utcDate(credit.expiresAt)}
-            <span className="ml-1 text-xs text-muted-foreground">UTC</span>
-          </div>
+          <div className="text-sm tabular-nums">{when(credit.expiresAt, now)}</div>
         </Cell>
       }
     />
