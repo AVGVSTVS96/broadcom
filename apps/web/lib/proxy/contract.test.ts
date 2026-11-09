@@ -5,7 +5,7 @@ import { Schema } from "effect";
 
 import { decodeLiveEvent } from "@/lib/live/decode";
 import type { LiveEvent } from "@/lib/live/event";
-import { Credits, LimitUsage, UsageView } from "@/lib/proxy/schema";
+import { Credits, LimitUsage, TokensView, UsageView } from "@/lib/proxy/schema";
 
 const examples = new URL("../../../../crates/usage/api/examples/", import.meta.url);
 
@@ -34,6 +34,7 @@ const decodes = (schema: Schema.Codec<unknown>, name: string) => {
 
 const checked = [
   "credits.json",
+  "tokens.json",
   "usage.json",
   "events-snapshot.json",
   "events-patch.json",
@@ -45,6 +46,10 @@ const neverRead = ["batch.json", "sessions.json"];
 describe("the usage service's examples decode with the dashboard's schemas", () => {
   test("/deck/credits", () => {
     decodes(Credits, "credits.json");
+  });
+
+  test("/deck/tokens", () => {
+    decodes(TokensView, "tokens.json");
   });
 
   test("/deck/usage", () => {

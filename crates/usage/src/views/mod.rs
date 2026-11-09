@@ -12,6 +12,7 @@ mod row;
 mod schema;
 mod sessions;
 mod timeframe;
+mod tokens;
 mod view;
 
 pub use attribution::{AgentSdk, attribution_reach};
@@ -24,6 +25,7 @@ pub use row::Row;
 pub use schema::schemas;
 pub use sessions::{Amount, LimitInputs, Prepared, Session, SessionUsage, prepare, session_usage};
 pub use timeframe::{Range, parse_millis};
+pub use tokens::{TokensView, tokens_view};
 pub use view::{
     Labels, Part, Query, UsageView, parse_query, parts_of, proxy_since, usage_view, with_live,
 };

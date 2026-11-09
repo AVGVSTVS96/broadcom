@@ -117,6 +117,23 @@ export type Grant = typeof Grant.Type;
 
 export const Credits = Schema.Struct({ api: Schema.Array(Grant) });
 
+export const TokensView = Schema.Struct({
+  days: Schema.Array(
+    Schema.Struct({
+      cacheRead: Schema.Number,
+      cacheWrite: Schema.Number,
+      day: Schema.String,
+      input: Schema.Number,
+      output: Schema.Number,
+      tokens: Schema.Number,
+    }),
+  ),
+  models: Schema.Array(Schema.Struct({ model: Schema.String, tokens: Schema.Number })),
+  timezone: Schema.String,
+});
+
+export type TokensView = typeof TokensView.Type;
+
 export type Credits = typeof Credits.Type;
 
 const moveCauses = ["limit", "over", "early", "restart", "start", "other"] as const;
@@ -223,6 +240,7 @@ export type LimitUsage = typeof LimitUsage.Type;
 export const UsageAmount = Schema.Struct({
   apiUsd: Schema.Number,
   cacheRead: Schema.Number,
+  cacheWrite: Schema.Number,
   input: Schema.Number,
   output: Schema.Number,
   planUsd: Schema.Number,

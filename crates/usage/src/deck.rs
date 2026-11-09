@@ -15,7 +15,7 @@ use crate::store::{Store, now_millis};
 use crate::stream::Stream;
 use crate::views::{
     self, AppendLog, Binding, CreditsView, Labels, LimitInputs, LimitReading, Live, Names, Past,
-    PlanPricing, Processes, Range, Row, SessionUsage, UsageView,
+    PlanPricing, Processes, Range, Row, SessionUsage, TokensView, UsageView,
 };
 
 /// A range older than this reloads behind the request that finds it.
@@ -116,6 +116,7 @@ pub struct Deck {
     bindings: Mutex<AppendLog<Binding>>,
     loader: tokio::sync::Mutex<()>,
     past: Mutex<Option<Past>>,
+    tokens: Mutex<Option<(i64, Arc<TokensView>)>>,
 }
 
 /// The machine's IANA zone, as Go's deck finds it.
@@ -164,6 +165,7 @@ impl Deck {
             bindings: Mutex::new(bindings),
             loader: tokio::sync::Mutex::new(()),
             past: Mutex::new(None),
+            tokens: Mutex::new(None),
         }
     }
 
@@ -357,6 +359,26 @@ impl Deck {
         };
         let live = self.state.lock().live.sessions.clone();
         Ok(views::with_live(&view, &live))
+    }
+
+    /// Every day's tokens over all history, summed again only after the store's rows change.
+    pub async fn tokens(self: &Arc<Self>) -> Result<Arc<TokensView>> {
+        let deck = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut rows = deck.rows.lock();
+            rows.sync(&deck.store)?;
+            let rev = rows.rev.unwrap_or(-1);
+            let mut cached = deck.tokens.lock();
+            if let Some((at, view)) = cached.as_ref()
+                && *at == rev
+            {
+                return Ok(view.clone());
+            }
+            let view = Arc::new(views::tokens_view(&rows.sorted, deck.zone));
+            *cached = Some((rev, view.clone()));
+            Ok(view)
+        })
+        .await?
     }
 
     /// The API-credit grants, carried forward by the proxy's receipts since their reading.
