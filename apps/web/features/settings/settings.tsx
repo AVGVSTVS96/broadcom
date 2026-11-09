@@ -107,7 +107,7 @@ const Control = ({
     <Input
       id={field.key}
       value={values[field.key]}
-      className="h-9 font-mono text-sm"
+      className="h-9 font-mono"
       autoComplete="off"
       spellCheck={false}
       onChange={(event) => {
