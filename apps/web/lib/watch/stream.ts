@@ -6,32 +6,54 @@ const encoder = new TextEncoder();
 export const changeStream = (
   signal: AbortSignal,
   watch: (changed: () => void) => Promise<() => void>,
-) =>
-  new Response(
-    new ReadableStream<Uint8Array>({
-      start: async (controller) => {
-        let timer: ReturnType<typeof setTimeout> | undefined;
+) => {
+  let closed = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let ping: ReturnType<typeof setInterval> | undefined;
+  let unwatch: (() => void) | undefined;
 
+  const cleanup = () => {
+    closed = true;
+    clearTimeout(timer);
+    clearInterval(ping);
+    unwatch?.();
+  };
+
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      cancel: cleanup,
+      start: async (controller) => {
         const send = (line: string) => {
-          controller.enqueue(encoder.encode(line));
+          if (!closed) {
+            controller.enqueue(encoder.encode(line));
+          }
         };
 
-        const unwatch = await watch(() => {
+        const stop = await watch(() => {
           timer ??= setTimeout(() => {
             timer = undefined;
             send("data: changed\n\n");
           }, settle);
         });
 
-        const ping = setInterval(() => {
+        if (closed || signal.aborted) {
+          stop();
+          cleanup();
+
+          return;
+        }
+
+        unwatch = stop;
+
+        ping = setInterval(() => {
           send(": ping\n\n");
         }, 20_000);
 
         signal.addEventListener("abort", () => {
-          clearTimeout(timer);
-          clearInterval(ping);
-          unwatch();
-          controller.close();
+          if (!closed) {
+            cleanup();
+            controller.close();
+          }
         });
 
         send(": watching\n\n");
@@ -45,3 +67,4 @@ export const changeStream = (
       },
     },
   );
+};
