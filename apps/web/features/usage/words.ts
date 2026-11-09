@@ -58,11 +58,7 @@ export const slotWords = {
   "4h": "day",
 } as const satisfies Record<BucketSize, string>;
 
-export const presets = [
-  ["microscope", { q: "microscope", "w.app": null }],
-  ["autofork", { q: "autofork", "w.app": null }],
-  ["GitHub Actions", { q: null, "w.app": "actions" }],
-] as const;
+export const presets = [["GitHub Actions", { q: null, "w.app": "actions" }]] as const;
 
 export const listOf = (items: readonly string[]) =>
   new Intl.ListFormat("en", { type: "conjunction" }).format(items);
