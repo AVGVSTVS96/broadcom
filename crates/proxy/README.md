@@ -12,8 +12,10 @@ claude ─┘   127.0.0.1:8317       └─▶ Pro account C   (then API keys)
 
 ## Start
 
+[BROADCOM's install](https://github.com/AVGVSTVS96/broadcom#install) sets up this pool with its dashboard, no Rust needed. For the pool alone:
+
 ```sh
-cargo install --git https://github.com/AVGVSTVS96/broadcom broadcom-proxy
+cargo install broadcom-proxy
 broadcom-proxy login     # once per Claude account: open the link, paste the code
 broadcom-proxy           # serves on 127.0.0.1:8317
 ```
@@ -56,7 +58,7 @@ Optional. Without a file at `~/.config/broadcom-proxy/config.json` (or the path 
 
 ## Keep it running
 
-The repo's [systemd/](../../systemd) has a user socket that holds the port across restarts, so clients queue instead of failing, and a service that gives requests in flight 10 minutes to finish on stop:
+The repo's [systemd/](https://github.com/AVGVSTVS96/broadcom/tree/main/systemd) has a user socket that holds the port across restarts, so clients queue instead of failing, and a service that gives requests in flight 10 minutes to finish on stop:
 
 ```sh
 git clone https://github.com/AVGVSTVS96/broadcom && cd broadcom
@@ -71,7 +73,7 @@ Set `credentialsDir` to CLIProxyAPI's auth directory (`~/.cli-proxy-api` unless 
 ## What it writes and serves
 
 - `receipts.ndjson`: one line per upstream attempt, with Anthropic's usage object as sent. Also limit history, session moves and resets spent, all append-only in the state directory.
-- `/v8/management/...` with the management key: accounts, pool standing as a live SSE stream, policy, sign-ins from any device, reset spending. [BROADCOM](../../apps/web), in the same repo, is a dashboard built on it.
+- `/v8/management/...` with the management key: accounts, pool standing as a live SSE stream, policy, sign-ins from any device, reset spending. [BROADCOM](https://github.com/AVGVSTVS96/broadcom/tree/main/apps/web), in the same repo, is a dashboard built on it.
 
 How it works inside, and why: [DESIGN.md](DESIGN.md).
 
