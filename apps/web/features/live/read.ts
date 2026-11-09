@@ -6,7 +6,7 @@ import { connection } from "next/server";
 import { handoffs } from "@/lib/pool/live";
 import type { Handoffs } from "@/lib/pool/live";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { readGrants } from "@/lib/proxy/read";
+import { creditProblem, readGrants } from "@/lib/proxy/read";
 import { Moves } from "@/lib/proxy/schema";
 import type { Grant } from "@/lib/proxy/schema";
 
@@ -14,6 +14,7 @@ export interface LiveData {
   readonly now: number;
   readonly handoffs: Handoffs | null;
   readonly grants: readonly Pick<Grant, "account" | "credentialId">[];
+  readonly problems: readonly string[];
 }
 
 const readHandoffs = async () => {
@@ -37,5 +38,14 @@ export const readLiveData = async (): Promise<LiveData> => {
 
   const [moves, read] = await Promise.all([readHandoffs().catch(() => null), readGrants()]);
 
-  return { grants: read.ok ? read.value : [], handoffs: moves, now: Date.now() };
+  const problem = creditProblem(read);
+
+  return {
+    grants: read.ok
+      ? read.value.map((grant) => ({ account: grant.account, credentialId: grant.credentialId }))
+      : [],
+    handoffs: moves,
+    now: Date.now(),
+    problems: problem === null ? [] : [problem],
+  };
 };

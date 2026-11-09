@@ -3,7 +3,7 @@ import { connection } from "next/server";
 
 import { Accounts } from "@/features/accounts/accounts";
 import { RefreshOnStale } from "@/lib/live/client";
-import { readCredits, readLogins } from "@/lib/proxy/read";
+import { creditProblem, readCredits, readLogins } from "@/lib/proxy/read";
 
 export const metadata: Metadata = { title: "Accounts" };
 
@@ -14,7 +14,7 @@ const AccountsPage = async () => {
 
   const problems = [
     logins.ok ? null : `Sign-ins didn't load: ${logins.reason}`,
-    credits.ok ? null : `API keys didn't load: ${credits.reason}`,
+    creditProblem(credits),
   ].filter((problem) => problem !== null);
 
   return (

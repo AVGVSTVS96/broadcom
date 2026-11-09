@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { Legend } from "@/components/viz/legend";
+import { Problems } from "@/components/viz/problems";
 import { Section } from "@/components/viz/section";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
@@ -551,6 +552,7 @@ export const LiveView = ({ data }: { data: LiveData }) => {
 
   return (
     <div className="space-y-5">
+      <Problems problems={data.problems} />
       <Running sessions={running} name={name} now={now} />
       <Waiting sessions={sessions} name={name} now={now} />
       {data.handoffs === null ? (

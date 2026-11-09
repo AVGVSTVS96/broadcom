@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { Problems } from "@/components/viz/problems";
 import { Views } from "@/components/viz/views";
 import { queryOf, readUsage, readWallet } from "@/features/usage/read";
 import { UsageView } from "@/features/usage/usage";
@@ -12,6 +13,7 @@ export const metadata: Metadata = { title: "Usage" };
 const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
   const params = await searchParams;
   const view = viewOf(params.view);
+  const read = view === "wallet" ? await readWallet() : await readUsage(queryOf(params));
 
   return (
     <>
@@ -19,10 +21,11 @@ const UsagePage = async ({ searchParams }: PageProps<"/usage">) => {
       <div className="group/page space-y-5">
         <Views views={views} current={view} />
         <div className="space-y-5 transition-opacity delay-150 duration-300 group-has-[nav[aria-busy=true]]/page:opacity-60">
-          {view === "wallet" ? (
-            <WalletView wallet={await readWallet()} />
+          <Problems problems={read.problems} />
+          {"wallet" in read ? (
+            <WalletView wallet={read.wallet} now={read.now} />
           ) : (
-            <UsageView usage={await readUsage(queryOf(params))} />
+            <UsageView usage={read} />
           )}
         </div>
       </div>

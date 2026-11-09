@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { readLive } from "@/lib/live/server";
 import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { grants } from "@/lib/proxy/read";
+import { creditProblem, grantsOutcome } from "@/lib/proxy/read";
 import { Config, UsageView } from "@/lib/proxy/schema";
 import type { BucketSize, UsageRow } from "@/lib/proxy/schema";
 import {
@@ -107,6 +107,7 @@ export interface Usage {
   readonly rowCount: number;
   readonly selected: Selected | null;
   readonly owner: string | null;
+  readonly problems: readonly string[];
   readonly filters: readonly {
     readonly dimension: string;
     readonly id: string;
@@ -218,7 +219,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
   const { view, spend, credits, owner } = await runtime.runPromise(
     Effect.all(
       {
-        credits: grants.pipe(Effect.orElseSucceed(() => [])),
+        credits: grantsOutcome,
         owner: agent(query.within),
         spend: isLimit(query.unit)
           ? get(
@@ -238,7 +239,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     ),
   );
 
-  const names = namesOf(view.facets.account ?? [], credits);
+  const names = namesOf(view.facets.account ?? [], credits.ok ? credits.value : []);
   const labels = labelsOf(view.rows);
 
   const rowOf = (row: UsageRow): Row => ({
@@ -328,6 +329,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     layers,
     now,
     owner: owner?.label ?? null,
+    problems: [creditProblem(credits)].filter((problem) => problem !== null),
     query,
     readings,
     rowCount: view.rowCount,
@@ -379,19 +381,19 @@ export const readWallet = async () => {
         config: Effect.gen(function* () {
           return yield* (yield* Proxy).get("/config", Config);
         }),
-        credits: grants,
+        credits: grantsOutcome,
         harness: spendBy("harness"),
       },
       { concurrency: "unbounded" },
     ),
   );
 
-  const names = namesOf(accounts.facets.account ?? [], credits);
+  const names = namesOf(accounts.facets.account ?? [], credits.ok ? credits.value : []);
 
-  return walletOf({
+  const wallet = walletOf({
     byAccount: spent(accounts, "a:"),
     byHarness: spent(harness, "h:"),
-    grants: credits.map((grant) => ({
+    grants: (credits.ok ? credits.value : []).map((grant) => ({
       allowance: grant.allowance,
       expiresAt: grant.expiresAt,
       id: grant.credentialId,
@@ -411,4 +413,10 @@ export const readWallet = async () => {
     })),
     total: accounts.totals.apiUsd,
   });
+
+  return {
+    now: Date.now(),
+    problems: [creditProblem(credits)].filter((problem) => problem !== null),
+    wallet,
+  };
 };

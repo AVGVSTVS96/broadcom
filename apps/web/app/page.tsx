@@ -2,7 +2,7 @@ import { connection } from "next/server";
 
 import { Overview } from "@/features/overview/overview";
 import { RefreshOnStale } from "@/lib/live/client";
-import { readGrants, readWeekHistory } from "@/lib/proxy/read";
+import { creditProblem, readGrants, readWeekHistory } from "@/lib/proxy/read";
 
 const OverviewPage = async () => {
   await connection();
@@ -11,7 +11,7 @@ const OverviewPage = async () => {
 
   const problems = [
     history.ok ? null : `Limit history didn't load: ${history.reason}`,
-    grants.ok ? null : `API credit didn't load: ${grants.reason}`,
+    creditProblem(grants),
   ].filter((problem) => problem !== null);
 
   return (

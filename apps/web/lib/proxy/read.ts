@@ -6,7 +6,8 @@ import { creditOf, loginOf } from "@/lib/pool/accounts";
 import { compact } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import type { Daily } from "@/lib/pool/weeks";
-import { attempt, attemptCached } from "@/lib/proxy/attempt";
+import { attempt, attemptCached, outcome } from "@/lib/proxy/attempt";
+import type { Outcome } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
 import { Config, Credentials, Credits, History, LimitUsage } from "@/lib/proxy/schema";
 import { redact } from "@/lib/settings/redact";
@@ -67,13 +68,18 @@ export const readLogins = async () =>
     }),
   );
 
-export const grants = Effect.gen(function* () {
+const grants = Effect.gen(function* () {
   const view = yield* (yield* Proxy).get("/deck/credits", Credits);
 
   return view.api;
 });
 
+export const grantsOutcome = outcome(grants);
+
 export const readGrants = async () => await attempt(grants);
+
+export const creditProblem = (read: Outcome<unknown>) =>
+  read.ok ? null : `API credit didn't load: ${read.reason}`;
 
 export const readCredits = async () => {
   const read = await readGrants();
