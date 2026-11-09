@@ -53,6 +53,28 @@ pub fn read_grants(path: &Path) -> Result<Vec<ApiCredit>, String> {
     }
 }
 
+/// Once `renews_at` has passed, the grant is a fresh period: the allowance is back,
+/// read as of the renewal, and `renews_at` rolls to the next monthly renewal after `now`.
+fn renew(g: &mut ApiCredit, now: i64) {
+    let at = |ms: i64| chrono::DateTime::from_timestamp_millis(ms);
+    if g.renews_at <= 0 || g.renews_at > now {
+        return;
+    }
+    let Some(mut start) = at(g.renews_at) else {
+        return;
+    };
+    while let Some(next) = start.checked_add_months(chrono::Months::new(1)) {
+        if next.timestamp_millis() > now {
+            break;
+        }
+        start = next;
+    }
+    let next = start.checked_add_months(chrono::Months::new(1));
+    g.remaining = g.allowance;
+    g.observed_at = start.timestamp_millis();
+    g.renews_at = next.map_or(0, |n| n.timestamp_millis());
+}
+
 /// Counts only matching proxy receipts during each grant; failed requests are not
 /// billed. Needs every proxy event since the earliest grant's `starts_at`. `now` is unix ms.
 pub fn credits(grants: &[ApiCredit], events: &[Event], now: i64) -> Result<CreditsView, String> {
@@ -73,6 +95,8 @@ pub fn credits(grants: &[ApiCredit], events: &[Event], now: i64) -> Result<Credi
         {
             return Err(INVALID.into());
         }
+        let mut g = g.clone();
+        renew(&mut g, now);
         let mut item = CreditUsage {
             grant: g.clone(),
             recorded: g.remaining,
@@ -164,5 +188,42 @@ mod tests {
             ),
             (120.0, 150.0, 80.0, 4, 1)
         );
+    }
+
+    #[test]
+    fn a_credit_past_its_renewal_starts_a_fresh_period() {
+        let hour = 3_600_000;
+        let now = 1_800_000_000_000;
+        let renewed = now - hour;
+        let grant = ApiCredit {
+            account: "a".into(),
+            organization: "o".into(),
+            credential_id: "key".into(),
+            remaining: 0.0,
+            allowance: 200.0,
+            monthly_cap: 200.0,
+            starts_at: now - 5 * hour,
+            observed_at: now - 4 * hour,
+            expires_at: now + 24 * 40 * hour,
+            renews_at: renewed,
+        };
+        let at = |ms: i64| {
+            chrono::DateTime::from_timestamp_millis(ms)
+                .unwrap()
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        };
+        let proxy = |ms: i64, cost: f64| Event {
+            source: "proxy".into(),
+            account_id: "key".into(),
+            timestamp: at(ms),
+            cost_usd: cost,
+            cost_known: true,
+            ..Default::default()
+        };
+        let events = [proxy(renewed - 60_000, 40.0), proxy(renewed + 60_000, 15.0)];
+        let got = &credits(&[grant], &events, now).unwrap().api[0];
+        assert_eq!(got.grant.remaining, 185.0);
+        assert_eq!(got.recorded, 200.0);
+        assert!(got.grant.renews_at > now);
     }
 }
