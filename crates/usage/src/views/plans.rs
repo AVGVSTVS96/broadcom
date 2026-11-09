@@ -3,6 +3,7 @@ use std::path::Path;
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 
+use super::credits::ApiCredit;
 use super::sessions::Prepared;
 use super::timeframe::{month_start, next_month, parse_millis};
 
@@ -163,8 +164,8 @@ fn seat_fees(seat: &Seat, m: Month, from: f64, to: f64) -> f64 {
     seat.monthly_usd * overlap(m.start, m.end, go_max(from, seat.since), to) / (m.end - m.start)
 }
 
-/// Requests on an API-key credential run on free credit, not on a plan seat.
-fn is_free_credit(event: &Prepared) -> bool {
+/// Requests on an API-key credential run on no plan seat.
+fn is_api_key(event: &Prepared) -> bool {
     event.account_id.contains(":apikey:")
 }
 
@@ -176,13 +177,20 @@ pub struct PlanPricing {
     active: Vec<Plan>,
     covers: Vec<f64>,
     months: Vec<Month>,
+    grants: Vec<ApiCredit>,
     rate: Vec<Vec<f64>>,
     now: f64,
 }
 
 impl PlanPricing {
     /// `now` is unix ms.
-    pub fn new(plans: &[Plan], events: &[Prepared], zone: Tz, now: i64) -> Self {
+    pub fn new(
+        plans: &[Plan],
+        grants: &[ApiCredit],
+        events: &[Prepared],
+        zone: Tz,
+        now: i64,
+    ) -> Self {
         let now = now as f64;
         let mut active = Vec::new();
         let mut covers = Vec::new();
@@ -211,12 +219,13 @@ impl PlanPricing {
             active,
             covers,
             months,
+            grants: grants.to_vec(),
             rate: Vec::new(),
             now,
         };
         let mut api = vec![vec![0.0; pricing.months.len()]; pricing.active.len()];
         for event in events {
-            if !event.cost_known || event.cost_usd <= 0.0 || is_free_credit(event) {
+            if !event.cost_known || event.cost_usd <= 0.0 {
                 continue;
             }
             if let (Some(plan), Some(m)) = (pricing.plan_of(event), pricing.month_of(event.millis))
@@ -266,17 +275,30 @@ impl PlanPricing {
         }
     }
 
-    /// The plan covering a request.
+    /// The plan covering a request; none for an API key, which no seat covers.
     fn plan_of(&self, event: &Prepared) -> Option<usize> {
+        if is_api_key(event) {
+            return None;
+        }
         (0..self.active.len()).find(|&i| {
             self.active[i].providers.iter().any(|p| p == event.provider)
                 && event.millis >= self.covers[i]
         })
     }
 
-    /// A request's plan $; free API credit costs nothing.
+    /// A request on a grant from credits.json, inside the grant's window, ran on free credit.
+    fn is_free(&self, event: &Prepared) -> bool {
+        is_api_key(event)
+            && self.grants.iter().any(|g| {
+                *event.account_id == *g.credential_id
+                    && event.millis >= g.starts_at as f64
+                    && event.millis < g.expires_at as f64
+            })
+    }
+
+    /// A request's plan $; free API credit costs nothing and any other API key its full price.
     pub fn price(&self, event: &Prepared) -> f64 {
-        if is_free_credit(event) {
+        if self.is_free(event) {
             return 0.0;
         }
         match (self.plan_of(event), self.month_of(event.millis)) {
@@ -326,7 +348,7 @@ mod tests {
         ];
         let rows = events.map(|e| Row::from(&e));
         let prepared = prepare(&rows);
-        let p = PlanPricing::new(&plans, &prepared, utc, now.timestamp_millis());
+        let p = PlanPricing::new(&plans, &[], &prepared, utc, now.timestamp_millis());
         assert!((p.price(&prepared[0]) - 310.0).abs() < 1e-9);
         assert!((p.price(&prepared[1]) - 150.0).abs() < 1e-9);
         assert_eq!(p.price(&prepared[2]), 70.0);
@@ -358,11 +380,22 @@ mod tests {
             account_id: account.into(),
             ..Default::default()
         };
-        let events = [event("", 300.0), event("claude:apikey:f8bd1a2f93d9", 200.0)];
+        let grants = [ApiCredit {
+            credential_id: "claude:apikey:f8bd1a2f93d9".into(),
+            starts_at: since as i64,
+            expires_at: since as i64 + 60 * 86_400_000,
+            ..Default::default()
+        }];
+        let events = [
+            event("", 300.0),
+            event("claude:apikey:f8bd1a2f93d9", 200.0),
+            event("claude:apikey:paid00000000", 80.0),
+        ];
         let rows = events.map(|e| Row::from(&e));
         let prepared = prepare(&rows);
-        let p = PlanPricing::new(&plans, &prepared, utc, now.timestamp_millis());
+        let p = PlanPricing::new(&plans, &grants, &prepared, utc, now.timestamp_millis());
         assert!((p.price(&prepared[0]) - 300.0).abs() < 1e-9);
         assert_eq!(p.price(&prepared[1]), 0.0);
+        assert_eq!(p.price(&prepared[2]), 80.0);
     }
 }

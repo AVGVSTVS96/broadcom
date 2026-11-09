@@ -192,7 +192,9 @@ impl Deck {
             Some(&self.config.pool_dir),
             &self.config.plans,
         );
-        let pricing = PlanPricing::new(&plans, &prepared, self.zone, now);
+        let grants =
+            views::read_grants(&self.config.pool_dir.join("credits.json")).unwrap_or_default();
+        let pricing = PlanPricing::new(&plans, &grants, &prepared, self.zone, now);
         let limits = LimitInputs::new(readings, bindings, self.config.agent_sdk());
         let devices = self.store.devices()?;
         Ok(ranges
