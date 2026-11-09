@@ -119,6 +119,9 @@ pub fn start(app: Arc<App>) {
     });
     let pool = app.config.pool_dir.clone();
     let receipts = app.config.receipts.clone();
+    if let Err(e) = std::fs::create_dir_all(pool.join("plans")) {
+        tracing::warn!("creating {}: {e}", pool.display());
+    }
     spawn_watch(
         &[(pool.clone(), false), (pool.join("plans"), false)],
         Duration::from_secs(1),
@@ -367,7 +370,11 @@ pub async fn follow_files(app: Arc<App>) {
         return;
     };
     for dir in &dirs {
-        if let Err(e) = watcher.watch(dir, RecursiveMode::NonRecursive) {
+        if let Err(e) = std::fs::create_dir_all(dir).and_then(|()| {
+            watcher
+                .watch(dir, RecursiveMode::NonRecursive)
+                .map_err(std::io::Error::other)
+        }) {
             tracing::warn!("watching {}: {e}", dir.display());
         }
     }
