@@ -73,7 +73,18 @@ fn sorted_entries(dir: &Path) -> Vec<String> {
     names
 }
 
-/// Reads `<claude>/sessions/<pid>.json` (live only while /proc has the pid),
+/// Signal 0 only checks that the process exists; a process of another user still counts.
+fn is_running(pid: f64) -> bool {
+    use nix::errno::Errno;
+    use nix::sys::signal::kill;
+    use nix::unistd::Pid;
+    i32::try_from(pid as i64)
+        .ok()
+        .filter(|pid| *pid > 0)
+        .is_some_and(|pid| matches!(kill(Pid::from_raw(pid), None), Ok(()) | Err(Errno::EPERM)))
+}
+
+/// Reads `<claude>/sessions/<pid>.json` (live only while its pid is a running process),
 /// `<claude>/jobs/*/state.json` and `<hex>/state/<app>/{sessions,hub.sock}`.
 pub fn read_processes(claude: &Path, hex: &Path) -> Processes {
     #[derive(Deserialize)]
@@ -120,7 +131,7 @@ pub fn read_processes(claude: &Path, hex: &Path) -> Processes {
         let (Some(id), Some(pid)) = (s.session_id.filter(|id| !id.is_empty()), s.pid) else {
             continue;
         };
-        if !Path::new(&format!("/proc/{pid}")).exists() {
+        if !is_running(pid) {
             continue;
         }
         let running = Running {
@@ -347,6 +358,14 @@ pub fn live_map(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn liveness_is_checked_without_proc() {
+        assert!(is_running(f64::from(std::process::id())));
+        for pid in [0.0, -1.0, 4_294_967_295.0] {
+            assert!(!is_running(pid));
+        }
+    }
 
     #[test]
     fn running_and_blocked_sessions() {

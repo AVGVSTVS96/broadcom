@@ -162,8 +162,11 @@ impl Config {
 
     pub fn device_label(&self) -> String {
         self.device_label.clone().unwrap_or_else(|| {
-            std::fs::read_to_string("/etc/hostname")
-                .map_or_else(|_| "server".into(), |h| h.trim().to_string())
+            nix::unistd::gethostname()
+                .ok()
+                .and_then(|h| h.into_string().ok())
+                .filter(|h| !h.is_empty())
+                .unwrap_or_else(|| "server".into())
         })
     }
 }

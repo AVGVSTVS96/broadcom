@@ -259,6 +259,7 @@ dependencies = [
  "jsonschema",
  "memchr",
  "mimalloc",
+ "nix",
  "notify",
  "parking_lot 0.13.0",
  "postcard",

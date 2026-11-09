@@ -17,6 +17,7 @@ form_urlencoded = "1"
 indexmap = { version = "2", features = ["serde"] }
 memchr = "2"
 mimalloc = "0.1"
+nix = { version = "0.31", default-features = false, features = ["hostname", "signal"] }
 notify = "8"
 postcard = { version = "1", features = ["use-std"] }
 regex = "1"
