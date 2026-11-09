@@ -288,7 +288,7 @@ export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: numbe
 
       return end === undefined || plan.pace.locked
         ? []
-        : [[plan.id, ((100 - end[1]) / 100) * size.height] as const];
+        : [[plan.id, (end[1] / 100) * size.height] as const];
     }),
   );
 
