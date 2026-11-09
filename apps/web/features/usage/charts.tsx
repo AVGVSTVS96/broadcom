@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const palettes = {
   greys: { fills: ["bg-chart-1", "bg-chart-2", "bg-chart-3"], rest: "bg-chart-4" },
-  tokens: { fills: ["bg-tokens", "bg-tokens-2", "bg-tokens-3"], rest: "bg-tokens/45" },
+  tokens: { fills: ["bg-tokens", "bg-tokens-2", "bg-tokens-3"], rest: "bg-chart-4" },
 } as const;
 
 export const fillOf = (layers: readonly Layer[], key: string, unit: Unit) => {
@@ -171,7 +171,7 @@ export const Stack = ({
                     : layers.map((layer) => {
                         const value = layer.values[index] ?? 0;
 
-                        return value <= 0 ? null : (
+                        return value / top < 0.01 ? null : (
                           <span
                             key={layer.key}
                             className={cn(

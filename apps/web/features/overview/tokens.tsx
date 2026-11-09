@@ -42,7 +42,7 @@ const Figure = ({
   </div>
 );
 
-const shades = ["bg-tokens", "bg-tokens/70", "bg-tokens/50", "bg-tokens/35", "bg-tokens/20"];
+const shades = ["bg-tokens", "bg-tokens-2", "bg-tokens-3", "bg-chart-4"];
 
 const Models = ({ models }: { models: TokenStats["models"] }) => (
   <div className="min-w-0 space-y-4">
