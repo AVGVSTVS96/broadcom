@@ -118,6 +118,7 @@ export type Grant = typeof Grant.Type;
 export const Credits = Schema.Struct({ api: Schema.Array(Grant) });
 
 export const TokensView = Schema.Struct({
+  at: Millis,
   days: Schema.Array(
     Schema.Struct({
       cacheRead: Schema.Number,
@@ -128,6 +129,8 @@ export const TokensView = Schema.Struct({
       tokens: Schema.Number,
     }),
   ),
+  last30d: Schema.Number,
+  last7d: Schema.Number,
   models: Schema.Array(Schema.Struct({ model: Schema.String, tokens: Schema.Number })),
   timezone: Schema.String,
 });

@@ -1,11 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "TokensView",
-  "description": "Every day with tokens since the first record, and each model's share of them.",
+  "description": "Every day with tokens since the first record, each model's share of them, and the\ntokens of the 7 and 30 days before `at`, counted back as the Usage page's ranges are.",
   "type": "object",
   "properties": {
     "timezone": {
       "type": "string"
+    },
+    "at": {
+      "type": "integer",
+      "format": "int64"
+    },
+    "last7d": {
+      "type": "number",
+      "format": "double"
+    },
+    "last30d": {
+      "type": "number",
+      "format": "double"
     },
     "days": {
       "type": "array",
@@ -22,6 +34,9 @@
   },
   "required": [
     "timezone",
+    "at",
+    "last7d",
+    "last30d",
     "days",
     "models"
   ],

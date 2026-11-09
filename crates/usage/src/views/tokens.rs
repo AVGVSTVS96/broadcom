@@ -27,16 +27,24 @@ pub struct ModelTokens {
     pub tokens: f64,
 }
 
-/// Every day with tokens since the first record, and each model's share of them.
+/// Every day with tokens since the first record, each model's share of them, and the
+/// tokens of the 7 and 30 days before `at`, counted back as the Usage page's ranges are.
 #[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TokensView {
     pub timezone: String,
+    pub at: i64,
+    pub last7d: f64,
+    pub last30d: f64,
     pub days: Vec<TokenDay>,
     pub models: Vec<ModelTokens>,
 }
 
 /// Sums rows sorted by time into calendar days in the zone, finding each day's bounds once.
-pub fn tokens_view(rows: &[Row], zone: Tz) -> TokensView {
+pub fn tokens_view(rows: &[Row], zone: Tz, now: i64) -> TokensView {
+    let day = 86_400_000.0;
+    let (week, month) = (now as f64 - 7.0 * day, now as f64 - 30.0 * day);
+    let (mut last7d, mut last30d) = (0.0, 0.0);
     let mut days: Vec<TokenDay> = Vec::new();
     let mut models: HashMap<&str, f64> = HashMap::new();
     let mut ends = f64::NEG_INFINITY;
@@ -68,6 +76,12 @@ pub fn tokens_view(rows: &[Row], zone: Tz) -> TokensView {
         day.cache_read += row.cache_read_tokens as f64;
         day.cache_write += row.cache_write_tokens as f64;
         *models.entry(&row.model).or_default() += tokens;
+        if row.millis >= month && row.millis <= now as f64 {
+            last30d += tokens;
+            if row.millis >= week {
+                last7d += tokens;
+            }
+        }
     }
     let mut models: Vec<ModelTokens> = models
         .into_iter()
@@ -79,6 +93,9 @@ pub fn tokens_view(rows: &[Row], zone: Tz) -> TokensView {
     models.sort_by(|a, b| b.tokens.total_cmp(&a.tokens).then(a.model.cmp(&b.model)));
     TokensView {
         timezone: zone.name().to_string(),
+        at: now,
+        last7d,
+        last30d,
         days,
         models,
     }
@@ -124,7 +141,9 @@ mod tests {
             row("2026-11-09T12:00:00Z", "opus", 1, 0),
             row("2026-11-09T13:00:00Z", "opus", 0, 0),
         ];
-        let view = tokens_view(&rows, chrono_tz::America::Los_Angeles);
+        let now = super::super::parse_millis("2026-11-09T14:00:00Z") as i64;
+        let view = tokens_view(&rows, chrono_tz::America::Los_Angeles, now);
+        assert_eq!((view.last7d, view.last30d), (106.0, 106.0));
         let days: Vec<(&str, f64, f64)> = view
             .days
             .iter()

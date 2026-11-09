@@ -116,7 +116,7 @@ pub struct Deck {
     bindings: Mutex<AppendLog<Binding>>,
     loader: tokio::sync::Mutex<()>,
     past: Mutex<Option<Past>>,
-    tokens: Mutex<Option<(i64, Arc<TokensView>)>>,
+    tokens: Mutex<Option<(i64, Instant, Arc<TokensView>)>>,
 }
 
 /// The machine's IANA zone, as Go's deck finds it.
@@ -361,7 +361,8 @@ impl Deck {
         Ok(views::with_live(&view, &live))
     }
 
-    /// Every day's tokens over all history, summed again only after the store's rows change.
+    /// Every day's tokens over all history, summed again once the store's rows change or the
+    /// rolling windows are FRESH_FOR old.
     pub async fn tokens(self: &Arc<Self>) -> Result<Arc<TokensView>> {
         let deck = self.clone();
         tokio::task::spawn_blocking(move || {
@@ -369,13 +370,14 @@ impl Deck {
             rows.sync(&deck.store)?;
             let rev = rows.rev.unwrap_or(-1);
             let mut cached = deck.tokens.lock();
-            if let Some((at, view)) = cached.as_ref()
+            if let Some((at, built, view)) = cached.as_ref()
                 && *at == rev
+                && built.elapsed() < FRESH_FOR
             {
                 return Ok(view.clone());
             }
-            let view = Arc::new(views::tokens_view(&rows.sorted, deck.zone));
-            *cached = Some((rev, view.clone()));
+            let view = Arc::new(views::tokens_view(&rows.sorted, deck.zone, now_millis()));
+            *cached = Some((rev, Instant::now(), view.clone()));
             Ok(view)
         })
         .await?
