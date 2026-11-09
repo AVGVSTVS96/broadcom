@@ -5,7 +5,8 @@ import { connection } from "next/server";
 import { readLive } from "@/lib/live/server";
 import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { Config, Credits, UsageView } from "@/lib/proxy/schema";
+import { grants } from "@/lib/proxy/read";
+import { Config, UsageView } from "@/lib/proxy/schema";
 import type { BucketSize, UsageRow } from "@/lib/proxy/schema";
 import {
   bucketLabel,
@@ -217,9 +218,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
   const { view, spend, credits, owner } = await runtime.runPromise(
     Effect.all(
       {
-        credits: Effect.gen(function* () {
-          return yield* (yield* Proxy).get("/deck/credits", Credits);
-        }).pipe(Effect.orElseSucceed(() => ({ api: [] }))),
+        credits: grants.pipe(Effect.orElseSucceed(() => [])),
         owner: agent(query.within),
         spend: isLimit(query.unit)
           ? get(
@@ -239,7 +238,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     ),
   );
 
-  const names = namesOf(view.facets.account ?? [], credits.api);
+  const names = namesOf(view.facets.account ?? [], credits);
   const labels = labelsOf(view.rows);
 
   const rowOf = (row: UsageRow): Row => ({
@@ -380,21 +379,19 @@ export const readWallet = async () => {
         config: Effect.gen(function* () {
           return yield* (yield* Proxy).get("/config", Config);
         }),
-        credits: Effect.gen(function* () {
-          return yield* (yield* Proxy).get("/deck/credits", Credits);
-        }),
+        credits: grants,
         harness: spendBy("harness"),
       },
       { concurrency: "unbounded" },
     ),
   );
 
-  const names = namesOf(accounts.facets.account ?? [], credits.api);
+  const names = namesOf(accounts.facets.account ?? [], credits);
 
   return walletOf({
     byAccount: spent(accounts, "a:"),
     byHarness: spent(harness, "h:"),
-    grants: credits.api.map((grant) => ({
+    grants: credits.map((grant) => ({
       allowance: grant.allowance,
       expiresAt: grant.expiresAt,
       id: grant.credentialId,
