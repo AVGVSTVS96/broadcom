@@ -47,6 +47,7 @@
 }
 
 @theme inline {
+  --breakpoint-wide: 56.25rem;
   --color-brand: var(--brand);
   --color-ok: var(--ok);
   --color-over: var(--over);

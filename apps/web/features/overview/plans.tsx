@@ -27,6 +27,12 @@ const Bar = ({ value, tone, locked = false }: { value: number; tone: Tone; locke
   </div>
 );
 
+const Nowrap = ({ lead, children }: { lead: string; children: string }) => (
+  <>
+    {lead} <span className="whitespace-nowrap">{children}</span>
+  </>
+);
+
 const Cell = ({
   label,
   value,
@@ -48,7 +54,7 @@ const Cell = ({
       </span>
     </div>
     {children}
-    <p className="truncate text-xs text-muted-foreground">{note}</p>
+    <p className="text-xs text-muted-foreground">{note}</p>
   </div>
 );
 
@@ -63,7 +69,13 @@ const Session = ({ plan, now }: { plan: Plan; now: number }) => {
       label="Session"
       value={used(window)}
       tone={tone}
-      note={window.resetsAt === null ? "No reading" : `in ${duration(window.resetsAt - now)}`}
+      note={
+        window.resetsAt === null ? (
+          "No reading"
+        ) : (
+          <Nowrap lead="in">{duration(window.resetsAt - now)}</Nowrap>
+        )
+      }
     >
       <Bar value={window.used ?? 0} tone={tone} />
     </Cell>
@@ -81,13 +93,15 @@ const Weekly = ({ plan, now }: { plan: Plan; now: number }) => {
     }
 
     if (pace.locked) {
-      return `Back ${when(pace.resetsAt, now)}`;
+      return <Nowrap lead="Back">{when(pace.resetsAt, now)}</Nowrap>;
     }
 
     return pace.runsOut === null ? (
-      `Resets ${when(pace.resetsAt, now)}`
+      <Nowrap lead="Resets">{when(pace.resetsAt, now)}</Nowrap>
     ) : (
-      <span className="text-over">Runs out {when(pace.runsOut, now)}</span>
+      <span className="text-over">
+        <Nowrap lead="Runs out">{when(pace.runsOut, now)}</Nowrap>
+      </span>
     );
   };
 
@@ -150,7 +164,7 @@ export const PlanRows = ({
             {plan.id === next ? <span className="size-2 shrink-0 rounded-full bg-brand" /> : null}
             <span className={cn("truncate", plan.id === next && "text-brand")}>{plan.name}</span>
           </div>
-          <div className="truncate text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             {[
               plan.account.plan || "API key",
               ...facts(plan, working.get(plan.id)?.length ?? 0, now),
