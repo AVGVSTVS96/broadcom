@@ -9,7 +9,7 @@ import { creditLeft, creditTotal } from "@/lib/pool/pool";
 import type { Plan } from "@/lib/pool/pool";
 import { creditTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
-import type { LimitWindow } from "@/lib/proxy/schema";
+import type { LimitWindow, LiveSession } from "@/lib/proxy/schema";
 import { dollars, duration, percent, when } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +121,7 @@ const facts = (plan: Plan, working: number, now: number) => {
   const spent = resetsSpent.filter((at) => now - at < WEEK).length;
 
   return [
-    working > 0 ? `${working} active` : null,
+    working > 0 ? `${working} working` : null,
     held > 0 ? `${held} ${held === 1 ? "reset" : "resets"} held` : null,
     spent > 0 ? `${spent} ${spent === 1 ? "reset" : "resets"} used` : null,
   ].filter((fact) => fact !== null);
@@ -134,7 +134,7 @@ export const PlanRows = ({
   now,
 }: {
   plans: readonly Plan[];
-  working: ReadonlyMap<string | null, readonly unknown[]>;
+  working: ReadonlyMap<string | null, readonly LiveSession[]>;
   next: string | null;
   now: number;
 }) => (
