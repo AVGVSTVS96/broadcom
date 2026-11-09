@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { readLive } from "@/lib/live/server";
 import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { creditProblem, grantsOutcome } from "@/lib/proxy/read";
+import { creditFailure, creditProblem, grantsOutcome } from "@/lib/proxy/read";
 import { Config, UsageView } from "@/lib/proxy/schema";
 import type { BucketSize, UsageRow } from "@/lib/proxy/schema";
 import {
@@ -388,12 +388,16 @@ export const readWallet = async () => {
     ),
   );
 
-  const names = namesOf(accounts.facets.account ?? [], credits.ok ? credits.value : []);
+  if (!credits.ok) {
+    return { now: Date.now(), problems: [creditFailure(credits.reason)], wallet: null };
+  }
+
+  const names = namesOf(accounts.facets.account ?? [], credits.value);
 
   const wallet = walletOf({
     byAccount: spent(accounts, "a:"),
     byHarness: spent(harness, "h:"),
-    grants: (credits.ok ? credits.value : []).map((grant) => ({
+    grants: credits.value.map((grant) => ({
       allowance: grant.allowance,
       expiresAt: grant.expiresAt,
       id: grant.credentialId,
@@ -416,7 +420,7 @@ export const readWallet = async () => {
 
   return {
     now: Date.now(),
-    problems: [creditProblem(credits)].filter((problem) => problem !== null),
+    problems: [],
     wallet,
   };
 };

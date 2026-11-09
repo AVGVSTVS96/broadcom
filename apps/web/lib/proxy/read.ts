@@ -78,8 +78,10 @@ export const grantsOutcome = outcome(grants);
 
 export const readGrants = async () => await attempt(grants);
 
+export const creditFailure = (reason: string) => `API credit didn't load: ${reason}`;
+
 export const creditProblem = (read: Outcome<unknown>) =>
-  read.ok ? null : `API credit didn't load: ${read.reason}`;
+  read.ok ? null : creditFailure(read.reason);
 
 export const readCredits = async () => {
   const read = await readGrants();
