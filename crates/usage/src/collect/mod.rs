@@ -68,6 +68,18 @@ pub struct Collector {
     device_id: String,
     workers: usize,
     db: Connection,
+    listing: Option<Listing>,
+    changed: HashSet<PathBuf>,
+}
+
+/// A full walk this old is taken again, in case a change went unreported.
+const WALK_EVERY: std::time::Duration = std::time::Duration::from_hours(24);
+
+/// Every log the last walk found, kept current from the paths reported changed since.
+struct Listing {
+    roots: Vec<Option<PathBuf>>,
+    logs: BTreeMap<(usize, Vec<u8>), LogFile>,
+    walked: std::time::Instant,
 }
 
 fn env_dirs(name: &str) -> Vec<PathBuf> {
@@ -87,8 +99,8 @@ fn base(path: &Path) -> String {
 }
 
 impl Collector {
-    /// Resolves the source directories once; directories created later are still found
-    /// because each pass walks them again.
+    /// Resolves the source directories once; one created later is still found, since
+    /// each pass checks every root is where it was.
     pub fn open(sources: Sources, cache_path: &Path) -> Result<Self> {
         let home = sources
             .home
@@ -186,7 +198,20 @@ impl Collector {
             device_id: sources.device_id,
             workers,
             db: cache::open(cache_path)?,
+            listing: None,
+            changed: HashSet::new(),
         })
+    }
+
+    /// Notes paths under the roots that changed, so the next pass reads only those
+    /// instead of walking every root.
+    pub fn changed(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        self.changed.extend(paths);
+    }
+
+    /// Makes the next pass walk every root, for when changes may have gone unreported.
+    pub fn rescan(&mut self) {
+        self.listing = None;
     }
 
     /// The directories whose changes call for a new pass.
@@ -201,7 +226,12 @@ impl Collector {
         policy: &Policy,
         deliver: impl FnOnce(Collection) -> Result<()>,
     ) -> Result<()> {
-        let (logs, mut warnings) = list_logs(&self.sources);
+        let mut warnings = self.list();
+        let logs: Vec<&LogFile> = self
+            .listing
+            .as_ref()
+            .map(|l| l.logs.values().collect())
+            .unwrap_or_default();
         let cached = cache::files(&self.db)?;
         let cold = cached.is_empty();
         let stale: Vec<usize> = (0..logs.len())
@@ -304,6 +334,103 @@ struct LogFile {
     signature: String,
 }
 
+impl Collector {
+    /// Brings the listing up to date: a walk of every root when there is none, a root
+    /// appeared or vanished, or the last walk is a day old; otherwise a fresh look at
+    /// each path reported changed.
+    fn list(&mut self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        let roots: Vec<Option<PathBuf>> = self
+            .sources
+            .iter()
+            .map(|source| real_root(source, &mut warnings))
+            .collect();
+        let changed = std::mem::take(&mut self.changed);
+        match &mut self.listing {
+            Some(listing) if listing.roots == roots && listing.walked.elapsed() < WALK_EVERY => {
+                for path in changed {
+                    listing.refresh(&self.sources, &path, &mut warnings);
+                }
+            }
+            _ => {
+                let mut logs = BTreeMap::new();
+                for (i, root) in roots.iter().enumerate() {
+                    if let Some(root) = root {
+                        walk(&self.sources, i, root, &mut logs, &mut warnings);
+                    }
+                }
+                self.listing = Some(Listing {
+                    roots,
+                    logs,
+                    walked: std::time::Instant::now(),
+                });
+            }
+        }
+        warnings
+    }
+}
+
+impl Listing {
+    /// Reads one changed path again: what was listed at or under it goes, and what is
+    /// there now comes back.
+    fn refresh(&mut self, sources: &[Source], path: &Path, warnings: &mut Vec<String>) {
+        let Some((i, real)) = sources.iter().enumerate().find_map(|(i, s)| {
+            let rest = path.strip_prefix(&s.path).ok()?;
+            Some((i, self.roots[i].as_ref()?.join(rest)))
+        }) else {
+            return;
+        };
+        let bytes = real.as_os_str().as_encoded_bytes().to_vec();
+        let below = |end: u8| [&bytes[..], &[end]].concat();
+        self.logs.remove(&(i, bytes.clone()));
+        let gone: Vec<_> = self
+            .logs
+            .range((i, below(b'/'))..(i, below(b'/' + 1)))
+            .map(|(k, _)| k.clone())
+            .collect();
+        for key in gone {
+            self.logs.remove(&key);
+        }
+        match std::fs::symlink_metadata(&real) {
+            Ok(m) if m.is_dir() => walk(sources, i, &real, &mut self.logs, warnings),
+            Ok(m) if m.is_file() && jsonl_name(&base(&real)) => {
+                if let Some(log) = log_file(&sources[i], real) {
+                    self.logs.insert((i, bytes), log);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Where a source's logs really are (its root may be a symlink), if it is there.
+fn real_root(source: &Source, warnings: &mut Vec<String>) -> Option<PathBuf> {
+    if source.harness == Harness::Grok {
+        return None;
+    }
+    match std::fs::canonicalize(&source.path) {
+        Ok(real) if real.is_dir() => Some(real),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        _ => {
+            warnings.push(format!(
+                "{}: Usage directory could not be read.",
+                source.harness
+            ));
+            None
+        }
+    }
+}
+
+fn log_file(source: &Source, path: PathBuf) -> Option<LogFile> {
+    let m = std::fs::metadata(&path).ok()?;
+    Some(LogFile {
+        harness: source.harness,
+        signature: signature(&m),
+        key: format!("{}:{}", source.harness, path.display()),
+        path,
+    })
+}
+
 /// A signature changes on any write or replacement, including same-size rewrites that
 /// restore the modification time.
 fn signature(m: &std::fs::Metadata) -> String {
@@ -329,67 +456,42 @@ fn jsonl_name(name: &str) -> bool {
     }
 }
 
-/// Every log in token-tracker's order: each source root (which may be a symlink) walked
-/// without following nested symlinks, paths sorted.
-fn list_logs(sources: &[Source]) -> (Vec<LogFile>, Vec<String>) {
-    let mut logs = Vec::new();
-    let mut warnings = Vec::new();
-    for source in sources.iter().filter(|s| s.harness != Harness::Grok) {
-        let real = match std::fs::canonicalize(&source.path) {
-            Ok(real) if real.is_dir() => real,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-            _ => {
-                warnings.push(format!(
-                    "{}: Usage directory could not be read.",
-                    source.harness
-                ));
-                continue;
-            }
+/// Lists the logs under `dir`, keyed in token-tracker's order: by source, then path
+/// bytes, without following nested symlinks.
+fn walk(
+    sources: &[Source],
+    i: usize,
+    dir: &Path,
+    into: &mut BTreeMap<(usize, Vec<u8>), LogFile>,
+    warnings: &mut Vec<String>,
+) {
+    let mut problems = 0;
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            problems += 1;
+            continue;
         };
-        let mut paths = Vec::new();
-        let mut problems = 0;
-        let mut pending = vec![real];
-        while let Some(dir) = pending.pop() {
-            let Ok(entries) = std::fs::read_dir(&dir) else {
-                problems += 1;
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else {
                 continue;
             };
-            for entry in entries.flatten() {
-                let Ok(kind) = entry.file_type() else {
-                    continue;
-                };
-                if kind.is_dir() {
-                    pending.push(entry.path());
-                } else if kind.is_file() && jsonl_name(&entry.file_name().to_string_lossy()) {
-                    paths.push(entry.path());
-                }
+            if kind.is_dir() {
+                pending.push(entry.path());
+            } else if kind.is_file()
+                && jsonl_name(&entry.file_name().to_string_lossy())
+                && let Some(log) = log_file(&sources[i], entry.path())
+            {
+                into.insert((i, log.path.as_os_str().as_encoded_bytes().to_vec()), log);
             }
-        }
-        if problems > 0 {
-            warnings.push(format!(
-                "{}: some directories could not be read.",
-                source.harness
-            ));
-        }
-        paths.sort_by(|a, b| {
-            a.as_os_str()
-                .as_encoded_bytes()
-                .cmp(b.as_os_str().as_encoded_bytes())
-        });
-        for path in paths {
-            let Ok(m) = std::fs::metadata(&path) else {
-                continue;
-            };
-            let key = format!("{}:{}", source.harness, path.display());
-            logs.push(LogFile {
-                harness: source.harness,
-                signature: signature(&m),
-                key,
-                path,
-            });
         }
     }
-    (logs, warnings)
+    if problems > 0 {
+        warnings.push(format!(
+            "{}: some directories could not be read.",
+            sources[i].harness
+        ));
+    }
 }
 
 const TAIL: u64 = 64;
@@ -449,7 +551,7 @@ fn resumable(file: &mut File, resume: Resume) -> Option<Resume> {
 }
 
 fn parse_all(
-    logs: &[LogFile],
+    logs: &[&LogFile],
     stale: &[usize],
     prior: HashMap<usize, (Parsed, Resume)>,
     workers: usize,
@@ -462,7 +564,7 @@ fn parse_all(
             scope.spawn(|| {
                 while let Some(&i) = stale.get(next.fetch_add(1, Ordering::Relaxed)) {
                     let before = prior.lock().remove(&i);
-                    let parsed = parse_file(&logs[i], before);
+                    let parsed = parse_file(logs[i], before);
                     if let Some(entry) = parsed.and_then(|(p, r)| cache::Entry::new(p, r).ok()) {
                         results.lock().insert(i, entry);
                     }
@@ -645,16 +747,18 @@ mod tests {
             Collector::open(sources, &root.join("cache.sqlite")).unwrap()
         }
 
-        fn append(&self, file: &str, lines: &[String]) {
+        fn append(&mut self, file: &str, lines: &[String]) {
             use std::io::Write;
+            let path = self.root.join(file);
             let mut f = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(self.root.join(file))
+                .open(&path)
                 .unwrap();
             for line in lines {
                 writeln!(f, "{line}").unwrap();
             }
+            self.collector.changed([path]);
         }
 
         fn pass(&mut self) -> Collection {
@@ -767,12 +871,57 @@ mod tests {
             &[claude_line("s1", "r1", "m1", 1, false)],
         );
         f.pass();
+        let log = f.root.join("claude/projects/p/s1.jsonl");
+        std::fs::write(&log, claude_line("s1", "r2", "m2", 2, false) + "\n").unwrap();
+        f.collector.changed([log]);
+        assert_eq!(f.ids(), ["claude:message:m2:r2"]);
+    }
+
+    #[test]
+    fn reported_paths_keep_the_listing_whole() {
+        let mut f = Fixture::new("listing");
+        f.append(
+            "claude/projects/p/s1.jsonl",
+            &[claude_line("s1", "r1", "m1", 1, false)],
+        );
+        f.pass();
+        let listed = |c: &Collector| -> Vec<(String, String)> {
+            c.listing
+                .as_ref()
+                .unwrap()
+                .logs
+                .values()
+                .map(|l| (l.key.clone(), l.signature.clone()))
+                .collect()
+        };
+        let check = |f: &mut Fixture, change: &str, want: &[&str]| {
+            f.collector.changed([f.root.join(change)]);
+            assert_eq!(f.ids(), want, "{change}");
+            let kept = listed(&f.collector);
+            f.collector.rescan();
+            f.collector.list();
+            assert_eq!(kept, listed(&f.collector), "{change} lists as a walk would");
+        };
+        let q = f.root.join("claude/projects/q/s3/subagents");
+        std::fs::create_dir_all(&q).unwrap();
         std::fs::write(
-            f.root.join("claude/projects/p/s1.jsonl"),
-            claude_line("s1", "r2", "m2", 2, false) + "\n",
+            q.join("a.jsonl"),
+            claude_line("s3", "r3", "m3", 3, false) + "\n",
         )
         .unwrap();
-        assert_eq!(f.ids(), ["claude:message:m2:r2"]);
+        check(&mut f, "claude/projects/q", &["claude:message:m3:r3"]);
+        std::fs::write(
+            q.join("b.jsonl"),
+            claude_line("s4", "r4", "m4", 4, false) + "\n",
+        )
+        .unwrap();
+        check(
+            &mut f,
+            "claude/projects/q/s3/subagents/b.jsonl",
+            &["claude:message:m4:r4"],
+        );
+        std::fs::remove_dir_all(f.root.join("claude/projects/q")).unwrap();
+        check(&mut f, "claude/projects/q", &[]);
     }
 
     fn copy_dir(from: &Path, to: &Path) {
