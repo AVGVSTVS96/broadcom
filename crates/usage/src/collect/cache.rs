@@ -2,7 +2,9 @@
 //! session links between logs, and the T3 metadata the last pass saw. It is a cache: a
 //! missing or outdated file is rebuilt by one full pass.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
+
+use foldhash::{HashMap, HashSet, HashSetExt};
 use std::io::{Read, Write};
 use std::path::Path;
 

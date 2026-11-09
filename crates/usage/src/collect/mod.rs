@@ -14,7 +14,9 @@ mod repository;
 mod t3;
 
 use parking_lot::Mutex;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::BTreeMap;
+
+use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
@@ -70,7 +72,7 @@ pub struct Collector {
     db: Connection,
     listing: Option<Listing>,
     changed: HashSet<PathBuf>,
-    sent: foldhash::HashMap<u64, u64>,
+    sent: HashMap<u64, u64>,
     hashes: foldhash::fast::RandomState,
 }
 
@@ -202,7 +204,7 @@ impl Collector {
             db: cache::open(cache_path)?,
             listing: None,
             changed: HashSet::new(),
-            sent: foldhash::HashMap::default(),
+            sent: HashMap::new(),
             hashes: foldhash::fast::RandomState::default(),
         })
     }
