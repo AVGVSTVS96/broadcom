@@ -306,7 +306,14 @@ const TileValue = ({ unit, value }: { unit: Unit; value: number | null }) => {
 
   return (
     <div className="flex items-baseline gap-1 truncate">
-      <span className="text-3xl tracking-tight tabular-nums sm:text-4xl">{number}</span>
+      <span
+        className={cn(
+          "text-3xl tracking-tight tabular-nums sm:text-4xl",
+          unit === "tokens" && "text-tokens",
+        )}
+      >
+        {number}
+      </span>
       <span className="text-sm text-muted-foreground">{rest.join(" ")}</span>
     </div>
   );
@@ -344,6 +351,61 @@ const Tiles = ({ usage }: { usage: Usage }) => {
         </button>
       ))}
     </fieldset>
+  );
+};
+
+const share = (part: number, whole: number) => {
+  if (whole <= 0) {
+    return "–";
+  }
+
+  const value = (part / whole) * 100;
+
+  return value > 0 && value < 1 ? "<1%" : `${Math.round(value)}%`;
+};
+
+const Mix = ({ usage }: { usage: Usage }) => {
+  const { mix } = usage.total;
+
+  const parts = [
+    { fill: "bg-tokens", label: "Cache reads", value: mix.cacheRead },
+    { fill: "bg-tokens/60", label: "Cache writes", value: mix.cacheWrite },
+    { fill: "bg-tokens/35", label: "Output", value: mix.output },
+    { fill: "bg-tokens/20", label: "Input", value: mix.input },
+  ];
+
+  const whole = parts.reduce((sum, part) => sum + part.value, 0);
+
+  return whole <= 0 ? null : (
+    <div className="space-y-4">
+      <div className="flex h-3 gap-0.5">
+        {parts.map((part) => (
+          <span
+            key={part.label}
+            className={cn("h-full rounded-full", part.fill)}
+            style={{ flexBasis: 0, flexGrow: part.value / whole, minWidth: "3px" }}
+          />
+        ))}
+      </div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        {parts.map((part) => (
+          <div key={part.label} className="min-w-0 space-y-1">
+            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span aria-hidden className={cn("size-2 shrink-0 rounded-[2px]", part.fill)} />
+              {part.label}
+            </dt>
+            <dd className="flex items-baseline gap-2 whitespace-nowrap">
+              <span className="text-2xl font-light tracking-tight tabular-nums">
+                {format("tokens", part.value)}
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {share(part.value, whole)}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 };
 
@@ -508,7 +570,7 @@ const Line = ({
   const { params, go } = useNav();
   const { unit } = usage.query;
   const value = row.values[unit];
-  const fill = fillOf(usage.layers, row.key);
+  const fill = fillOf(usage.layers, row.key, unit);
   const next = new URLSearchParams(params);
 
   if (picked) {
@@ -586,7 +648,7 @@ const Breakdown = ({ usage }: { usage: Usage }) => {
   return (
     <div className="min-w-0 space-y-4">
       <h3 className="text-sm">Breakdown</h3>
-      <Parts layers={usage.layers} label={`${unitName(unit)} by part`} />
+      <Parts layers={usage.layers} label={`${unitName(unit)} by part`} unit={unit} />
       <ul className="space-y-4">
         {usage.layers.map((layer, index) => {
           const sum = sums[index] ?? 0;
@@ -597,7 +659,10 @@ const Breakdown = ({ usage }: { usage: Usage }) => {
                 <span className="flex min-w-0 items-center gap-2">
                   <span
                     aria-hidden
-                    className={cn("size-2 shrink-0 rounded-[2px]", fillOf(usage.layers, layer.key))}
+                    className={cn(
+                      "size-2 shrink-0 rounded-[2px]",
+                      fillOf(usage.layers, layer.key, unit),
+                    )}
                   />
                   <span className="truncate">{layer.label}</span>
                 </span>
@@ -605,7 +670,7 @@ const Breakdown = ({ usage }: { usage: Usage }) => {
               </div>
               <div className="h-1 rounded-full bg-track">
                 <div
-                  className={cn("h-full rounded-full", fillOf(usage.layers, layer.key))}
+                  className={cn("h-full rounded-full", fillOf(usage.layers, layer.key, unit))}
                   style={{
                     width: `${whole > 0 ? (sum / whole) * 100 : 0}%`,
                   }}
@@ -685,6 +750,7 @@ const Body = ({ usage }: { usage: Usage }) => (
     <Section title={verdictOf(usage)} detail={evidenceOf(usage)}>
       <div className="space-y-6">
         <Tiles usage={usage} />
+        {usage.query.unit === "tokens" ? <Mix usage={usage} /> : null}
         {usage.rows.length === 0 && usage.selected === null ? (
           <p className="py-10 text-center text-muted-foreground">Nothing matches.</p>
         ) : (
