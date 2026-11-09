@@ -5,7 +5,7 @@ import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/p
 import type { Points } from "@/lib/pool/history";
 import { namesOf } from "@/lib/pool/names";
 import { windowPace } from "@/lib/pool/pace";
-import { logins } from "@/lib/pool/pool";
+import { logins, plansOf, poolOf } from "@/lib/pool/pool";
 import { windows } from "@/lib/pool/timeline";
 import { weeksOf, withHistory } from "@/lib/pool/weeks";
 import type { Outlook } from "@/lib/pool/weeks";
@@ -220,6 +220,32 @@ describe("pool", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.name).toBe("me");
     expect(result[0]?.grants).toHaveLength(1);
+  });
+});
+
+const reading = (id: string, used: number | null): Account => ({
+  ...account(id, `${id}@x.com`),
+  fiveHour: window(used),
+});
+
+describe("session pool", () => {
+  test("a plan with no reading stays out of the sum and the total", () => {
+    const plans = plansOf(
+      {
+        a: reading("a", 8),
+        b: reading("b", null),
+        c: reading("c", null),
+      },
+      [],
+      {},
+      resetsAt,
+    );
+
+    const { session } = poolOf(plans);
+
+    expect(session.total).toBe(100);
+    expect(session.left).toBe(92);
+    expect(session.parts).toHaveLength(1);
   });
 });
 
