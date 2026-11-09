@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
-import { clock, dollars, plural, times } from "@/lib/time/format";
+import { dollars, plural, times, when } from "@/lib/time/format";
 import type { Part, Source, Wallet } from "@/lib/usage/wallet";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +39,7 @@ const Tile = ({
   </Stat>
 );
 
-const Tiles = ({ wallet }: { wallet: Wallet }) => {
+const Tiles = ({ wallet, now }: { wallet: Wallet; now: number }) => {
   const { credit } = wallet;
 
   return (
@@ -70,7 +70,7 @@ const Tiles = ({ wallet }: { wallet: Wallet }) => {
           }
           unit="left"
         >
-          Of {dollars(credit.granted)}, ends {clock(credit.ends)}
+          Of {dollars(credit.granted)}, ends {when(credit.ends, now)}
         </Tile>
       )}
     </div>
@@ -232,7 +232,7 @@ const footnote = (wallet: Wallet) =>
     .filter((part) => part !== null)
     .join(" · ");
 
-export const WalletView = ({ wallet }: { wallet: Wallet }) => {
+export const WalletView = ({ wallet, now }: { wallet: Wallet; now: number }) => {
   const [top] = wallet.sources;
 
   return (
@@ -245,7 +245,7 @@ export const WalletView = ({ wallet }: { wallet: Wallet }) => {
         }
         detail="Last 30 days, against what the plans cost a month."
       >
-        <Tiles wallet={wallet} />
+        <Tiles wallet={wallet} now={now} />
       </Section>
       {top === undefined ? null : (
         <Section
