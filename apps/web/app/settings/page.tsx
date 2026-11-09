@@ -15,7 +15,10 @@ const read = async () => {
     ? { ...settings.value, problem: null }
     : {
         facts: null,
-        problem: `The proxy config didn't load: ${settings.reason}`,
+        problem:
+          settings.reason === "HTTP 404"
+            ? "broadcom-proxy keeps its settings in ~/.config/broadcom-proxy/config.json. Its cutoffs are on Accounts."
+            : `The proxy config didn't load: ${settings.reason}`,
         raw: "",
         values: null,
       };
