@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { SearchInput } from "@/components/ui/search-input";
 import { Side, Tools } from "@/features/files/bench";
 import { CopyButton } from "@/features/files/copy-button";
 import { FileBar } from "@/features/files/file-bar";
@@ -49,15 +50,13 @@ export const HistoryView = ({
     <>
       <Side title="Commits">
         <div className="space-y-2 p-2">
-          <input
-            type="search"
+          <SearchInput
             value={filter}
             onChange={(event) => {
               setFilter(event.target.value);
             }}
             placeholder="Filter commits"
             aria-label="Filter commits"
-            className="h-8 w-full rounded-lg border bg-transparent px-2.5 text-sm outline-none placeholder:text-faint focus-visible:ring-2 focus-visible:ring-ring/50"
           />
           {path !== "" && (
             <div className="flex items-center gap-1 rounded-lg bg-muted py-1 pr-1 pl-2.5 text-xs">

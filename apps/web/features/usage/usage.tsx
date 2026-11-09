@@ -1,9 +1,10 @@
 "use client";
 
-import { SearchIcon, XIcon } from "lucide-react";
+import { XIcon } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { SearchInput } from "@/components/ui/search-input";
 import { Legend } from "@/components/viz/legend";
 import { Section } from "@/components/viz/section";
 import { fillOf, Parts, Stack } from "@/features/usage/charts";
@@ -97,19 +98,15 @@ const Search = () => {
   }, [text, value, go]);
 
   return (
-    <label className="flex h-9 w-full items-center gap-2 rounded-full bg-muted px-3 text-sm sm:w-64">
-      <SearchIcon aria-hidden className="size-4 text-muted-foreground" />
-      <input
-        type="search"
-        aria-label="Search names and projects"
-        placeholder="Search"
-        value={text}
-        onChange={(event) => {
-          setText(event.currentTarget.value);
-        }}
-        className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-      />
-    </label>
+    <SearchInput
+      aria-label="Search names and projects"
+      placeholder="Search"
+      value={text}
+      onChange={(event) => {
+        setText(event.currentTarget.value);
+      }}
+      className="sm:w-64"
+    />
   );
 };
 

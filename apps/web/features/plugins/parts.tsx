@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
 import { filesHref } from "@/features/files/urls";
 import { setPlugin } from "@/features/plugins/actions";
@@ -76,15 +77,14 @@ export const Skills = ({ skills }: { skills: readonly Skill[] }) => {
 
   return (
     <div className="space-y-3">
-      <input
-        type="search"
+      <SearchInput
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
         }}
         placeholder={`Search ${skills.length} skills`}
         aria-label="Search skills"
-        className="h-9 w-full max-w-sm rounded-xl border bg-transparent px-3 text-sm outline-none placeholder:text-faint focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="max-w-sm"
       />
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {shown.map((skill) => (
