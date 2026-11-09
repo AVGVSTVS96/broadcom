@@ -46,9 +46,9 @@ pub struct Sources {
     pub max_workers: usize,
 }
 
-/// One pass's result: the records that may have changed since the previous pass (every
-/// record on a cold cache), priced and sorted by time and id, and the ids proved to be
-/// replays that earlier passes may have reported.
+/// One pass's result: the records that changed since a pass delivered them (every record
+/// on a cold cache or a fresh start), priced and sorted by time and id, and the ids proved
+/// to be replays that earlier passes may have reported.
 #[derive(Debug, Clone, Default)]
 pub struct Collection {
     pub events: Vec<Event>,
@@ -70,6 +70,8 @@ pub struct Collector {
     db: Connection,
     listing: Option<Listing>,
     changed: HashSet<PathBuf>,
+    sent: foldhash::HashMap<u64, u64>,
+    hashes: foldhash::fast::RandomState,
 }
 
 /// A full walk this old is taken again, in case a change went unreported.
@@ -200,6 +202,8 @@ impl Collector {
             db: cache::open(cache_path)?,
             listing: None,
             changed: HashSet::new(),
+            sent: foldhash::HashMap::default(),
+            hashes: foldhash::fast::RandomState::default(),
         })
     }
 
@@ -321,8 +325,28 @@ impl Collector {
         let mut collection = build(files, &t3_now, policy, &self.device_id);
         warnings.append(&mut collection.warnings);
         collection.warnings = warnings;
+        let hash = |bytes: &[u8]| std::hash::BuildHasher::hash_one(&self.hashes, bytes);
+        let sent: Vec<(u64, u64)> = collection
+            .events
+            .iter()
+            .map(|e| {
+                let record = serde_json::to_vec(e).unwrap_or_default();
+                (hash(e.id.as_bytes()), hash(&record))
+            })
+            .collect();
+        let mut unsent = sent.iter().map(|(id, h)| self.sent.get(id) != Some(h));
+        collection.events.retain(|_| unsent.next().unwrap_or(true));
+        let retracted: Vec<u64> = collection
+            .retracted_ids
+            .iter()
+            .map(|id| hash(id.as_bytes()))
+            .collect();
         deliver(collection)?;
         tx.commit()?;
+        self.sent.extend(sent);
+        for id in retracted {
+            self.sent.remove(&id);
+        }
         Ok(())
     }
 }
@@ -813,9 +837,16 @@ mod tests {
             "claude/projects/p/s1.jsonl",
             &[claude_line("s1", "r4", "m4", 4, false)],
         );
-        assert_eq!(f.ids(), ["claude:message:m1:r1", "claude:message:m4:r4"]);
-        let warm = f.pass().events;
-        assert_eq!(warm, []);
+        let by_id = |events: Vec<Event>| -> BTreeMap<String, Event> {
+            events.into_iter().map(|e| (e.id.clone(), e)).collect()
+        };
+        let mut held = by_id(f.pass().events);
+        assert_eq!(
+            held.keys().collect::<Vec<_>>(),
+            ["claude:message:m1:r1", "claude:message:m4:r4"],
+            "a fresh start sends every record the change can touch"
+        );
+        assert_eq!(f.pass().events, []);
 
         let fresh_root = f.root.with_extension("fresh");
         let _ = std::fs::remove_dir_all(&fresh_root);
@@ -824,28 +855,22 @@ mod tests {
             collector: Fixture::open(&fresh_root),
             root: fresh_root,
         };
-        let mut all = fresh.pass().events;
-        all.retain(|e| e.session_id == "s1");
-        f.append(
-            "claude/projects/p/s1.jsonl",
-            &[claude_line("s1", "r5", "m5", 5, false)],
-        );
-        fresh.append(
-            "claude/projects/p/s1.jsonl",
-            &[claude_line("s1", "r5", "m5", 5, false)],
-        );
+        let m5 = [claude_line("s1", "r5", "m5", 5, false)];
+        f.append("claude/projects/p/s1.jsonl", &m5);
+        fresh.append("claude/projects/p/s1.jsonl", &m5);
         let appended = f.pass().events;
-        let expected: Vec<Event> = fresh
-            .pass()
-            .events
-            .into_iter()
-            .filter(|e| e.session_id == "s1")
-            .collect();
         assert_eq!(
-            appended, expected,
+            appended.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(),
+            ["claude:message:m5:r5"],
+            "only the new record is sent"
+        );
+        held.extend(by_id(appended));
+        let mut expected = by_id(fresh.pass().events);
+        expected.retain(|_, e| e.session_id == "s1");
+        assert_eq!(
+            held, expected,
             "an appended log reads the same as a fresh parse"
         );
-        assert_eq!(all.len() + 1, appended.len());
     }
 
     #[test]
