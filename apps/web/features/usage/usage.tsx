@@ -268,7 +268,7 @@ const evidenceOf = (usage: Usage) => {
 
   if (coverage === null || coverage.read.length === coverage.active) {
     return unit === "fiveHour" && agentSdk.fiveHour !== null && agentSdk.share >= 0.05
-      ? `${lead} The Agent SDK counts ${agentSdk.factor}× here, so its ${Math.round(agentSdk.share * 100)}% of spend took ${Math.round(agentSdk.fiveHour * 100)}% of points.`
+      ? `${lead} The Agent SDK took ${Math.round(agentSdk.share * 100)}% of spend and ${Math.round(agentSdk.fiveHour * 100)}% of points.`
       : lead;
   }
 
