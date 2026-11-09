@@ -491,19 +491,23 @@ export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: numbe
                   );
                 })}
                 {lockFrom === null ? null : (
-                  <>
-                    <span
-                      className="absolute -top-8 -translate-x-1/2 text-xs whitespace-nowrap text-bad"
-                      style={{
-                        left: `${Math.min(80, fraction(focus.pace, lockFrom))}%`,
-                      }}
-                    >
-                      {focus.pace.locked ? "Ran out" : "Runs out"} {when(lockFrom, now)}
+                  <span
+                    className={cn(
+                      "absolute -top-8 text-xs whitespace-nowrap text-bad",
+                      fraction(focus.pace, lockFrom) > 50 ? "right-0" : "-translate-x-1/2",
+                    )}
+                    style={
+                      fraction(focus.pace, lockFrom) > 50
+                        ? undefined
+                        : { left: `${fraction(focus.pace, lockFrom)}%` }
+                    }
+                  >
+                    {focus.pace.locked ? "Ran out" : "Runs out"} {when(lockFrom, now)}
+                    <span className="max-sm:hidden">
+                      {" · locked "}
+                      {duration(lockedFor(focus.pace))}
                     </span>
-                    <span className="absolute -top-8 right-0 text-xs text-bad max-sm:hidden">
-                      Locked {duration(lockedFor(focus.pace))}
-                    </span>
-                  </>
+                  </span>
                 )}
                 {hover === null ? null : (
                   <div
