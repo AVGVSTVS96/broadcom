@@ -5,21 +5,26 @@ import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
 import type { Points } from "@/lib/pool/history";
 import { plansOf, poolOf, workingOn } from "@/lib/pool/pool";
-import type { Grant } from "@/lib/proxy/schema";
+import type { Grant, TokensView } from "@/lib/proxy/schema";
 import { plural } from "@/lib/time/format";
+import { tokenStats } from "@/lib/usage/tokens";
+import { format } from "@/lib/usage/usage";
 
 import { PaceSection } from "./pace";
 import { PlanRows } from "./plans";
 import { Pools } from "./pools";
+import { TokensSection } from "./tokens";
 
 export const Overview = ({
   history,
   grants,
+  tokens,
   problems,
   rendered,
 }: {
   history: Readonly<Record<string, Points>>;
   grants: readonly Grant[] | null;
+  tokens: TokensView | null;
   problems: readonly string[];
   rendered: number;
 }) => {
@@ -33,6 +38,7 @@ export const Overview = ({
 
   const working = workingOn(sessions);
   const total = [...working.values()].reduce((sum, list) => sum + list.length, 0);
+  const stats = tokens === null ? null : tokenStats(tokens, now);
 
   return (
     <div className="space-y-10">
@@ -52,10 +58,19 @@ export const Overview = ({
               {summary.open.length === 1 ? "has" : "have"} room
             </span>
           </h1>
-          <p className="text-muted-foreground">{plural(total, "session")} working</p>
+          <p className="text-muted-foreground">
+            {plural(total, "session")} working
+            {stats === null ? null : (
+              <>
+                {" · "}
+                <span className="text-tokens">{format("tokens", stats.today)}</span> tokens today
+              </>
+            )}
+          </p>
         </div>
         <Problems problems={problems} />
         <Pools summary={summary} creditProblem={grants === null ? "Didn't load" : null} now={now} />
+        {stats === null ? null : <TokensSection stats={stats} />}
         <PlanRows plans={plans} working={working} next={pool?.next ?? null} now={now} />
       </section>
       <PaceSection plans={plans} now={now} />
