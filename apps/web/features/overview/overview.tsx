@@ -25,12 +25,14 @@ export const Overview = ({
 }) => {
   const accounts = useLive((live) => live.accounts);
   const pool = useLive((live) => live.pool);
+  const sessions = useLive((live) => live.sessions);
   const now = useNow(rendered);
   const plans = plansOf(accounts, grants ?? [], history, now);
   const summary = poolOf(plans);
   const next = plans.find((plan) => plan.id === pool?.next);
 
-  const active = Object.values(accounts).reduce((sum, account) => sum + account.working, 0);
+  const working = Object.values(sessions).filter((session) => session.state === "working");
+  const workingBy = Map.groupBy(working, (session) => session.account);
 
   return (
     <div className="space-y-10">
@@ -50,13 +52,11 @@ export const Overview = ({
               {summary.open.length === 1 ? "has" : "have"} room
             </span>
           </h1>
-          <p className="text-muted-foreground">
-            {plural(active, "session")} active in the last 2 min
-          </p>
+          <p className="text-muted-foreground">{plural(working.length, "session")} working</p>
         </div>
         <Problems problems={problems} />
         <Pools summary={summary} creditProblem={grants === null ? "Didn't load" : null} now={now} />
-        <PlanRows plans={plans} next={pool?.next ?? null} now={now} />
+        <PlanRows plans={plans} working={workingBy} next={pool?.next ?? null} now={now} />
       </section>
       <PaceSection plans={plans} now={now} />
     </div>

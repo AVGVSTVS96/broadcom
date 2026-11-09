@@ -115,8 +115,8 @@ const Credit = ({ plan }: { plan: Plan }) => {
   );
 };
 
-const facts = (plan: Plan, now: number) => {
-  const { heldResets, resetsSpent = [], working } = plan.account;
+const facts = (plan: Plan, working: number, now: number) => {
+  const { heldResets, resetsSpent = [] } = plan.account;
   const held = heldResets.reduce((sum, reset) => sum + reset.left, 0);
   const spent = resetsSpent.filter((at) => now - at < WEEK).length;
 
@@ -129,10 +129,12 @@ const facts = (plan: Plan, now: number) => {
 
 export const PlanRows = ({
   plans,
+  working,
   next,
   now,
 }: {
   plans: readonly Plan[];
+  working: ReadonlyMap<string | null, readonly unknown[]>;
   next: string | null;
   now: number;
 }) => (
@@ -149,7 +151,10 @@ export const PlanRows = ({
             <span className={cn("truncate", plan.id === next && "text-brand")}>{plan.name}</span>
           </div>
           <div className="truncate text-sm text-muted-foreground">
-            {[plan.account.plan || "API key", ...facts(plan, now)].join(" · ")}
+            {[
+              plan.account.plan || "API key",
+              ...facts(plan, working.get(plan.id)?.length ?? 0, now),
+            ].join(" · ")}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 sm:gap-6">
