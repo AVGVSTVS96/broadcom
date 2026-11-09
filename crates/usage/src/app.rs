@@ -201,6 +201,56 @@ pub fn start(app: Arc<App>) {
     });
 }
 
+/// The folders to watch for transcripts. A folder that doesn't exist yet is not created:
+/// the nearest existing folder above it is watched instead, and `arm` moves the watch
+/// onto the folder itself once it appears.
+struct Roots {
+    wanted: Vec<PathBuf>,
+    watching: std::collections::HashSet<PathBuf>,
+    waiting_on: std::collections::HashSet<PathBuf>,
+}
+
+impl Roots {
+    fn new(wanted: Vec<PathBuf>) -> Self {
+        Self {
+            wanted,
+            watching: std::collections::HashSet::default(),
+            waiting_on: std::collections::HashSet::default(),
+        }
+    }
+
+    /// Returns whether a folder was newly watched, so the files already in it get read.
+    fn arm(&mut self, watcher: &mut impl Watcher) -> bool {
+        let mut armed = false;
+        for root in &self.wanted {
+            if self.watching.contains(root) {
+                continue;
+            }
+            if root.is_dir() {
+                match watcher.watch(root, RecursiveMode::Recursive) {
+                    Ok(()) => {
+                        armed = true;
+                        self.watching.insert(root.clone());
+                    }
+                    Err(e) => tracing::warn!("watching {}: {e}", root.display()),
+                }
+            } else if let Some(above) = root.ancestors().skip(1).find(|p| p.is_dir())
+                && self.waiting_on.insert(above.to_path_buf())
+            {
+                tracing::info!(
+                    "{} not there yet; watching {}",
+                    root.display(),
+                    above.display()
+                );
+                if let Err(e) = watcher.watch(above, RecursiveMode::NonRecursive) {
+                    tracing::warn!("watching {}: {e}", above.display());
+                }
+            }
+        }
+        armed
+    }
+}
+
 /// Collects this machine's transcripts into the store, then again whenever they change:
 /// once writes go quiet for a second, or five seconds into a steady stream.
 fn collect(app: &App) {
@@ -227,12 +277,11 @@ fn collect(app: &App) {
     else {
         return;
     };
-    for root in collector.roots() {
-        if let Err(e) = watcher.watch(&root, RecursiveMode::Recursive) {
-            tracing::debug!("watching {}: {e}", root.display());
-        }
-    }
+    let mut roots = Roots::new(collector.roots());
     loop {
+        if roots.arm(&mut watcher) {
+            collector.rescan();
+        }
         let policy = app.pricing.policy();
         let device = app.local().clone();
         let result = collector.collect(&policy, |c| {
@@ -430,4 +479,33 @@ pub async fn sessions(State(app): State<Arc<App>>, RawQuery(query): RawQuery) ->
 
 pub async fn credits(State(app): State<Arc<App>>) -> Response {
     reply(app.deck.credits().await.as_ref().clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_root_that_appears_later_is_watched_without_being_created() {
+        let base = std::env::temp_dir().join(format!("app-roots-{}", std::process::id()));
+        let root = base.join("tool/sessions");
+        std::fs::create_dir_all(&base).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = notify::recommended_watcher(move |event| {
+            let _ = tx.send(event);
+        })
+        .unwrap();
+        let mut roots = Roots::new(vec![root.clone()]);
+        assert!(!roots.arm(&mut watcher));
+        assert!(!root.exists());
+
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(rx.recv_timeout(Duration::from_secs(5)).is_ok());
+        assert!(roots.arm(&mut watcher));
+        while rx.try_recv().is_ok() {}
+        std::fs::write(root.join("late.jsonl"), "{}").unwrap();
+        let seen = rx.recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        assert!(seen.paths.iter().any(|p| p.starts_with(&root)));
+        std::fs::remove_dir_all(base).unwrap();
+    }
 }
