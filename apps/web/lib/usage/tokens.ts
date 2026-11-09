@@ -95,15 +95,12 @@ const sum = (values: readonly number[]) => {
 const quantile = (sorted: readonly number[], q: number) =>
   sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
 
-const shown = 4;
+const shown = 3;
 
 export const tokenStats = (view: TokensView, now: number, weekCount = 53): TokenStats => {
   const today = todayIn(view.timezone, now);
   const byDay = new Map(view.days.map((entry) => [dayOf(entry.day), entry.tokens]));
   const tokensOn = (day: number) => byDay.get(day) ?? 0;
-
-  const sumSince = (days: number) =>
-    sum(view.days.filter((entry) => dayOf(entry.day) > today - days).map((entry) => entry.tokens));
 
   const total = sum(view.days.map((entry) => entry.tokens));
   const cache = sum(view.days.map((entry) => entry.cacheRead));
@@ -170,12 +167,12 @@ export const tokenStats = (view: TokensView, now: number, weekCount = 53): Token
     best,
     cacheShare: total > 0 ? cache / total : null,
     models,
-    month: sumSince(30),
+    month: view.last30d,
     since: view.days[0] === undefined ? null : utcOfDay(dayOf(view.days[0].day)),
     streak,
     today: tokensOn(today),
     total,
-    week: sumSince(7),
+    week: view.last7d,
     weeks,
   };
 };

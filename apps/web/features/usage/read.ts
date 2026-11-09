@@ -116,7 +116,6 @@ export interface Usage {
     readonly values: Values;
     readonly sessions: number;
     readonly previous: Values | null;
-    readonly cacheHit: number | null;
     readonly mix: Mix;
   };
   readonly agentSdk: {
@@ -208,12 +207,10 @@ const totalsOf = (view: UsageView, searching: boolean) =>
             values: valuesOf(row.amount, row.points),
           })),
         ),
-        cacheHit: null,
         mix: mixOf(view.rows.map((row) => row.amount)),
         previous: null,
       }
     : {
-        cacheHit: view.totals.cacheHitRate,
         mix: mixOf([view.totals]),
         previous: view.previous === null ? null : valuesOf(view.previous, view.previous.points),
         series: sumSeries(view.series.map((line) => line.values)),
@@ -375,7 +372,6 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     size,
     ticks: view.buckets.map((bucket) => bucketLabel(bucket.at, size, zone)),
     total: {
-      cacheHit: total.cacheHit,
       mix: total.mix,
       previous: total.previous,
       sessions: total.sessions,

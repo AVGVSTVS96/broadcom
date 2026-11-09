@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 
 export const heat = {
   0: "bg-track",
-  1: "bg-tokens/20",
-  2: "bg-tokens/40",
+  1: "bg-tokens/30",
+  2: "bg-tokens/50",
   3: "bg-tokens/70",
   4: "bg-tokens",
 } as const satisfies Record<Level, string>;
@@ -79,7 +79,7 @@ export const HeatLegend = () => (
   <span className="flex items-center gap-1">
     Less
     {([0, 1, 2, 3, 4] as const).map((level) => (
-      <span key={level} aria-hidden className={cn("size-2.5 rounded-[3px]", heat[level])} />
+      <span key={level} aria-hidden className={cn("size-3 rounded-[3px]", heat[level])} />
     ))}
     More
   </span>

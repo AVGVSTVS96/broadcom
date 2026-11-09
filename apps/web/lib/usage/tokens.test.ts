@@ -13,6 +13,7 @@ const day = (text: string, tokens: number) => ({
 });
 
 const view: TokensView = {
+  at: 0,
   days: [
     day("2026-10-01", 50),
     day("2026-11-05", 400),
@@ -20,6 +21,8 @@ const view: TokensView = {
     day("2026-11-08", 200),
     day("2026-11-09", 300),
   ],
+  last30d: 1000,
+  last7d: 990,
   models: [
     { model: "claude-opus-5-5", tokens: 700 },
     { model: "gpt-6.1-sol", tokens: 200 },
@@ -38,7 +41,7 @@ describe("token stats", () => {
   test("sums days, windows and the best day", () => {
     expect(stats.total).toBe(1050);
     expect(stats.today).toBe(300);
-    expect(stats.week).toBe(1000);
+    expect(stats.week).toBe(990);
     expect(stats.month).toBe(1000);
     expect(stats.best).toEqual({ day: Date.parse("2026-11-05") / 86_400_000, tokens: 400 });
     expect(stats.since).toBe(utcOfDay(Date.parse("2026-10-01") / 86_400_000));
@@ -58,15 +61,14 @@ describe("token stats", () => {
     expect(last[1]?.level).toBeGreaterThan(last[0]?.level ?? 0);
   });
 
-  test("keeps the top four models and folds the rest", () => {
+  test("keeps the top three models and folds the rest", () => {
     expect(stats.models.map((model) => model.label)).toEqual([
       "Opus 5.5",
       "GPT-6.1 Sol",
       "Haiku 5.5",
-      "Fable 5",
       "Everything else",
     ]);
-    expect(stats.models.at(-1)?.tokens).toBe(10);
+    expect(stats.models.at(-1)?.tokens).toBe(70);
   });
 });
 

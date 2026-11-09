@@ -276,6 +276,16 @@ const evidenceOf = (usage: Usage) => {
     : `${lead} Readings on ${read}.`;
 };
 
+const share = (part: number, whole: number) => {
+  if (whole <= 0) {
+    return "–";
+  }
+
+  const value = (part / whole) * 100;
+
+  return value > 0 && value < 1 ? "<1%" : `${Math.round(value)}%`;
+};
+
 const tileNote = (usage: Usage, unit: Unit) => {
   const { total, coverage, query } = usage;
 
@@ -289,7 +299,9 @@ const tileNote = (usage: Usage, unit: Unit) => {
   }
 
   if (unit === "tokens") {
-    return total.cacheHit === null ? null : `${Math.round(total.cacheHit * 100)}% cache reads`;
+    const tokens = total.values.tokens ?? 0;
+
+    return tokens > 0 ? `${share(total.mix.cacheRead, tokens)} cache reads` : null;
   }
 
   if (unit === "plan") {
@@ -301,7 +313,15 @@ const tileNote = (usage: Usage, unit: Unit) => {
     : "Across all plans";
 };
 
-const TileValue = ({ unit, value }: { unit: Unit; value: number | null }) => {
+const TileValue = ({
+  unit,
+  value,
+  selected,
+}: {
+  unit: Unit;
+  value: number | null;
+  selected: boolean;
+}) => {
   const [number, ...rest] = format(unit, value).split(" ");
 
   return (
@@ -309,7 +329,7 @@ const TileValue = ({ unit, value }: { unit: Unit; value: number | null }) => {
       <span
         className={cn(
           "text-3xl tracking-tight tabular-nums sm:text-4xl",
-          unit === "tokens" && "text-tokens",
+          selected && "text-tokens",
         )}
       >
         {number}
@@ -324,7 +344,7 @@ const Tiles = ({ usage }: { usage: Usage }) => {
   const current = params.get("unit") ?? usage.query.unit;
 
   return (
-    <fieldset className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-5">
+    <fieldset className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border md:grid-cols-5">
       <legend className="sr-only">Unit</legend>
       {unitNames.map(([unit, name], index) => (
         <button
@@ -336,7 +356,7 @@ const Tiles = ({ usage }: { usage: Usage }) => {
           }}
           className={cn(
             "group min-w-0 space-y-1.5 bg-card p-4 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-pressed:bg-muted sm:p-5",
-            index === 0 && "col-span-2 sm:col-span-1",
+            index === 0 && "col-span-2 md:col-span-1",
           )}
         >
           <div className="flex items-center gap-2 text-sm text-muted-foreground group-aria-pressed:text-foreground">
@@ -346,22 +366,16 @@ const Tiles = ({ usage }: { usage: Usage }) => {
             />
             {name}
           </div>
-          <TileValue unit={unit} value={usage.total.values[unit]} />
+          <TileValue
+            unit={unit}
+            value={usage.total.values[unit]}
+            selected={unit === "tokens" && current === unit}
+          />
           <div className="min-h-4 text-xs text-muted-foreground">{tileNote(usage, unit)}</div>
         </button>
       ))}
     </fieldset>
   );
-};
-
-const share = (part: number, whole: number) => {
-  if (whole <= 0) {
-    return "–";
-  }
-
-  const value = (part / whole) * 100;
-
-  return value > 0 && value < 1 ? "<1%" : `${Math.round(value)}%`;
 };
 
 const Mix = ({ usage }: { usage: Usage }) => {
@@ -374,7 +388,7 @@ const Mix = ({ usage }: { usage: Usage }) => {
     { fill: "bg-tokens/20", label: "Input", value: mix.input },
   ];
 
-  const whole = parts.reduce((sum, part) => sum + part.value, 0);
+  const whole = usage.total.values.tokens ?? 0;
 
   return whole <= 0 ? null : (
     <div className="space-y-4">
