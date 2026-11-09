@@ -4,7 +4,7 @@ import { Problems } from "@/components/viz/problems";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
 import type { Points } from "@/lib/pool/history";
-import { plansOf, poolOf } from "@/lib/pool/pool";
+import { plansOf, poolOf, workingOn } from "@/lib/pool/pool";
 import type { Grant } from "@/lib/proxy/schema";
 import { plural } from "@/lib/time/format";
 
@@ -31,8 +31,8 @@ export const Overview = ({
   const summary = poolOf(plans);
   const next = plans.find((plan) => plan.id === pool?.next);
 
-  const working = Object.values(sessions).filter((session) => session.state === "working");
-  const workingBy = Map.groupBy(working, (session) => session.account);
+  const working = workingOn(sessions);
+  const total = [...working.values()].reduce((sum, list) => sum + list.length, 0);
 
   return (
     <div className="space-y-10">
@@ -52,11 +52,11 @@ export const Overview = ({
               {summary.open.length === 1 ? "has" : "have"} room
             </span>
           </h1>
-          <p className="text-muted-foreground">{plural(working.length, "session")} working</p>
+          <p className="text-muted-foreground">{plural(total, "session")} working</p>
         </div>
         <Problems problems={problems} />
         <Pools summary={summary} creditProblem={grants === null ? "Didn't load" : null} now={now} />
-        <PlanRows plans={plans} working={workingBy} next={pool?.next ?? null} now={now} />
+        <PlanRows plans={plans} working={working} next={pool?.next ?? null} now={now} />
       </section>
       <PaceSection plans={plans} now={now} />
     </div>

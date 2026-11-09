@@ -4,7 +4,7 @@ import { windowPace } from "@/lib/pool/pace";
 import type { Pace } from "@/lib/pool/pace";
 import { creditTone, poolTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
-import type { Account, Grant } from "@/lib/proxy/schema";
+import type { Account, Grant, LiveSession } from "@/lib/proxy/schema";
 
 export interface Login {
   readonly id: string;
@@ -34,6 +34,12 @@ export const logins = (
     name: nameOf(named, account.id),
   }));
 };
+
+export const workingOn = (sessions: Readonly<Record<string, LiveSession>>) =>
+  Map.groupBy(
+    Object.values(sessions).filter((session) => session.state === "working"),
+    (session) => session.account,
+  );
 
 export const hasRoom = (account: Account) =>
   account.standing !== "limited" && account.standing !== "signed-out";
@@ -90,13 +96,21 @@ export const poolOf = (plans: readonly Plan[]) => {
   const open = subscriptions.filter((plan) => hasRoom(plan.account));
   const grants = plans.flatMap((plan) => plan.grants);
 
-  const week = subscriptions.map((plan): Part => ({
-    id: plan.id,
-    label: plan.name,
-    locked: plan.pace?.locked === true,
-    tone: windowTone(plan.account.week, plan.pace),
-    value: left(plan.account.week.used) ?? 0,
-  }));
+  const week = subscriptions.flatMap((plan): Part[] => {
+    const { used } = plan.account.week;
+
+    return used === null
+      ? []
+      : [
+          {
+            id: plan.id,
+            label: plan.name,
+            locked: plan.pace?.locked === true,
+            tone: windowTone(plan.account.week, plan.pace),
+            value: left(used) ?? 0,
+          },
+        ];
+  });
 
   const session = subscriptions.flatMap((plan): Part[] => {
     const room = hasRoom(plan.account);

@@ -5,11 +5,11 @@ import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/p
 import type { Points } from "@/lib/pool/history";
 import { namesOf } from "@/lib/pool/names";
 import { windowPace } from "@/lib/pool/pace";
-import { logins, plansOf, poolOf } from "@/lib/pool/pool";
+import { logins, plansOf, poolOf, workingOn } from "@/lib/pool/pool";
 import { windows } from "@/lib/pool/timeline";
 import { weeksOf, withHistory } from "@/lib/pool/weeks";
 import type { Outlook } from "@/lib/pool/weeks";
-import type { Account, Grant } from "@/lib/proxy/schema";
+import type { Account, Grant, LiveSession } from "@/lib/proxy/schema";
 import { duration, when } from "@/lib/time/format";
 
 const resetsAt = Date.UTC(2026, 10, 8, 2);
@@ -246,6 +246,68 @@ describe("session pool", () => {
     expect(session.total).toBe(100);
     expect(session.left).toBe(92);
     expect(session.parts).toHaveLength(1);
+  });
+
+  test("a locked plan counts as nothing left", () => {
+    const plans = plansOf(
+      { a: reading("a", 8), b: { ...reading("b", 100), standing: "limited" } },
+      [],
+      {},
+      resetsAt,
+    );
+
+    const { session } = poolOf(plans);
+
+    expect(session.total).toBe(200);
+    expect(session.left).toBe(92);
+  });
+
+  test("a plan with no weekly reading stays out of the weekly total", () => {
+    const plans = plansOf(
+      { a: { ...reading("a", 8), week: window(30) }, b: reading("b", 8) },
+      [],
+      {},
+      resetsAt,
+    );
+
+    const { week } = poolOf(plans);
+
+    expect(week.total).toBe(100);
+    expect(week.left).toBe(70);
+  });
+
+  test("no readings at all leaves no parts", () => {
+    const { session, week } = poolOf(plansOf({ a: reading("a", null) }, [], {}, resetsAt));
+
+    expect(session.parts).toHaveLength(0);
+    expect(week.parts).toHaveLength(0);
+  });
+});
+
+const live = (id: string, owner: string | null, state: LiveSession["state"]): LiveSession => ({
+  account: owner,
+  app: null,
+  cwd: "/",
+  entrypoint: "cli",
+  host: "h",
+  id,
+  label: id,
+  row: id,
+  since: 0,
+  state,
+});
+
+describe("workingOn", () => {
+  test("counts only working sessions, per account", () => {
+    const counts = workingOn({
+      a: live("a", "x", "working"),
+      b: live("b", "x", "idle"),
+      c: live("c", "y", "working"),
+      d: live("d", "x", "working"),
+    });
+
+    expect(counts.get("x")?.length).toBe(2);
+    expect(counts.get("y")?.length).toBe(1);
   });
 });
 

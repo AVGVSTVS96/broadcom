@@ -32,7 +32,11 @@ const Column = ({
   </div>
 );
 
-const percentOf = (totals: Totals) => `${Math.round(totals.left)}%`;
+const percentOf = (totals: Totals) =>
+  totals.parts.length === 0 ? "–" : `${Math.round(totals.left)}%`;
+
+const unitOf = (totals: Totals) =>
+  totals.parts.length === 0 ? "no readings" : `left of ${totals.total}%`;
 
 export const Pools = ({
   summary,
@@ -50,19 +54,14 @@ export const Pools = ({
       <Column
         label="Weekly"
         value={percentOf(summary.week)}
-        unit={`left of ${summary.week.total}%`}
+        unit={unitOf(summary.week)}
         totals={summary.week}
       >
         {firstBack === undefined
           ? `All ${subscriptions.length} plans have room`
           : `${firstBack.name} is back first, ${when(firstBack.account.week.resetsAt ?? 0, now)}`}
       </Column>
-      <Column
-        label="Session"
-        value={percentOf(session)}
-        unit={`left of ${session.total}%`}
-        totals={session}
-      >
+      <Column label="Session" value={percentOf(session)} unit={unitOf(session)} totals={session}>
         {sessionReset === undefined
           ? `${open.length} of ${subscriptions.length} plans open`
           : `Next reset in ${duration(sessionReset - now)}`}

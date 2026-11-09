@@ -26,8 +26,10 @@ import { hatchStyle } from "@/components/viz/hatch";
 import { fills, texts } from "@/components/viz/meter";
 import { removeCredential, renewCredential, setDisabled } from "@/features/accounts/actions";
 import { SignIn } from "@/features/accounts/sign-in";
+import { useLive } from "@/lib/live/client";
 import { endsSoon, needsYou } from "@/lib/pool/accounts";
 import type { Login, Row, State } from "@/lib/pool/accounts";
+import { workingOn } from "@/lib/pool/pool";
 import { creditTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
@@ -233,14 +235,12 @@ const Actions = ({ login, name, working }: { login: Login; name: string; working
   );
 };
 
-const planNote = (row: Row) => {
-  const { state, account } = row;
-
-  if (state.is === "error") {
-    return state.message;
+const planNote = (row: Row, working: number) => {
+  if (row.state.is === "error") {
+    return row.state.message;
   }
 
-  return account !== null && account.working > 0 ? `${account.working} active` : undefined;
+  return working > 0 ? `${working} working` : undefined;
 };
 
 const UsageWindow = ({
@@ -310,6 +310,8 @@ const SignedIn = ({ row, now }: { row: Row; now: number }) => {
 
 export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
   const { account, login } = row;
+  const sessions = useLive((live) => live.sessions);
+  const working = workingOn(sessions).get(account?.id ?? null)?.length ?? 0;
 
   return (
     <Line
@@ -317,7 +319,7 @@ export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
       name={row.name}
       state={row.state}
       plan={account?.plan}
-      note={planNote(row)}
+      note={planNote(row, working)}
       first={
         <div className="space-y-3">
           <UsageWindow label="5-hour used" window={account?.fiveHour ?? null} now={now} />
@@ -325,11 +327,7 @@ export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
         </div>
       }
       second={<SignedIn row={row} now={now} />}
-      actions={
-        login === null ? null : (
-          <Actions login={login} name={row.name} working={account?.working ?? 0} />
-        )
-      }
+      actions={login === null ? null : <Actions login={login} name={row.name} working={working} />}
     />
   );
 };
