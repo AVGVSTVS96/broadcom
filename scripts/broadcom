@@ -1,0 +1,67 @@
+#!/bin/sh
+set -eu
+
+root=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
+proxy_config=$HOME/.config/broadcom-proxy/config.json
+usage_config=$HOME/.config/broadcom-usage/config.json
+state=$HOME/.local/state/broadcom
+port=${BROADCOM_PORT:-4840}
+
+case ${1:-} in
+"") ;;
+-h | --help)
+  echo "usage: broadcom    sign in a first Claude account if there's none, then run the pool, usage service and dashboard"
+  exit 0
+  ;;
+*)
+  echo "broadcom: unknown argument $1 (try broadcom-proxy for the pool alone)" >&2
+  exit 2
+  ;;
+esac
+
+if [ ! -f "$proxy_config" ]; then
+  mkdir -p "$(dirname "$proxy_config")"
+  printf '{ "accountsFile": "~/.local/state/broadcom-proxy/accounts.json" }\n' >"$proxy_config"
+fi
+if [ ! -f "$usage_config" ]; then
+  mkdir -p "$(dirname "$usage_config")"
+  cat >"$usage_config" <<'EOF'
+{
+  "keyFile": "~/.config/broadcom-proxy/management-key",
+  "poolDir": "~/.local/state/broadcom-proxy",
+  "accountsFile": "~/.local/state/broadcom-proxy/accounts.json",
+  "receipts": "~/.local/state/broadcom-proxy/receipts.ndjson"
+}
+EOF
+fi
+
+if ! ls "$HOME"/.config/broadcom-proxy/auths/*.json >/dev/null 2>&1; then
+  if [ -t 0 ]; then
+    "$root/bin/broadcom-proxy" login "$proxy_config"
+  else
+    echo "No Claude account yet: run broadcom-proxy login, or add one on the dashboard's Accounts page."
+  fi
+fi
+
+mkdir -p "$state"
+"$root/bin/broadcom-proxy" "$proxy_config" &
+proxy=$!
+while [ ! -s "$HOME/.config/broadcom-proxy/management-key" ] && kill -0 $proxy 2>/dev/null; do sleep 0.1; done
+"$root/bin/broadcom-usage" serve --config "$usage_config" >"$state/usage.log" 2>&1 &
+usage=$!
+trap 'kill $proxy $usage 2>/dev/null' EXIT
+trap 'exit 130' INT TERM
+
+cat <<EOF
+
+Dashboard: http://127.0.0.1:$port
+
+Point Claude Code at the pool:
+  export ANTHROPIC_BASE_URL=http://127.0.0.1:8317
+  export ANTHROPIC_CUSTOM_HEADERS="X-Api-Key: \$(head -1 ~/.config/broadcom-proxy/client-keys)"
+
+EOF
+
+PORT=$port HOSTNAME=127.0.0.1 \
+  BROADCOM_KEY_FILE=$HOME/.config/broadcom-proxy/management-key \
+  "$root/runtime/bun" "$root/dashboard/apps/web/server.js"

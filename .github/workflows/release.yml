@@ -1,0 +1,61 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-15-intel }
+          - { target: aarch64-apple-darwin, os: macos-15 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --profile dist --locked -p broadcom-proxy -p broadcom-usage
+      - run: bun install --frozen-lockfile
+      - run: bun --filter @broadcom/web build
+      - name: pack
+        run: |
+          mkdir -p pack/bin pack/runtime pack/dashboard
+          cp target/dist/broadcom-proxy target/dist/broadcom-usage scripts/broadcom pack/bin/
+          cp "$(command -v bun)" pack/runtime/
+          cp -R apps/web/.next/standalone/. pack/dashboard/
+          cp -R apps/web/.next/static pack/dashboard/apps/web/.next/
+          tar -czf broadcom-${{ matrix.target }}.tar.gz -C pack .
+      - name: smoke test
+        run: |
+          export HOME=$RUNNER_TEMP/home
+          mkdir -p "$HOME"
+          pack/bin/broadcom </dev/null &
+          for _ in $(seq 60); do curl -sf -o /dev/null http://127.0.0.1:4840/accounts && break; sleep 1; done
+          curl -sf -o /dev/null http://127.0.0.1:4840/accounts
+          curl -sf -o /dev/null -H "Authorization: Bearer $(cat "$HOME/.config/broadcom-proxy/management-key")" http://127.0.0.1:8317/v8/management/deck/accounts
+          curl -sf -o /dev/null -H "Authorization: Bearer $(cat "$HOME/.config/broadcom-proxy/management-key")" http://127.0.0.1:8320/v8/management/deck/credits
+          kill %1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: broadcom-${{ matrix.target }}
+          path: broadcom-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" --title "BROADCOM $GITHUB_REF_NAME" --generate-notes broadcom-*.tar.gz scripts/install.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
