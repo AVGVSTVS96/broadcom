@@ -7,7 +7,7 @@ import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
 import { creditFailure, creditProblem, grantsOutcome } from "@/lib/proxy/read";
 import { Config, UsageView } from "@/lib/proxy/schema";
-import type { BucketSize, UsageRow } from "@/lib/proxy/schema";
+import type { BucketSize, UsageAmount, UsageRow } from "@/lib/proxy/schema";
 import {
   bucketLabel,
   cellsOf,
@@ -83,6 +83,26 @@ export interface Selected extends Row {
   } | null;
 }
 
+export interface Mix {
+  readonly cacheRead: number;
+  readonly cacheWrite: number;
+  readonly output: number;
+  readonly input: number;
+}
+
+const mixOf = (amounts: readonly UsageAmount[]): Mix => {
+  const mix = { cacheRead: 0, cacheWrite: 0, input: 0, output: 0 };
+
+  for (const amount of amounts) {
+    mix.cacheRead += amount.cacheRead;
+    mix.cacheWrite += amount.cacheWrite;
+    mix.input += amount.input;
+    mix.output += amount.output;
+  }
+
+  return mix;
+};
+
 export interface Usage {
   readonly query: UsageQuery;
   readonly now: number;
@@ -97,6 +117,7 @@ export interface Usage {
     readonly sessions: number;
     readonly previous: Values | null;
     readonly cacheHit: number | null;
+    readonly mix: Mix;
   };
   readonly agentSdk: {
     readonly share: number;
@@ -188,10 +209,12 @@ const totalsOf = (view: UsageView, searching: boolean) =>
           })),
         ),
         cacheHit: null,
+        mix: mixOf(view.rows.map((row) => row.amount)),
         previous: null,
       }
     : {
         cacheHit: view.totals.cacheHitRate,
+        mix: mixOf([view.totals]),
         previous: view.previous === null ? null : valuesOf(view.previous, view.previous.points),
         series: sumSeries(view.series.map((line) => line.values)),
         sessions: view.totals.sessions,
@@ -353,6 +376,7 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     ticks: view.buckets.map((bucket) => bucketLabel(bucket.at, size, zone)),
     total: {
       cacheHit: total.cacheHit,
+      mix: total.mix,
       previous: total.previous,
       sessions: total.sessions,
       values: total.values,

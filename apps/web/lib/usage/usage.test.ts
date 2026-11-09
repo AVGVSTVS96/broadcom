@@ -111,6 +111,7 @@ test("accounts are named by login, API keys by the login they bill", () => {
 const amount = {
   apiUsd: 668,
   cacheRead: 0,
+  cacheWrite: 0,
   input: 0,
   output: 0,
   planUsd: 12,

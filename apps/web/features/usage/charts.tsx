@@ -7,16 +7,20 @@ import { format, formatShort, gapsOf, rest } from "@/lib/usage/usage";
 import type { Cell, Layer, Reading, Unit } from "@/lib/usage/usage";
 import { cn } from "@/lib/utils";
 
-const fills = ["bg-chart-1", "bg-chart-2", "bg-chart-3"] as const;
+const palettes = {
+  greys: { fills: ["bg-chart-1", "bg-chart-2", "bg-chart-3"], rest: "bg-chart-4" },
+  tokens: { fills: ["bg-tokens", "bg-tokens-2", "bg-tokens-3"], rest: "bg-tokens/45" },
+} as const;
 
-export const fillOf = (layers: readonly Layer[], key: string) => {
+export const fillOf = (layers: readonly Layer[], key: string, unit: Unit) => {
   const at = layers.findIndex((layer) => layer.key === key);
+  const palette = palettes[unit === "tokens" ? "tokens" : "greys"];
 
   if (at === -1) {
     return null;
   }
 
-  return key === rest ? "bg-chart-4" : (fills[at] ?? "bg-chart-3");
+  return key === rest ? palette.rest : (palette.fills[at] ?? palette.fills[2]);
 };
 
 const Tip = ({
@@ -58,7 +62,7 @@ const Tip = ({
               key={layer.key}
               className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2"
             >
-              <span className={cn("size-2 rounded-[2px]", fillOf(layers, layer.key))} />
+              <span className={cn("size-2 rounded-[2px]", fillOf(layers, layer.key, unit))} />
               <span className="truncate">{layer.label}</span>
               <span className="tabular-nums">{format(unit, layer.values[at] ?? 0)}</span>
             </li>
@@ -172,7 +176,7 @@ export const Stack = ({
                             key={layer.key}
                             className={cn(
                               "w-full max-w-6 shrink-0 last:rounded-t-[4px]",
-                              fillOf(layers, layer.key),
+                              fillOf(layers, layer.key, unit),
                             )}
                             style={{
                               height: `max(1px, calc(${(value / top) * 100}% - 2px))`,
@@ -216,7 +220,15 @@ export const Stack = ({
   );
 };
 
-export const Parts = ({ layers, label }: { layers: readonly Layer[]; label: string }) => {
+export const Parts = ({
+  layers,
+  label,
+  unit,
+}: {
+  layers: readonly Layer[];
+  label: string;
+  unit: Unit;
+}) => {
   const sums = layers.map((layer) => layer.values.reduce((sum, value) => sum + value, 0));
 
   const whole = sums.reduce((sum, value) => sum + value, 0);
@@ -230,7 +242,7 @@ export const Parts = ({ layers, label }: { layers: readonly Layer[]; label: stri
           <span
             key={layer.key}
             title={`${layer.label} ${Math.round(share * 100)}%`}
-            className={cn("rounded-full", fillOf(layers, layer.key))}
+            className={cn("rounded-full", fillOf(layers, layer.key, unit))}
             style={{ flexBasis: 0, flexGrow: share }}
           />
         );

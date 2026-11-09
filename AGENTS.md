@@ -45,7 +45,7 @@ Bloomberg terminal × Vercel × Linear, Swiss Helvetica, drawn heavily from the 
 
 - A section is a `Section` card (`components/viz/section.tsx`). Its title is the verdict, a sentence with the number in it ("Max 20x is 1.5× ahead of even pace"), and the line under it is the evidence. View toggles sit top right.
 - Numbers are big, light and tabular, with the unit small and muted beside them (`Stat`). Meters are thick rounded bars (`Meter`) or tick rows (`Ticks`).
-- Color means state, never decoration: greys for data, `ok` green for room, `over` amber for ahead of pace, `bad` coral for run out, hatched coral (`HatchPattern`) for locked until reset, dashed for forecast. `brand` orange marks only the account taking new work.
+- Color means state, never decoration: greys for data, `ok` green for room, `over` amber for ahead of pace, `bad` coral for run out, hatched coral (`HatchPattern`) for locked until reset, dashed for forecast. `brand` orange marks only the account taking new work. `tokens` violet marks token volume: the heatmap, token totals and the token views of Usage, with `tokens-2`/`tokens-3` as its second and third series.
 - Accounts are told apart by name and position, in greys, with the one in focus in full ink. Legends sit in one muted line under the chart.
 - Phone first: one column at 390 px, names above full-width tracks, nothing scrolls sideways except a chart that says so. Check 390 px and 1440 px, light and dark, before calling a page done.
 
