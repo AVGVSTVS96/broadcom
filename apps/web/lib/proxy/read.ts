@@ -99,6 +99,18 @@ export const plansOutcome = outcome(
   }),
 );
 
+export const readPlans = async () => await runtime.runPromise(plansOutcome);
+
+export const configuredPlans = (view: PlansView) =>
+  view.plans
+    .filter((plan) => plan.seats.every((seat) => seat.account === null))
+    .map((plan) => ({
+      monthly: plan.seats.reduce((sum, seat) => sum + seat.monthlyUsd, 0),
+      name: plan.name,
+      providers: plan.providers,
+      since: plan.seats[0]?.since ?? null,
+    }));
+
 export const planFailure = (reason: string) => `Plan prices didn't load: ${reason}`;
 
 export const planProblem = (read: Outcome<PlansView>) => {
@@ -136,11 +148,6 @@ export const readSettings = async () =>
       return {
         facts: {
           authDir: config.oauth?.["auth-dir"] ?? null,
-          plans: (config.usage?.plans ?? []).map((plan) => ({
-            name: plan.name,
-            since: plan.since ?? null,
-            usd: plan["monthly-usd"],
-          })),
           remote: config.management?.["allow-remote"] ?? false,
           server:
             config.server?.host === undefined

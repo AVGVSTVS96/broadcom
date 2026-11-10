@@ -6,6 +6,7 @@ import { readLive } from "@/lib/live/server";
 import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
 import {
+  configuredPlans,
   creditFailure,
   creditProblem,
   grantsOutcome,
@@ -416,13 +417,19 @@ export const readWallet = async () => {
     ),
   );
 
-  if (!credits.ok) {
-    return { now: Date.now(), problems: [creditFailure(credits.reason)], wallet: null };
+  if (!credits.ok || !plans.ok) {
+    return {
+      now: Date.now(),
+      problems: [
+        credits.ok ? null : creditFailure(credits.reason),
+        plans.ok ? null : planFailure(plans.reason),
+      ].filter((problem) => problem !== null),
+      wallet: null,
+    };
   }
 
   const names = namesOf(accounts.facets.account ?? [], credits.value);
-  const known = plans.ok ? plans.value : { plans: [], unpriced: [] };
-  const seats = known.plans.flatMap((plan) => plan.seats);
+  const seats = plans.value.plans.flatMap((plan) => plan.seats);
 
   const wallet = walletOf({
     byAccount: spent(accounts, "a:"),
@@ -434,14 +441,7 @@ export const readWallet = async () => {
       name: names[grant.credentialId] ?? "API key",
       remaining: grant.remaining,
     })),
-    plans: known.plans
-      .filter((plan) => plan.seats.every((seat) => seat.account === null))
-      .map((plan) => ({
-        monthly: plan.seats.reduce((sum, seat) => sum + seat.monthlyUsd, 0),
-        name: plan.name,
-        providers: plan.providers,
-        since: plan.seats[0]?.since ?? null,
-      })),
+    plans: configuredPlans(plans.value),
     seats: seats.flatMap((seat) =>
       seat.account === null
         ? []
@@ -455,12 +455,12 @@ export const readWallet = async () => {
           ],
     ),
     total: accounts.totals.apiUsd,
-    unpriced: known.unpriced.map((seat) => seat.tier),
+    unpriced: plans.value.unpriced.map((seat) => seat.tier),
   });
 
   return {
     now: Date.now(),
-    problems: plans.ok ? [] : [planFailure(plans.reason)],
+    problems: [],
     wallet,
   };
 };
