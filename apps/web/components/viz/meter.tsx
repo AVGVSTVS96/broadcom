@@ -15,6 +15,11 @@ export const texts = {
   over: "text-over-ink",
 } as const satisfies Record<Tone, string>;
 
+export const figures = {
+  ...texts,
+  over: "text-over-large",
+} as const satisfies Record<Tone, string>;
+
 export const Meter = ({
   value,
   tone = "ok",

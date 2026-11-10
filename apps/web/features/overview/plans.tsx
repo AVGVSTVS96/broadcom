@@ -198,22 +198,27 @@ export const PlanRows = ({
       <Link
         key={plan.id}
         href={`/accounts#${plan.id}`}
-        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[13rem_minmax(0,1fr)_1rem] lg:px-2"
+        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[20rem_minmax(0,1fr)_1rem] lg:px-2"
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2 truncate">
             {plan.id === next ? <span className="size-2 shrink-0 rounded-full bg-brand" /> : null}
             <span className={cn("truncate", plan.id === next && "text-brand")}>{plan.name}</span>
           </div>
-          <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-            {[
-              plan.account.plan || "API key",
-              ...facts(plan, working.get(plan.id)?.length ?? 0, now),
-            ].map((fact) => (
-              <span key={fact} className="whitespace-nowrap">
-                {fact}
-              </span>
-            ))}
+          <div className="overflow-hidden text-sm text-muted-foreground">
+            <div className="-ml-3.5 flex flex-wrap">
+              {[
+                plan.account.plan || "API key",
+                ...facts(plan, working.get(plan.id)?.length ?? 0, now),
+              ].map((fact) => (
+                <span
+                  key={fact}
+                  className="whitespace-nowrap before:inline-block before:w-3.5 before:text-center before:content-['·']"
+                >
+                  {fact}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 max-lg:col-start-1 lg:grid-cols-4 lg:gap-6">

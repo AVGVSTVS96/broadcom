@@ -27,6 +27,7 @@ const look = `
     --trees-search-bg-override: var(--muted);
     --trees-input-bg-override: var(--muted);
   }
+  :host [data-item-contains-git-change="true"] > [data-item-section="git"] { color: var(--over); }
   [data-file-tree-search-container] { padding: 8px 8px 6px; }
   [data-file-tree-search-input] { border-radius: 8px; height: 30px; }
 `;
