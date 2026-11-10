@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Problems } from "@/components/viz/problems";
 import { Section } from "@/components/viz/section";
 import { saveSettings } from "@/features/settings/actions";
 import { useLive } from "@/lib/live/client";
@@ -26,11 +27,12 @@ interface Facts {
   readonly authDir: string | null;
   readonly stateDir: string | null;
   readonly remote: boolean;
-  readonly plans: readonly {
-    readonly name: string;
-    readonly usd: number;
-    readonly since: string | null;
-  }[];
+}
+
+interface Plan {
+  readonly name: string;
+  readonly monthly: number;
+  readonly since: number | null;
 }
 
 const Row = ({
@@ -55,6 +57,15 @@ const Row = ({
     </div>
     {children}
   </div>
+);
+
+const PlanRow = ({ plan }: { plan: Plan }) => (
+  <Row label={plan.name}>
+    <span className="shrink-0 text-sm text-muted-foreground">
+      {dollars(plan.monthly)} a month
+      {plan.since === null ? "" : ` since ${utcDate(plan.since)}`}
+    </span>
+  </Row>
 );
 
 const Control = ({
@@ -129,11 +140,15 @@ export const Settings = ({
   facts,
   raw,
   problem,
+  plans,
+  plansProblem,
 }: {
   values: Values | null;
   facts: Facts | null;
   raw: string;
   problem: string | null;
+  plans: readonly Plan[];
+  plansProblem: string | null;
 }) => {
   const [draft, setDraft] = useState<Values | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -142,9 +157,18 @@ export const Settings = ({
 
   if (values === null || facts === null) {
     return (
-      <p className="rounded-2xl border border-bad/40 px-4 py-3 text-sm text-bad" role="alert">
-        {problem}
-      </p>
+      <div className="space-y-6">
+        <Problems problems={[problem, plansProblem].filter((one) => one !== null)} />
+        {plans.length === 0 ? null : (
+          <Section title="Usage">
+            <div className="-mt-4 divide-y">
+              {plans.map((plan) => (
+                <PlanRow key={plan.name} plan={plan} />
+              ))}
+            </div>
+          </Section>
+        )}
+      </div>
     );
   }
 
@@ -174,6 +198,7 @@ export const Settings = ({
 
   return (
     <div className="space-y-6 pb-24">
+      <Problems problems={plansProblem === null ? [] : [plansProblem]} />
       {groups.map((group) => (
         <Section key={group.name} title={group.name}>
           <div className="-mt-4 divide-y">
@@ -207,14 +232,7 @@ export const Settings = ({
               </Row>
             ) : null}
             {group.name === "Usage"
-              ? facts.plans.map((plan) => (
-                  <Row key={plan.name} label={plan.name}>
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {dollars(plan.usd)} a month
-                      {plan.since === null ? "" : ` since ${utcDate(Date.parse(plan.since))}`}
-                    </span>
-                  </Row>
-                ))
+              ? plans.map((plan) => <PlanRow key={plan.name} plan={plan} />)
               : null}
           </div>
         </Section>
