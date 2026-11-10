@@ -21,6 +21,8 @@ const DOWNLOAD: &str =
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
 const FILE: &str = "pricing-state.json";
 const REFRESH_EVERY: Duration = Duration::from_hours(24);
+/// How soon after the last check a model with no price may check again.
+const REFRESH_FOR_NEW: Duration = Duration::from_hours(1);
 
 /// USD per token, by LiteLLM field name (`input_cost_per_token_priority`, ...).
 pub type Rates = HashMap<String, f64>;
@@ -84,14 +86,14 @@ enum Ruled {
     Catalog,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Price<'a> {
     Free,
     Custom(&'a Rates),
     Catalog(&'a Rates),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct Resolved<'a> {
     model: &'a str,
     price: Price<'a>,
@@ -208,6 +210,12 @@ impl Policy {
             cost_known: known,
             ..e.clone()
         })
+    }
+
+    /// Whether a record of `raw` is priced and named the same under both policies.
+    pub fn prices_like(&self, other: &Policy, raw: &str) -> bool {
+        self.resolve(raw) == other.resolve(raw)
+            && self.ruled.contains_key(raw) == other.ruled.contains_key(raw)
     }
 
     /// Why these rules can't be saved together, if they can't.
@@ -552,6 +560,7 @@ pub struct Pricing {
     path: PathBuf,
     download: String,
     state: Mutex<State>,
+    unpriced: tokio::sync::Notify,
 }
 
 impl Pricing {
@@ -589,6 +598,7 @@ impl Pricing {
             path,
             download: DOWNLOAD.into(),
             state: Mutex::new(state),
+            unpriced: tokio::sync::Notify::new(),
         }
     }
 
@@ -596,14 +606,19 @@ impl Pricing {
         self.state.lock().policy.clone()
     }
 
-    fn until_due(&self) -> Duration {
+    /// Asks for a refresh: a record came in whose model the catalog has no price for.
+    pub fn missing(&self) {
+        self.unpriced.notify_one();
+    }
+
+    fn until_due(&self, every: Duration) -> Duration {
         let state = self.state.lock();
         let checked = state
             .checked_at
             .as_deref()
             .and_then(|at| DateTime::parse_from_rfc3339(at).ok());
         checked.map_or(Duration::ZERO, |at| {
-            (at.with_timezone(&Utc) + REFRESH_EVERY - Utc::now())
+            (at.with_timezone(&Utc) + every - Utc::now())
                 .to_std()
                 .unwrap_or(Duration::ZERO)
         })
@@ -645,10 +660,16 @@ impl Pricing {
         result
     }
 
-    /// Refreshes whenever the last check is a day old, telling `changed` about each new policy.
+    /// Refreshes whenever the last check is a day old, or an hour old once a model has no
+    /// price, telling `changed` about each new policy.
     pub async fn run(self: Arc<Self>, changed: impl Fn(Arc<Policy>)) {
         loop {
-            tokio::time::sleep(self.until_due()).await;
+            tokio::select! {
+                () = tokio::time::sleep(self.until_due(REFRESH_EVERY)) => {}
+                () = self.unpriced.notified() => {
+                    tokio::time::sleep(self.until_due(REFRESH_FOR_NEW)).await;
+                }
+            }
             let before = self.policy().revision.clone();
             let refreshed = self.refresh().await;
             if let Err(err) = refreshed {
@@ -873,7 +894,7 @@ mod tests {
             download: url,
             ..Pricing::open(&dir, None)
         };
-        assert_eq!(pricing.until_due(), Duration::ZERO);
+        assert_eq!(pricing.until_due(REFRESH_EVERY), Duration::ZERO);
         pricing.refresh().await.unwrap();
         let policy = pricing.policy();
         assert_eq!(
@@ -884,7 +905,8 @@ mod tests {
             ])
         );
         assert!(policy.catalog.models.contains_key("gpt-5") && policy.rules == test_rules());
-        assert!(pricing.until_due() > Duration::from_hours(23));
+        assert!(pricing.until_due(REFRESH_EVERY) > Duration::from_hours(23));
+        assert!(pricing.until_due(REFRESH_FOR_NEW) > Duration::from_mins(59));
         assert_eq!(Pricing::open(&dir, None).policy().revision, policy.revision);
         assert_eq!(
             std::fs::read(&seed).unwrap(),

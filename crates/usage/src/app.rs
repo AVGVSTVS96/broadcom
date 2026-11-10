@@ -87,7 +87,7 @@ pub fn start(app: Arc<App>) {
         app.pricing.clone().run(move |policy| {
             let store = store.clone();
             tokio::task::spawn_blocking(move || {
-                if let Err(e) = store.set_policy(policy) {
+                if let Err(e) = store.set_policy(&policy) {
                     tracing::warn!("repricing: {e:#}");
                 }
             });
@@ -298,6 +298,9 @@ fn collect(app: &App) {
         let result = collector.collect(&policy, |c| {
             for warning in &c.warnings {
                 tracing::warn!("collector: {warning}");
+            }
+            if !c.unpriced.is_empty() {
+                app.pricing.missing();
             }
             app.store
                 .apply(
