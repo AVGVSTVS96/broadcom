@@ -80,6 +80,7 @@ export type SessionState = typeof SessionState.Type;
 
 export const LiveSession = Schema.Struct({
   account: Schema.NullOr(Schema.String),
+  agentSdk: Schema.optionalKey(Schema.Boolean),
   app: Schema.NullOr(Schema.String),
   cwd: Schema.String,
   entrypoint: Schema.String,

@@ -44,6 +44,10 @@
       "description": "How its Claude Code process was started, from its transcript; \"\" until it has one.",
       "type": "string"
     },
+    "agentSdk": {
+      "description": "Whether the five-hour meter charges its entrypoint as the Agent SDK.",
+      "type": "boolean"
+    },
     "question": {
       "description": "What a blocked session waits on: its job's `needs`, else its `detail`.",
       "type": [
@@ -70,6 +74,7 @@
     "cwd",
     "since",
     "entrypoint",
+    "agentSdk",
     "question",
     "reply"
   ],

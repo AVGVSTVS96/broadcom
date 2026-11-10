@@ -193,8 +193,6 @@ export const threadHref = (row: string) => {
   return null;
 };
 
-export const agentSdk = (entrypoint: string) => entrypoint.startsWith("sdk-");
-
 const strength = { blocked: 0, idle: 2, working: 1 } as const;
 
 export const byState = (a: LiveSession, b: LiveSession) =>

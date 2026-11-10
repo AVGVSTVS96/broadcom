@@ -61,6 +61,13 @@ describe("the usage service's examples decode with the dashboard's schemas", () 
     expect(sessionsKept(decodeLiveEvent(read(name)))).toBe(sessionsSent(name));
   });
 
+  test("/deck/events from a service that predates agentSdk", () => {
+    const older = read("events-snapshot.json").replaceAll(/"agentSdk": (?:true|false),/gu, "");
+
+    expect(older).not.toContain("agentSdk");
+    expect(sessionsKept(decodeLiveEvent(older))).toBe(sessionsSent("events-snapshot.json"));
+  });
+
   test("/deck/events stale", () => {
     expect(decodeLiveEvent(read("events-stale.json"))?.type).toBe("stale");
   });

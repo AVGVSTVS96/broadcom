@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use super::attribution::AgentSdk;
 use super::identity::{Names, SessionRef, Who, label_of, row_of, who_of};
 use super::limits::Binding;
 use super::plans::read_json;
@@ -28,6 +29,9 @@ pub struct LiveSession {
     pub since: f64,
     /// How its Claude Code process was started, from its transcript; "" until it has one.
     pub entrypoint: String,
+    /// Whether the five-hour meter charges its entrypoint as the Agent SDK.
+    #[serde(rename = "agentSdk")]
+    pub agent_sdk: bool,
     /// What a blocked session waits on: its job's `needs`, else its `detail`.
     pub question: Option<String>,
     /// The reply its job suggests.
@@ -242,6 +246,7 @@ pub fn live_map(
     names: Option<&Names>,
     tracked: Option<&SessionUsage>,
     first_seen: &mut HashMap<String, f64>,
+    sdk: &AgentSdk,
     now: i64,
 ) -> Live {
     let seats: HashMap<&str, &str> = seats
@@ -285,6 +290,7 @@ pub fn live_map(
             },
         };
         let title = record.and_then(|r| r.title.as_deref());
+        let entrypoint = record.map_or("", |r| r.entrypoint.as_str());
         let ranked = who(title);
         let shown = match name {
             Some(name) if !name.is_empty() && title.is_none() => who(Some(name)),
@@ -313,7 +319,8 @@ pub fn live_map(
             host: "server".into(),
             cwd,
             since,
-            entrypoint: record.map(|r| r.entrypoint.clone()).unwrap_or_default(),
+            entrypoint: entrypoint.to_string(),
+            agent_sdk: sdk.includes(entrypoint),
             question: job.and_then(|j| j.question.clone()),
             reply: job.and_then(|j| j.reply.clone()),
         }
@@ -399,6 +406,7 @@ mod tests {
             None,
             None,
             &mut HashMap::new(),
+            &AgentSdk::default(),
             9,
         );
         let got: Vec<_> = live
@@ -431,5 +439,51 @@ mod tests {
         );
         assert_eq!(live.apps, [("telegram".to_string(), true)]);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn agent_sdk_follows_the_configured_entrypoints() {
+        let mut tracked: SessionUsage =
+            serde_json::from_slice(include_bytes!("../../api/examples/sessions.json")).unwrap();
+        let blocked = |id: &str| Blocked {
+            session_id: id.into(),
+            name: None,
+            cwd: String::new(),
+            since: 1.0,
+            question: None,
+            reply: None,
+        };
+        let found = Processes {
+            blocked: vec![blocked("sdk"), blocked("cli")],
+            ..Processes::default()
+        };
+        for (session, id) in tracked.sessions.iter_mut().zip(["sdk", "cli"]) {
+            session.session_id = id.into();
+            session.entrypoint = if id == "sdk" { "sdk-cli" } else { "cli" }.into();
+        }
+        let flags = |sdk: &AgentSdk| {
+            live_map(
+                &found,
+                &[],
+                None,
+                Some(&tracked),
+                &mut HashMap::new(),
+                sdk,
+                9,
+            )
+            .sessions
+            .iter()
+            .map(|s| (s.id.clone(), s.agent_sdk))
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            flags(&AgentSdk::default()),
+            [("sdk".into(), true), ("cli".into(), false)]
+        );
+        let cli = AgentSdk {
+            entrypoints: vec!["cli".into()],
+            ..AgentSdk::default()
+        };
+        assert_eq!(flags(&cli), [("sdk".into(), false), ("cli".into(), true)]);
     }
 }
