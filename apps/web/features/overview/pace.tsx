@@ -9,7 +9,7 @@ import { Area, At, Band, Dot, Path, Plot, Strokes, freeSpot } from "@/components
 import type { Box, XY } from "@/components/viz/plot";
 import { Section } from "@/components/viz/section";
 import { valueAt } from "@/lib/pool/history";
-import { lockedFor, outcome } from "@/lib/pool/pace";
+import { lockedFor, outcome, poolDry } from "@/lib/pool/pace";
 import type { Pace } from "@/lib/pool/pace";
 import { byPace } from "@/lib/pool/pool";
 import type { Paced, Plan } from "@/lib/pool/pool";
@@ -55,6 +55,20 @@ const verdict = (ranked: readonly Paced[], now: number, { when }: Time) => {
   const ranOut = locked > 0 ? ` ${locked} already ran out.` : "";
 
   const runsOut = runningOut?.pace.runsOut ?? null;
+  const dry = poolDry(ranked, now);
+
+  if (dry !== null) {
+    const resets =
+      dry.resets === 0
+        ? ""
+        : ` and ~${Math.round(dry.back)} from ${dry.resets} ${dry.resets === 1 ? "reset" : "resets"}`;
+
+    return {
+      detail: `${Math.round(dry.left)} points left${resets}, used at ${Math.round(dry.perHour)} an hour.${ranOut}`,
+      subject: runningOut ?? lead,
+      title: `Every plan runs out ${when(dry.at, now)}`,
+    };
+  }
 
   if (runningOut !== undefined && runsOut !== null) {
     return {
