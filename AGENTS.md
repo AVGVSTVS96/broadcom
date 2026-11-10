@@ -33,7 +33,7 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Only a `read.ts` or `actions.ts` talks to the proxy                                                      | `oxlint.config.ts` override                                   |
 | No `useEffect`: derive in render, act in handlers, `useSubscription`/`useImperative` for outside systems | `oxlint.config.ts`                                            |
-| No comments, `as` or `any`                                                                               | `oxlint.config.ts`                                            |
+| No `as` or `any`; comments only for a decision or fact the code can't show (one `WHY:` line or a link)   | `oxlint.config.ts`                                            |
 | Server code never reaches a client bundle                                                                | `import "server-only"` on adapters                            |
 | The dashboard decodes what the usage service sends                                                       | `lib/proxy/contract.test.ts` over `crates/usage/api/examples` |
 | The usage service reads what the proxy writes                                                            | the receipt test in `crates/usage`                            |
