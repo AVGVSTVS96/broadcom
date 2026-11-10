@@ -1,7 +1,7 @@
 import { lockedSpans, usedBetween } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import type { Pace } from "@/lib/pool/pace";
-import { addDays, startOfDay, startOfWeek } from "@/lib/time/calendar";
+import type { Calendar } from "@/lib/time/calendar";
 
 export interface Daily {
   readonly id: string;
@@ -48,7 +48,7 @@ const meaningfulBase = 1;
 
 export const evenPerDay = 100 / daysInWeek;
 
-export const weekStarts = (since: number, now: number) => {
+export const weekStarts = (since: number, now: number, { addDays, startOfWeek }: Calendar) => {
   const starts: number[] = [];
 
   for (let at = startOfWeek(since); at <= now; at = addDays(at, daysInWeek)) {
@@ -127,14 +127,16 @@ export const weeksOf = (
   since: number,
   now: number,
   outlook: Outlook,
+  calendar: Calendar,
 ): AccountWeeks => {
+  const { addDays, startOfDay } = calendar;
   const first = startOfDay(Math.max(since, outlook.since ?? since));
   const today = startOfDay(now);
   const forecast = forecaster(outlook);
 
   const used = new Map(daily.days.map(([at, value]) => [startOfDay(at), value]));
 
-  const weeks = weekStarts(since, now).map((from): Week => {
+  const weeks = weekStarts(since, now, calendar).map((from): Week => {
     const days = Array.from({ length: daysInWeek }, (_, index): WeekDay => {
       const day = addDays(from, index);
       const next = addDays(day, 1);
@@ -182,7 +184,12 @@ export const weeksOf = (
   return { base: base?.total ?? null, id: daily.id, weeks };
 };
 
-export const withHistory = (daily: Daily, points: Points, now: number): Daily => {
+export const withHistory = (
+  daily: Daily,
+  points: Points,
+  now: number,
+  { addDays, startOfDay }: Calendar,
+): Daily => {
   const [first] = points;
 
   if (first === undefined) {

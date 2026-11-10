@@ -7,8 +7,8 @@ import { activity, activityPlans, gaps } from "@/lib/pool/activity";
 import type { Day, Gap, Hour } from "@/lib/pool/activity";
 import type { Points } from "@/lib/pool/history";
 import type { Plan } from "@/lib/pool/pool";
-import { addHours } from "@/lib/time/calendar";
-import { clock, duration, hour, weekday } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { duration } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { level } from "./cells";
@@ -37,13 +37,14 @@ const DayRow = ({
   plans: readonly Plan[];
   dayGaps: readonly Gap[];
 }) => {
+  const { addHours, dayOfMonth, hour, weekday } = useTime();
   const hours = noneFree(day);
   const [longest] = dayGaps.toSorted((a, b) => b.to - b.from - (a.to - a.from));
 
   return (
     <div className="grid gap-x-4 gap-y-2 border-t py-3 sm:grid-cols-[4.5rem_minmax(0,1fr)_10rem]">
       <div className="text-sm">
-        {weekday(day.from)} {new Date(day.from).getDate()}
+        {weekday(day.from)} {dayOfMonth(day.from)}
       </div>
       <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5">
         {plans.map((plan, index) => (
@@ -98,6 +99,7 @@ const DayRow = ({
 };
 
 const PerDay = ({ days }: { days: readonly Day[] }) => {
+  const { weekday } = useTime();
   const counts = days.map(noneFree);
   const top = Math.max(...counts, 1);
 
@@ -136,7 +138,9 @@ export const HandOffView = ({
   history: Readonly<Record<string, Points>>;
   now: number;
 }) => {
-  const days = activity(activityPlans(plans, history), now);
+  const time = useTime();
+  const { addHours, clock } = time;
+  const days = activity(activityPlans(plans, history), now, time);
   const found = gaps(days);
   const total = days.reduce((sum, day) => sum + noneFree(day), 0);
   const [longest] = found.toSorted((a, b) => b.to - b.from - (a.to - a.from));

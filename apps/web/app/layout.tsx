@@ -12,6 +12,8 @@ import { Nav } from "@/components/shell/nav";
 import { Toaster } from "@/components/ui/sonner";
 import { LiveProvider } from "@/lib/live/client";
 import { readLive } from "@/lib/live/server";
+import { ZoneProvider } from "@/lib/time/client";
+import { readZone } from "@/lib/time/server";
 
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
@@ -28,12 +30,18 @@ export const viewport: Viewport = {
   width: "device-width",
 };
 
-const Live = async ({ children }: { children: ReactNode }) => (
-  <LiveProvider initial={await readLive()}>
-    <Lost />
-    {children}
-  </LiveProvider>
-);
+const Live = async ({ children }: { children: ReactNode }) => {
+  const [{ saved, zone }, live] = await Promise.all([readZone(), readLive()]);
+
+  return (
+    <ZoneProvider zone={zone} saved={saved}>
+      <LiveProvider initial={live}>
+        <Lost />
+        {children}
+      </LiveProvider>
+    </ZoneProvider>
+  );
+};
 
 const RootLayout = ({ children }: { children: ReactNode }) => (
   <html lang="en" className={`${mono.variable} antialiased`}>

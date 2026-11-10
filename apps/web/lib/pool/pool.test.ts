@@ -10,7 +10,11 @@ import { windows } from "@/lib/pool/timeline";
 import { weeksOf, withHistory } from "@/lib/pool/weeks";
 import type { Outlook } from "@/lib/pool/weeks";
 import type { Account, Grant, LiveSession } from "@/lib/proxy/schema";
-import { duration, when } from "@/lib/time/format";
+import { duration } from "@/lib/time/format";
+import { timeIn } from "@/lib/time/zone";
+
+const pacific = timeIn("America/Los_Angeles");
+const { when } = pacific;
 
 const resetsAt = Date.UTC(2026, 10, 8, 2);
 const start = resetsAt - WEEK;
@@ -324,19 +328,19 @@ describe("format", () => {
   });
 
   test("when names the day once it isn't today, and the date past six days", () => {
-    const now = new Date(2026, 10, 5, 7, 20).getTime();
+    const now = pacific.instant(2026, 10, 5, 7, 20);
 
-    expect(when(new Date(2026, 10, 5, 20, 13).getTime(), now)).toBe("8:13 PM");
-    expect(when(new Date(2026, 10, 7, 18).getTime(), now)).toBe("Sat 6 PM");
-    expect(when(new Date(2026, 10, 7, 17, 59, 59).getTime(), now)).toBe("Sat 6 PM");
-    expect(when(new Date(2026, 10, 11, 18).getTime(), now)).toBe("Nov 11");
+    expect(when(pacific.instant(2026, 10, 5, 20, 13), now)).toBe("8:13 PM");
+    expect(when(pacific.instant(2026, 10, 7, 18), now)).toBe("Sat 6 PM");
+    expect(when(pacific.instant(2026, 10, 7, 17, 59, 59), now)).toBe("Sat 6 PM");
+    expect(when(pacific.instant(2026, 10, 11, 18), now)).toBe("Nov 11");
   });
 });
 
 describe("activity", () => {
   test("hours with every plan locked become one gap", () => {
-    const now = new Date(2026, 10, 5, 12).getTime();
-    const dayStart = new Date(2026, 10, 5).getTime();
+    const now = pacific.instant(2026, 10, 5, 12);
+    const dayStart = pacific.instant(2026, 10, 5);
 
     const plans: { cutoff: number; id: string; points: Points }[] = [
       {
@@ -358,7 +362,7 @@ describe("activity", () => {
       },
     ];
 
-    const days = activity(plans, now, 1);
+    const days = activity(plans, now, pacific, 1);
 
     expect(gaps(days)).toEqual([{ from: dayStart + 3 * HOUR, to: dayStart + 6 * HOUR }]);
     expect(days[0]?.hours[2]?.runOuts).toEqual(["a"]);
@@ -374,7 +378,7 @@ describe("windows", () => {
   });
 });
 
-const novemberDay = (date: number, hour = 0) => new Date(2026, 10, date, hour).getTime();
+const novemberDay = (date: number, hour = 0) => pacific.instant(2026, 10, date, hour);
 
 const outlook = (overrides: Partial<Outlook>): Outlook => ({
   cutoff: 98,
@@ -387,20 +391,26 @@ const outlook = (overrides: Partial<Outlook>): Outlook => ({
 });
 
 describe("weeks", () => {
-  const since = new Date(2026, 9, 17).getTime();
-  const now = new Date(2026, 10, 5, 12).getTime();
+  const since = pacific.instant(2026, 9, 17);
+  const now = pacific.instant(2026, 10, 5, 12);
 
   const daily = {
     days: [
-      [new Date(2026, 9, 17).getTime(), 10],
-      [new Date(2026, 9, 20).getTime(), 30],
-      [new Date(2026, 10, 3).getTime(), 20],
+      [pacific.instant(2026, 9, 17), 10],
+      [pacific.instant(2026, 9, 20), 30],
+      [pacific.instant(2026, 10, 3), 20],
     ] as const,
     id: "a",
   };
 
   test("weeks split Monday to Sunday, the first one partial", () => {
-    const result = weeksOf(daily, since, now, outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 }));
+    const result = weeksOf(
+      daily,
+      since,
+      now,
+      outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 }),
+      pacific,
+    );
 
     expect(result.weeks).toHaveLength(4);
     expect(result.weeks[0]?.part).toBe(true);
@@ -411,9 +421,13 @@ describe("weeks", () => {
   });
 
   test("the forecast starts now, so today's run-out lands on today", () => {
-    const week = weeksOf(daily, since, now, outlook({ rate: 10 / (24 * HOUR), room: 3 })).weeks.at(
-      -1,
-    );
+    const week = weeksOf(
+      daily,
+      since,
+      now,
+      outlook({ rate: 10 / (24 * HOUR), room: 3 }),
+      pacific,
+    ).weeks.at(-1);
 
     expect(week?.days[3]?.forecast).toBeCloseTo(3);
     expect(week?.days[3]?.out).toBe("forecast");
@@ -426,10 +440,11 @@ describe("weeks", () => {
       since,
       now,
       outlook({
-        locks: [[new Date(2026, 10, 3, 10).getTime(), new Date(2026, 10, 7, 18).getTime()]],
+        locks: [[pacific.instant(2026, 10, 3, 10), pacific.instant(2026, 10, 7, 18)]],
         rate: 10 / (24 * HOUR),
-        resetsAt: new Date(2026, 10, 7, 18).getTime(),
+        resetsAt: pacific.instant(2026, 10, 7, 18),
       }),
+      pacific,
     ).weeks.at(-1);
 
     expect(week?.expected).toBeCloseTo(20 + 2.5 + 10);
@@ -440,10 +455,11 @@ describe("weeks", () => {
 
   test("days before the account existed stay empty", () => {
     const week = weeksOf(
-      { days: [[new Date(2026, 10, 2).getTime(), 0.002]], id: "a" },
+      { days: [[pacific.instant(2026, 10, 2), 0.002]], id: "a" },
       since,
       now,
-      outlook({ since: new Date(2026, 10, 4, 22).getTime() }),
+      outlook({ since: pacific.instant(2026, 10, 4, 22) }),
+      pacific,
     ).weeks.at(-1);
 
     expect(week?.days[0]?.used).toBeNull();
@@ -465,6 +481,7 @@ describe("weeks", () => {
         [novemberDay(3, 20), 99],
       ],
       novemberDay(3, 21),
+      pacific,
     );
 
     expect(merged.days).toEqual([

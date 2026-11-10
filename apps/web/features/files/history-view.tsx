@@ -10,10 +10,11 @@ import { CopyButton } from "@/features/files/copy-button";
 import { FileBar } from "@/features/files/file-bar";
 import { Review } from "@/features/files/review";
 import { StylePills } from "@/features/files/style-pills";
-import { ago, timeOfDay } from "@/features/files/time";
+import { ago } from "@/features/files/time";
 import { filesHref } from "@/features/files/urls";
 import { dayGroups } from "@/lib/files/files";
 import type { Commit } from "@/lib/files/files";
+import { useTime } from "@/lib/time/client";
 import { cn } from "@/lib/utils";
 
 export const HistoryView = ({
@@ -35,6 +36,7 @@ export const HistoryView = ({
   removed: number;
   now: number;
 }) => {
+  const time = useTime();
   const [filter, setFilter] = useState("");
   const [showBody, setShowBody] = useState(false);
   const needle = filter.trim().toLowerCase();
@@ -72,7 +74,7 @@ export const HistoryView = ({
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
-          {dayGroups(shown, new Date(now)).map((group) => (
+          {dayGroups(shown, now, time).map((group) => (
             <section key={group.day}>
               <h3 className="sticky top-0 bg-card px-2 pt-3 pb-1 text-xs text-muted-foreground">
                 {group.day}
@@ -91,7 +93,7 @@ export const HistoryView = ({
                         {commit.subject}
                       </span>
                       <span className="mt-0.5 flex gap-2 text-xs text-faint tabular-nums">
-                        <span>{timeOfDay(commit.at)}</span>
+                        <span>{time.timeOfDay(commit.at)}</span>
                         <span className="font-mono">{commit.short}</span>
                         {!commit.signed && <span className="text-bad">unsigned</span>}
                       </span>

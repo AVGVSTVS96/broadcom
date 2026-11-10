@@ -28,7 +28,9 @@ import {
 import type { Span, Spiral, Turn } from "@/lib/pool/spiral";
 import { evenPerDay } from "@/lib/pool/weeks";
 import type { Daily, WeekDay } from "@/lib/pool/weeks";
-import { clock, date, duration, weekday, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { duration } from "@/lib/time/format";
+import type { Time } from "@/lib/time/zone";
 import { cn } from "@/lib/utils";
 
 import { legendLevels, planSteps } from "./cells";
@@ -49,7 +51,7 @@ const span = (ms: number) => {
 const shiftText = (earlier: number) =>
   `${span(Math.abs(earlier))} ${earlier >= 0 ? "earlier" : "later"}`;
 
-const titleOf = (plan: Plan, now: number) => {
+const titleOf = (plan: Plan, now: number, { when }: Time) => {
   const { pace, name } = plan;
 
   if (pace === null) {
@@ -69,13 +71,17 @@ const titleOf = (plan: Plan, now: number) => {
 
 const toMinute = (at: number) => Math.round(at / 60_000) * 60_000;
 
-const timeOnly = (at: number) => clock(toMinute(at)).replace(/^\S+ /u, "");
+const timeOnly = (at: number, { clock }: Time) => clock(toMinute(at)).replace(/^\S+ /u, "");
 
 const shownRunOuts = 4;
 
-const runOutsText = (spiral: Spiral) => {
+const runOutsText = (spiral: Spiral, time: Time) => {
+  const { clock, date } = time;
+
   const outs = spiral.turns.flatMap((turn) =>
-    turn.runOuts.map((at) => (turn.current ? clock(toMinute(at)) : `${date(at)} ${timeOnly(at)}`)),
+    turn.runOuts.map((at) =>
+      turn.current ? clock(toMinute(at)) : `${date(at)} ${timeOnly(at, time)}`,
+    ),
   );
 
   if (outs.length === 0) {
@@ -89,7 +95,8 @@ const runOutsText = (spiral: Spiral) => {
   return `Ran out ${outs.slice(-shownRunOuts).join(", ")}.`;
 };
 
-const detailOf = (spiral: Spiral, plan: Plan, now: number) => {
+const detailOf = (spiral: Spiral, plan: Plan, now: number, time: Time) => {
+  const { date, when } = time;
   const { pace } = plan;
 
   const after =
@@ -106,13 +113,14 @@ const detailOf = (spiral: Spiral, plan: Plan, now: number) => {
       ? `Before ${date(spiral.exactFrom)}, daily estimates.`
       : null;
 
-  return [after, runOutsText(spiral), estimates].filter((part) => part !== null).join(" ");
+  return [after, runOutsText(spiral, time), estimates].filter((part) => part !== null).join(" ");
 };
 
 const lockedTime = (spans: readonly Span[]) =>
   spans.reduce((sum, [from, to]) => sum + (to - from), 0);
 
 const Center = ({ spiral, selected, now }: { spiral: Spiral; selected: number; now: number }) => {
+  const { date, when } = useTime();
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -150,7 +158,7 @@ const Center = ({ spiral, selected, now }: { spiral: Spiral; selected: number; n
   );
 };
 
-const readout = (focus: Focus | null, spiral: Spiral) => {
+const readout = (focus: Focus | null, spiral: Spiral, { clock, date, weekday }: Time) => {
   const turn = focus === null ? undefined : spiral.turns[focus.turn];
   const cell = focus?.cell ?? null;
 
@@ -210,6 +218,7 @@ const Curve = ({
   ahead: Span | null;
   now: number;
 }) => {
+  const { weekday } = useTime();
   const line: Points = turn.line;
   const cutoff = pace?.cutoff ?? 100;
   const forecast = line.length === 0 ? null : forecastOf(turn, pace, now);
@@ -355,6 +364,7 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
 };
 
 const PerDay = ({ turn }: { turn: Turn }) => {
+  const { weekday } = useTime();
   const top = Math.max(evenPerDay * 2, ...turn.days.map((day) => (day.used ?? 0) + day.forecast));
 
   return (
@@ -395,7 +405,7 @@ const PerDay = ({ turn }: { turn: Turn }) => {
   );
 };
 
-const outNote = (turn: Turn, shift: number | null, projected: boolean) => {
+const outNote = (turn: Turn, shift: number | null, projected: boolean, { clock }: Time) => {
   const [, again] = turn.runOuts;
 
   if (shift !== null) {
@@ -416,6 +426,8 @@ const outNote = (turn: Turn, shift: number | null, projected: boolean) => {
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
 const Stats = ({ spiral, selected, now }: { spiral: Spiral; selected: number; now: number }) => {
+  const time = useTime();
+  const { weekday, when } = time;
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -425,7 +437,7 @@ const Stats = ({ spiral, selected, now }: { spiral: Spiral; selected: number; no
   const ahead = turn.current ? spiral.ahead : null;
   const locks = locksFrom(spiral, turn);
   const end = locks.at(-1)?.[1] ?? null;
-  const held = lockedHours(locks, spiral.usual);
+  const held = lockedHours(locks, spiral.usual, time);
   const usualWeek = usualPerWeek(spiral.usual);
   const projected = turn.ranOut === null && ahead !== null;
   const out = turn.ranOut ?? ahead?.[0] ?? null;
@@ -439,11 +451,11 @@ const Stats = ({ spiral, selected, now }: { spiral: Spiral; selected: number; no
         hint={out === null ? undefined : weekday(toMinute(out))}
         value={
           <span className={cn("whitespace-nowrap", out !== null && "text-bad")}>
-            {out === null ? "–" : timeOnly(out)}
+            {out === null ? "–" : timeOnly(out, time)}
           </span>
         }
       >
-        <div className="text-sm text-muted-foreground">{outNote(turn, shift, projected)}</div>
+        <div className="text-sm text-muted-foreground">{outNote(turn, shift, projected, time)}</div>
       </Stat>
       <Stat compact label={muted("Locked")} value={held.all === 0 ? "0 h" : span(held.all)}>
         <div className="text-sm text-muted-foreground">
@@ -470,6 +482,7 @@ const Panel = ({
   selected: number;
   now: number;
 }) => {
+  const { date } = useTime();
   const turn = spiral.turns[selected];
 
   if (turn === undefined) {
@@ -566,6 +579,7 @@ export const SpiralView = ({
   picked: number | null;
   setPicked: (from: number | null) => void;
 }) => {
+  const time = useTime();
   const next = useLive((live) => live.pool?.next ?? null);
   const [focus, setFocus] = useState<Focus | null>(null);
 
@@ -579,6 +593,7 @@ export const SpiralView = ({
     plan: one,
     spiral: spiralOf({
       accountSince: one.account.since,
+      calendar: time,
       daily: daily?.accounts.find((account) => account.id === one.id) ?? {
         days: [],
         id: one.id,
@@ -605,8 +620,8 @@ export const SpiralView = ({
 
   return (
     <Section
-      title={titleOf(plan, now)}
-      detail={detailOf(spiral, plan, now)}
+      title={titleOf(plan, now, time)}
+      detail={detailOf(spiral, plan, now, time)}
       actions={<Picker plans={plans} value={plan.id} next={next} onChange={setChosen} />}
     >
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
@@ -625,7 +640,7 @@ export const SpiralView = ({
             </Coil>
           </div>
           <p className="min-h-5 text-center text-sm text-muted-foreground tabular-nums">
-            {readout(focus, spiral)}
+            {readout(focus, spiral, time)}
           </p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
             <Scale />

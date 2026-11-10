@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { texts } from "@/components/viz/meter";
 import { Segments } from "@/components/viz/segments";
 import type { Summary, Column as Totals } from "@/lib/pool/pool";
-import { dollars, duration, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { dollars, duration } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const Column = ({
@@ -47,6 +48,7 @@ export const Pools = ({
   creditProblem: string | null;
   now: number;
 }) => {
+  const { when } = useTime();
   const { credit, firstBack, open, session, sessionReset, subscriptions } = summary;
 
   return (

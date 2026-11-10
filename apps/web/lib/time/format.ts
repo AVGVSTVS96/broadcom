@@ -31,54 +31,64 @@ export const duration = (ms: number) => {
 export const ago = (at: number, now: number) =>
   now - at < minute ? "just now" : `${duration(now - at)} ago`;
 
-const weekdayTime = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-  weekday: "short",
-});
-
-const monthDay = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-});
-
 const monthDayUtc = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   month: "short",
   timeZone: "UTC",
 });
 
-const timeOnly = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-const weekdayShort = new Intl.DateTimeFormat("en-US", { weekday: "short" });
-
-const hourOnly = new Intl.DateTimeFormat("en-US", { hour: "numeric" });
-
-export const clock = (at: number) => weekdayTime.format(at);
-
-export const date = (at: number) => monthDay.format(at);
-
-const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
-
-export const when = (exact: number, now: number) => {
-  const at = Math.round(exact / minute) * minute;
-  const time = timeOnly.format(at).replace(":00", "");
-
-  if (sameDay(at, now)) {
-    return time;
-  }
-
-  return Math.abs(at - now) < 6 * DAY ? `${weekdayShort.format(at)} ${time}` : monthDay.format(at);
-};
-
 export const utcDate = (at: number) => monthDayUtc.format(at);
 
-export const weekday = (at: number) => weekdayShort.format(at);
+const hourUtc = new Intl.DateTimeFormat("en-US", { hour: "numeric", timeZone: "UTC" });
 
-export const hour = (at: number) => hourOnly.format(at);
+export const hourLabel = (hourOfDay: number) => hourUtc.format(Date.UTC(2026, 0, 1, hourOfDay));
+
+export const formatsIn = (zone: string, startOfDay: (at: number) => number) => {
+  const formatter = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat("en-US", { ...options, timeZone: zone });
+
+  const weekdayTime = formatter({ hour: "numeric", minute: "2-digit", weekday: "short" });
+  const monthDay = formatter({ day: "numeric", month: "short" });
+  const timeOnly = formatter({ hour: "numeric", minute: "2-digit" });
+  const weekdayShort = formatter({ weekday: "short" });
+  const hourOnly = formatter({ hour: "numeric" });
+  const hourMinute = formatter({ hour: "2-digit", hourCycle: "h23", minute: "2-digit" });
+  const dayOfYear = formatter({ day: "numeric", month: "short", weekday: "short" });
+
+  const dayWithYear = formatter({
+    day: "numeric",
+    month: "short",
+    weekday: "short",
+    year: "numeric",
+  });
+
+  const yearOnly = formatter({ year: "numeric" });
+
+  const when = (exact: number, now: number) => {
+    const at = Math.round(exact / minute) * minute;
+    const time = timeOnly.format(at).replace(":00", "");
+
+    if (startOfDay(at) === startOfDay(now)) {
+      return time;
+    }
+
+    return Math.abs(at - now) < 6 * DAY
+      ? `${weekdayShort.format(at)} ${time}`
+      : monthDay.format(at);
+  };
+
+  return {
+    clock: (at: number) => weekdayTime.format(at),
+    clock24: (at: number) => hourMinute.format(at),
+    date: (at: number) => monthDay.format(at),
+    day: (at: number, now: number) =>
+      (yearOnly.format(at) === yearOnly.format(now) ? dayOfYear : dayWithYear).format(at),
+    hour: (at: number) => hourOnly.format(at),
+    timeOfDay: (at: number) => timeOnly.format(at),
+    weekday: (at: number) => weekdayShort.format(at),
+    when,
+  };
+};
 
 export const plural = (count: number, one: string, many = `${one}s`) =>
   `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;

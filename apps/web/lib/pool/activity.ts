@@ -1,7 +1,7 @@
 import { HOUR, isLocked, lockedSpans, usedBetween } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import type { Plan as PoolPlan } from "@/lib/pool/pool";
-import { addHours, lastDays } from "@/lib/time/calendar";
+import type { Calendar } from "@/lib/time/calendar";
 
 export interface Plan {
   readonly id: string;
@@ -47,7 +47,12 @@ export const activityPlans = (
 
 const busySpan = 3;
 
-export const activity = (plans: readonly Plan[], now: number, days = 7) => {
+export const activity = (
+  plans: readonly Plan[],
+  now: number,
+  { addHours, lastDays }: Calendar,
+  days = 7,
+) => {
   const locks = plans.map((plan) => ({
     plan,
     spans: lockedSpans(plan.points, plan.cutoff, now),

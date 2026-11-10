@@ -10,7 +10,8 @@ import type { Plan } from "@/lib/pool/pool";
 import { creditTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
 import type { LimitWindow, LiveSession } from "@/lib/proxy/schema";
-import { dollars, duration, percent, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { dollars, duration, percent } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const Bar = ({ value, tone, locked = false }: { value: number; tone: Tone; locked?: boolean }) => (
@@ -83,6 +84,7 @@ const Session = ({ plan, now }: { plan: Plan; now: number }) => {
 };
 
 const Weekly = ({ plan, now }: { plan: Plan; now: number }) => {
+  const { when } = useTime();
   const { pace } = plan;
   const window = plan.account.week;
   const tone = windowTone(window, pace);

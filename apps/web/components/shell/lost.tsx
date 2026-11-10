@@ -4,7 +4,7 @@ import { Problems } from "@/components/viz/problems";
 import { useLive } from "@/lib/live/client";
 import type { Link, LostSince } from "@/lib/live/event";
 import { useNow } from "@/lib/live/now";
-import { when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
 
 const names: Record<Link, string> = {
   dashboard: "Offline",
@@ -13,6 +13,7 @@ const names: Record<Link, string> = {
 };
 
 const Lines = ({ lost }: { lost: LostSince }) => {
+  const { when } = useTime();
   const now = useNow(Math.max(...Object.values(lost)));
   const shown: readonly Link[] = lost.dashboard === undefined ? ["proxy", "usage"] : ["dashboard"];
 

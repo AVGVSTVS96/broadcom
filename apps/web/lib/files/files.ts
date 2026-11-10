@@ -1,3 +1,5 @@
+import type { Time } from "@/lib/time/zone";
+
 export interface Commit {
   readonly sha: string;
   readonly short: string;
@@ -220,14 +222,12 @@ export const resolveLink = (from: string, href: string) => {
   return parts.length === 0 ? null : parts.join("/");
 };
 
-export const dayGroups = (commits: readonly Commit[], now: Date) => {
-  const today = new Date(now);
-
-  today.setHours(0, 0, 0, 0);
-  const yesterday = today.getTime() - 86_400_000;
+export const dayGroups = (commits: readonly Commit[], now: number, time: Time) => {
+  const today = time.startOfDay(now);
+  const yesterday = time.addDays(today, -1);
 
   const name = (at: number) => {
-    if (at >= today.getTime()) {
+    if (at >= today) {
       return "Today";
     }
 
@@ -235,12 +235,7 @@ export const dayGroups = (commits: readonly Commit[], now: Date) => {
       return "Yesterday";
     }
 
-    return new Date(at).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      weekday: "short",
-      year: new Date(at).getFullYear() === now.getFullYear() ? undefined : "numeric",
-    });
+    return time.day(at, now);
   };
 
   const groups: { day: string; commits: Commit[] }[] = [];
