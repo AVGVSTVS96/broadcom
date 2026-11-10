@@ -102,7 +102,7 @@ const Weekly = ({ plan, now }: { plan: Plan; now: number }) => {
     return pace.runsOut === null ? (
       <Nowrap lead="Resets">{when(pace.resetsAt, now)}</Nowrap>
     ) : (
-      <span className="text-over">
+      <span className="text-over-ink">
         <Nowrap lead="Runs out">{when(pace.runsOut, now)}</Nowrap>
       </span>
     );
@@ -199,7 +199,7 @@ export const PlanRows = ({
       <Link
         key={plan.id}
         href={`/accounts#${plan.id}`}
-        className="group grid items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 sm:grid-cols-[11rem_minmax(0,1fr)_1rem] sm:px-2"
+        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 sm:grid-cols-[11rem_minmax(0,1fr)_1rem] sm:px-2"
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2 truncate">
@@ -228,7 +228,7 @@ export const PlanRows = ({
           )}
           {plan.grants.length === 0 ? <div /> : <Credit plan={plan} />}
         </div>
-        <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 max-sm:hidden" />
+        <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </Link>
     ))}
   </section>

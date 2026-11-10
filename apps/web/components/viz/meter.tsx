@@ -12,7 +12,7 @@ export const texts = {
   bad: "text-bad",
   none: "text-muted-foreground",
   ok: "text-ok",
-  over: "text-over",
+  over: "text-over-ink",
 } as const satisfies Record<Tone, string>;
 
 export const Meter = ({

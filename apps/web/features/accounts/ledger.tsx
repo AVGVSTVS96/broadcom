@@ -303,7 +303,7 @@ const SignedIn = ({ row, now }: { row: Row; now: number }) => {
         ) : undefined
       }
     >
-      <div className={cn("text-sm tabular-nums", ending && "text-over")}>
+      <div className={cn("text-sm tabular-nums", ending && "text-over-ink")}>
         {until === null ? "–" : when(until, now)}
       </div>
     </Cell>

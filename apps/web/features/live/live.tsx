@@ -83,7 +83,7 @@ const Entry = ({ agentSdk }: { agentSdk: boolean | undefined }) =>
   agentSdk === true ? (
     <span
       title="Agent SDK or claude -p: 5-hour limits count it more"
-      className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over"
+      className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over-ink"
     >
       SDK
     </span>

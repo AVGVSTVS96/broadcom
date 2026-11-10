@@ -60,7 +60,7 @@ const Meta = async ({ app, framework }: { app: ExecutorApp; framework: string | 
         {app.versions > 1 && ` · ${plural(app.versions, "version")}`}
       </div>
       {app.pinned !== null && (
-        <div className={cn(behind > 0 && "text-over")}>
+        <div className={cn(behind > 0 && "text-over-ink")}>
           apps@{shortRelease(app.pinned)}
           {behind > 0 && `, ${plural(behind, "release")} behind`}
         </div>

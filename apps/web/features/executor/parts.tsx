@@ -190,7 +190,7 @@ const SourceFileRow = ({
           />
           <span className="truncate font-mono text-[13px]">{file.path}</span>
           <span
-            className="shrink-0 text-xs text-muted-foreground data-[same=false]:text-over"
+            className="shrink-0 text-xs text-muted-foreground data-[same=false]:text-over-ink"
             data-same={same}
           >
             {stateOf(file)}
