@@ -218,7 +218,7 @@ export const PlanRows = ({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+        <div className="grid grid-cols-2 gap-4 max-sm:col-start-1 sm:grid-cols-4 sm:gap-6">
           {plan.hasPlan ? <Session plan={plan} now={now} /> : <div />}
           {plan.hasPlan ? <Weekly plan={plan} now={now} /> : <div />}
           {plan.hasPlan && plan.account.fable !== undefined ? (
@@ -228,7 +228,7 @@ export const PlanRows = ({
           )}
           {plan.grants.length === 0 ? <div /> : <Credit plan={plan} />}
         </div>
-        <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 max-sm:col-start-2 max-sm:row-span-2 max-sm:row-start-1" />
       </Link>
     ))}
   </section>
