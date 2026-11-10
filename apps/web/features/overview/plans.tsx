@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
@@ -209,7 +210,12 @@ export const PlanRows = ({
             {[
               plan.account.plan || "API key",
               ...facts(plan, working.get(plan.id)?.length ?? 0, now),
-            ].join(" · ")}
+            ].map((fact, i) => (
+              <Fragment key={fact}>
+                {i > 0 ? " · " : null}
+                <span className="whitespace-nowrap">{fact}</span>
+              </Fragment>
+            ))}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
