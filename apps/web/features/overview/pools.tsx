@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { texts } from "@/components/viz/meter";
+import { figures } from "@/components/viz/meter";
 import { Segments } from "@/components/viz/segments";
 import type { Summary, Column as Totals } from "@/lib/pool/pool";
 import { useTime } from "@/lib/time/client";
@@ -20,10 +20,10 @@ const Column = ({
   totals: Totals;
   children: ReactNode;
 }) => (
-  <div className="min-w-0 space-y-3 py-5 sm:px-6 sm:first:pl-0 sm:last:pr-0">
+  <div className="min-w-0 space-y-3 py-5 sm:px-4 sm:first:pl-0 sm:last:pr-0 wide:px-6">
     <div className="text-sm">{label}</div>
     <div className="flex items-baseline gap-1.5 sm:max-wide:flex-col sm:max-wide:items-start sm:max-wide:gap-0">
-      <span className={cn("text-5xl font-light tracking-tight tabular-nums", texts[totals.tone])}>
+      <span className={cn("text-5xl font-light tracking-tight tabular-nums", figures[totals.tone])}>
         {value}
       </span>
       <span className="text-sm whitespace-nowrap text-muted-foreground">{unit}</span>
@@ -52,7 +52,7 @@ export const Pools = ({
   const { credit, firstBack, open, session, sessionReset, subscriptions } = summary;
 
   return (
-    <div className="grid divide-y border-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    <div className="grid divide-y border-y sm:grid-cols-[1fr_1fr_1.1fr] sm:divide-x sm:divide-y-0 wide:grid-cols-3">
       <Column
         label="Weekly"
         value={percentOf(summary.week)}
