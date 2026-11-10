@@ -118,6 +118,29 @@ export type Grant = typeof Grant.Type;
 
 export const Credits = Schema.Struct({ api: Schema.Array(Grant) });
 
+export const PlansView = Schema.Struct({
+  plans: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      providers: Schema.Array(Schema.String),
+      seats: Schema.Array(
+        Schema.Struct({
+          account: Schema.NullOr(Schema.String),
+          label: Schema.String,
+          monthlyUsd: Schema.Number,
+          since: Schema.NullOr(Millis),
+          tier: Schema.String,
+        }),
+      ),
+    }),
+  ),
+  unpriced: Schema.Array(
+    Schema.Struct({ account: Schema.String, label: Schema.String, tier: Schema.String }),
+  ),
+});
+
+export type PlansView = typeof PlansView.Type;
+
 export const TokensView = Schema.Struct({
   at: Millis,
   days: Schema.Array(

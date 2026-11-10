@@ -15,7 +15,7 @@ use crate::store::{Store, now_millis};
 use crate::stream::Stream;
 use crate::views::{
     self, AppendLog, Binding, CreditsView, Labels, LimitInputs, LimitReading, Live, Names, Past,
-    PlanPricing, Processes, Range, Row, SessionUsage, TokensView, UsageView,
+    PlanPricing, PlansView, Processes, Range, Row, SessionUsage, TokensView, UsageView,
 };
 
 /// A range older than this reloads behind the request that finds it.
@@ -189,11 +189,7 @@ impl Deck {
         let mut rows = self.rows.lock();
         rows.sync(&self.store)?;
         let prepared = views::prepare(rows.since(from));
-        let plans = views::read_plans(
-            Some(&self.config.accounts_file),
-            Some(&self.config.pool_dir),
-            &self.config.plans,
-        );
+        let plans = self.plans().plans;
         let grants =
             views::read_grants(&self.config.pool_dir.join("credits.json")).unwrap_or_default();
         let pricing = PlanPricing::new(&plans, &grants, &prepared, self.zone, now);
@@ -381,6 +377,16 @@ impl Deck {
             Ok(view)
         })
         .await?
+    }
+
+    /// The pooled accounts' plan seats and the configured plans, as Plan $ prices them.
+    pub fn plans(&self) -> PlansView {
+        views::read_plans(
+            Some(&self.config.accounts_file),
+            Some(&self.config.pool_dir),
+            &self.config.plans,
+            &self.config.tiers,
+        )
     }
 
     /// The API-credit grants, carried forward by the proxy's receipts since their reading.

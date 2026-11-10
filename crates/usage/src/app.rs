@@ -490,6 +490,10 @@ pub async fn tokens(State(app): State<Arc<App>>) -> Response {
     )
 }
 
+pub async fn plans(State(app): State<Arc<App>>) -> Response {
+    reply(Ok::<_, String>(app.deck.plans()))
+}
+
 pub async fn credits(State(app): State<Arc<App>>) -> Response {
     reply(app.deck.credits().await.as_ref().clone())
 }

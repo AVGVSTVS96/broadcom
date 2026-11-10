@@ -9,20 +9,20 @@ const input = {
   grants: [{ allowance: 600, expiresAt: 20, id: "k", name: "a API", remaining: 2 }],
   plans: [{ monthly: 200, name: "ChatGPT Pro", providers: ["openai"], since: null }],
   seats: [
-    { id: "a", name: "a", plan: "Max 20x" },
-    { id: "b", name: "b", plan: "Max 20x" },
-    { id: "c", name: "c", plan: "Team" },
+    { id: "a", monthly: 200, name: "a", plan: "Max 20x" },
+    { id: "b", monthly: 200, name: "b", plan: "Max 20x" },
   ],
   total: 10_700,
+  unpriced: ["default_claude_team"],
 };
 
 describe("walletOf", () => {
   const wallet = walletOf(input);
 
-  test("prices known plans and lists the rest as unpriced", () => {
+  test("prices seats at the price they came with and lists the unpriced", () => {
     expect(wallet.monthly).toBe(600);
     expect(wallet.plans).toEqual(["2 × Claude Max 20x", "ChatGPT Pro"]);
-    expect(wallet.unpriced).toEqual(["Team"]);
+    expect(wallet.unpriced).toEqual(["default_claude_team"]);
   });
 
   test("each source's parts add up to what it ran", () => {

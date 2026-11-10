@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::views::{AgentSdk, ConfiguredPlan};
+use crate::views::{AgentSdk, ConfiguredPlan, Tier};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -28,6 +28,8 @@ pub struct Config {
     pub timezone: Option<String>,
     /// Subscriptions the pool can't read from an account profile, like ChatGPT Pro for Codex.
     pub plans: Vec<ConfiguredPlan>,
+    /// Claude plan tiers' names and monthly prices, over the built-in Max 20x, Max 5x and Pro.
+    pub tiers: Vec<Tier>,
     /// How much more the five-hour meter charges these entrypoints per token than interactive use.
     pub agent_sdk_factor: f64,
     pub agent_sdk_entrypoints: Vec<String>,
@@ -84,6 +86,7 @@ impl Default for Config {
             accounts_file: home.join(".config/cliproxyapi/accounts.json"),
             timezone: None,
             plans: Vec::new(),
+            tiers: Vec::new(),
             agent_sdk_factor: AgentSdk::default().factor,
             agent_sdk_entrypoints: AgentSdk::default().entrypoints,
             hex: home.join("hex"),

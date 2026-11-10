@@ -5,8 +5,15 @@ import { connection } from "next/server";
 import { readLive } from "@/lib/live/server";
 import { namesOf } from "@/lib/pool/names";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
-import { creditFailure, creditProblem, grantsOutcome } from "@/lib/proxy/read";
-import { Config, UsageView } from "@/lib/proxy/schema";
+import {
+  creditFailure,
+  creditProblem,
+  grantsOutcome,
+  planFailure,
+  planProblem,
+  plansOutcome,
+} from "@/lib/proxy/read";
+import { UsageView } from "@/lib/proxy/schema";
 import type { BucketSize, UsageAmount, UsageRow } from "@/lib/proxy/schema";
 import {
   bucketLabel,
@@ -236,11 +243,12 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
           Effect.orElseSucceed(() => null),
         );
 
-  const { view, spend, credits, owner } = await runtime.runPromise(
+  const { view, spend, credits, owner, plans } = await runtime.runPromise(
     Effect.all(
       {
         credits: grantsOutcome,
         owner: agent(query.within),
+        plans: query.unit === "plan" ? plansOutcome : Effect.succeed(null),
         spend: isLimit(query.unit)
           ? get(
               pathOf(query, {
@@ -349,7 +357,9 @@ export const readUsage = async (query: UsageQuery): Promise<Usage> => {
     layers,
     now,
     owner: owner?.label ?? null,
-    problems: [creditProblem(credits)].filter((problem) => problem !== null),
+    problems: [creditProblem(credits), plans === null ? null : planProblem(plans)].filter(
+      (problem) => problem !== null,
+    ),
     query,
     readings,
     rowCount: view.rowCount,
@@ -394,15 +404,13 @@ const spent = (view: UsageView, prefix: string) =>
 export const readWallet = async () => {
   const live = await readLive();
 
-  const { accounts, harness, credits, config } = await runtime.runPromise(
+  const { accounts, harness, credits, plans } = await runtime.runPromise(
     Effect.all(
       {
         accounts: spendBy("account"),
-        config: Effect.gen(function* () {
-          return yield* (yield* Proxy).get("/config", Config);
-        }),
         credits: grantsOutcome,
         harness: spendBy("harness"),
+        plans: plansOutcome,
       },
       { concurrency: "unbounded" },
     ),
@@ -413,6 +421,8 @@ export const readWallet = async () => {
   }
 
   const names = namesOf(accounts.facets.account ?? [], credits.value);
+  const known = plans.ok ? plans.value : { plans: [], unpriced: [] };
+  const seats = known.plans.flatMap((plan) => plan.seats);
 
   const wallet = walletOf({
     byAccount: spent(accounts, "a:"),
@@ -424,23 +434,33 @@ export const readWallet = async () => {
       name: names[grant.credentialId] ?? "API key",
       remaining: grant.remaining,
     })),
-    plans: (config.usage?.plans ?? []).map((plan) => ({
-      monthly: plan["monthly-usd"],
-      name: plan.name,
-      providers: plan.providers ?? [],
-      since: plan.since === undefined ? null : Date.parse(plan.since),
-    })),
-    seats: Object.values(live.accounts).map((account) => ({
-      id: account.id,
-      name: names[account.id] ?? account.label,
-      plan: account.plan,
-    })),
+    plans: known.plans
+      .filter((plan) => plan.seats.every((seat) => seat.account === null))
+      .map((plan) => ({
+        monthly: plan.seats.reduce((sum, seat) => sum + seat.monthlyUsd, 0),
+        name: plan.name,
+        providers: plan.providers,
+        since: plan.seats[0]?.since ?? null,
+      })),
+    seats: seats.flatMap((seat) =>
+      seat.account === null
+        ? []
+        : [
+            {
+              id: seat.account,
+              monthly: seat.monthlyUsd,
+              name: names[seat.account] ?? live.accounts[seat.account]?.label ?? seat.label,
+              plan: seat.tier,
+            },
+          ],
+    ),
     total: accounts.totals.apiUsd,
+    unpriced: known.unpriced.map((seat) => seat.tier),
   });
 
   return {
     now: Date.now(),
-    problems: [],
+    problems: plans.ok ? [] : [planFailure(plans.reason)],
     wallet,
   };
 };
