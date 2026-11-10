@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS cursors (
   offset INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_proxy ON events (account_id, millis) WHERE source = 'proxy';
+CREATE INDEX IF NOT EXISTS events_model ON events (raw_model);
 ";
 
 /// Whether a transcript row's upstream response or request has a proxy receipt.
@@ -278,26 +279,41 @@ impl Store {
         Ok(())
     }
 
-    /// Prices every record again under a new policy, from its raw copy, as on write.
-    pub fn set_policy(&self, policy: Arc<Policy>) -> Result<()> {
+    /// Prices again, from their raw copies, the records of every model a new policy prices
+    /// or names differently.
+    pub fn set_policy(&self, policy: &Arc<Policy>) -> Result<()> {
+        let old = std::mem::replace(&mut *self.policy.lock(), policy.clone());
+        self.reprice(policy, |raw| !old.prices_like(policy, raw))
+    }
+
+    fn reprice(&self, policy: &Policy, differs: impl Fn(&str) -> bool) -> Result<()> {
         let mut db = self.write.lock();
-        let policy = {
-            let mut current = self.policy.lock();
-            *current = policy;
-            current.clone()
-        };
         let tx = db.transaction()?;
-        let keys = tx
-            .prepare("SELECT harness, id FROM events WHERE gone = 0")?
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<BTreeSet<(String, String)>>>()?;
-        Resolver::new(&tx, &self.local.id, &policy)?.resolve(&keys)?;
+        let models = tx
+            .prepare("SELECT DISTINCT raw_model FROM events")?
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        let mut keys = BTreeSet::new();
+        {
+            let mut records =
+                tx.prepare("SELECT harness, id FROM events WHERE gone = 0 AND raw_model = ?1")?;
+            for model in models.iter().filter(|m| differs(m)) {
+                for key in records.query_map([model], |r| Ok((r.get(0)?, r.get(1)?)))? {
+                    keys.insert(key?);
+                }
+            }
+        }
+        if !keys.is_empty() {
+            Resolver::new(&tx, &self.local.id, policy)?.resolve(&keys)?;
+        }
         tx.execute(
             "INSERT OR REPLACE INTO meta (key, value) VALUES ('priced_with', ?1)",
             [policy.priced_with()],
         )?;
         tx.commit()?;
-        self.changed();
+        if !keys.is_empty() {
+            self.changed();
+        }
         Ok(())
     }
 
@@ -314,7 +330,7 @@ impl Store {
             )
             .optional()?;
         if stored.as_deref() != Some(policy.priced_with().as_str()) {
-            self.set_policy(policy)?;
+            self.reprice(&policy, |_| true)?;
         }
         Ok(())
     }

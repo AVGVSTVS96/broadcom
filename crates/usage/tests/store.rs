@@ -634,3 +634,42 @@ fn a_journal_for_a_repository_fetched_here_keeps_what_was_fetched() {
     ids.sort();
     assert_eq!(ids, ["g", "x"]);
 }
+
+#[test]
+fn a_new_price_reaches_only_its_models_records() {
+    use broadcom_usage::pricing::{Policy, Rates};
+    let dir = tempdir();
+    let store = open(&dir);
+    let unpriced = Event {
+        model: "claude-next-1".into(),
+        ..record("new", 10)
+    };
+    push(&store, vec![unpriced, record("old", 10)]);
+    let cost = |store: &Store, id: &str| {
+        let e = store
+            .events()
+            .unwrap()
+            .into_iter()
+            .find(|e| e.id == id)
+            .unwrap();
+        (e.cost_known, e.cost_usd)
+    };
+    assert_eq!(cost(&store, "new"), (false, 0.0));
+    let (_, before) = store.rows_after(-1).unwrap();
+
+    let mut catalog = Policy::bundled().catalog;
+    catalog.models.insert(
+        "claude-next-1".into(),
+        Rates::from([
+            ("input_cost_per_token".into(), 1e-6),
+            ("output_cost_per_token".into(), 2e-6),
+        ]),
+    );
+    store
+        .set_policy(&std::sync::Arc::new(Policy::new(catalog, Vec::new())))
+        .unwrap();
+    let (known, usd) = cost(&store, "new");
+    assert!(known && (usd - 120e-6).abs() < 1e-12);
+    let (changed, _) = store.rows_after(before).unwrap();
+    assert_eq!(changed.len(), 1, "records of other models are left alone");
+}

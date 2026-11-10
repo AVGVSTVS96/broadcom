@@ -56,6 +56,8 @@ pub struct Collection {
     pub events: Vec<Event>,
     pub retracted_ids: Vec<String>,
     pub warnings: Vec<String>,
+    /// Models among `events` the policy has no price for.
+    pub unpriced: Vec<String>,
 }
 
 struct Source {
@@ -713,17 +715,19 @@ fn build(
         events.push(e);
     }
     events.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then_with(|| a.id.cmp(&b.id)));
+    let unpriced: Vec<String> = unknown.into_iter().collect();
     let mut warnings = Vec::new();
-    if !unknown.is_empty() {
+    if !unpriced.is_empty() {
         warnings.push(format!(
             "No reliable API price for: {}. These tokens are included, but their costs are unavailable.",
-            unknown.into_iter().collect::<Vec<_>>().join(", ")
+            unpriced.join(", ")
         ));
     }
     Collection {
         events,
         retracted_ids: retracted,
         warnings,
+        unpriced,
     }
 }
 
