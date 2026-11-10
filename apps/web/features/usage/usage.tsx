@@ -69,7 +69,7 @@ const Sdk = ({ share }: { share: number }) =>
   share < 0.05 ? null : (
     <span
       title={`${Math.round(share * 100)}% ran on the Agent SDK or claude -p`}
-      className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over"
+      className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over-ink"
     >
       SDK{share < 0.95 ? ` ${Math.round(share * 100)}%` : ""}
     </span>
@@ -560,7 +560,7 @@ const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => {
       <Values usage={usage} row={row} />
       {row.agentSdk < 0.05 ? null : (
         <p className="text-sm text-pretty">
-          <span className="text-over">{Math.round(row.agentSdk * 100)}% on the Agent SDK.</span>{" "}
+          <span className="text-over-ink">{Math.round(row.agentSdk * 100)}% on the Agent SDK.</span>{" "}
           <span className="text-muted-foreground">
             5-hour limits count it {usage.agentSdk.factor}×.
           </span>
