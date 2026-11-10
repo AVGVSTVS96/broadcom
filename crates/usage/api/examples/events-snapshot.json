@@ -12,6 +12,7 @@
       "cwd": "cwd-6",
       "since": 1790000000000,
       "entrypoint": "",
+      "agentSdk": false,
       "question": null,
       "reply": null
     },
@@ -26,6 +27,7 @@
       "cwd": "cwd-13",
       "since": 1790003600000,
       "entrypoint": "cli",
+      "agentSdk": false,
       "question": null,
       "reply": null
     },

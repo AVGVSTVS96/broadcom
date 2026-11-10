@@ -11,7 +11,7 @@ import { Section } from "@/components/viz/section";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { agentSdk, byState, threadHref, waiting } from "@/lib/pool/live";
+import { byState, threadHref, waiting } from "@/lib/pool/live";
 import type { Handoff, Handoffs } from "@/lib/pool/live";
 import { nameOf, namesOf } from "@/lib/pool/names";
 import type { Account, LiveSession, MoveCause, SessionState } from "@/lib/proxy/schema";
@@ -78,8 +78,8 @@ const Dot = ({ state }: { state: SessionState }) => (
   </span>
 );
 
-const Entry = ({ entrypoint }: { entrypoint: string }) =>
-  agentSdk(entrypoint) ? (
+const Entry = ({ agentSdk }: { agentSdk: boolean | undefined }) =>
+  agentSdk === true ? (
     <span
       title="Agent SDK or claude -p: 5-hour limits count it more"
       className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over"
@@ -177,7 +177,7 @@ const SessionLine = ({ session, now }: { session: LiveSession; now: number }) =>
           >
             {session.label}
           </Link>
-          <Entry entrypoint={session.entrypoint} />
+          <Entry agentSdk={session.agentSdk} />
           {href === null ? null : (
             <a
               href={href}
@@ -278,7 +278,7 @@ const Running = ({
     .toSorted((a, b) => rankIn(order, a.id) - rankIn(order, b.id));
 
   const working = sessions.filter((session) => session.state === "working");
-  const sdk = sessions.filter((session) => agentSdk(session.entrypoint));
+  const sdk = sessions.filter((session) => session.agentSdk === true);
   const hosts = [...new Set(sessions.map((session) => session.host))];
   const most = Math.max(1, ...lanes.map((lane) => lane.sessions.length));
 

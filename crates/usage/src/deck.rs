@@ -523,6 +523,7 @@ impl Deck {
                 names.as_deref(),
                 tracked.as_deref(),
                 first_seen,
+                &self.config.agent_sdk(),
                 now_millis(),
             );
             let entries = live.entries();
