@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 import { Loading } from "@/components/shell/loading";
+import { Lost } from "@/components/shell/lost";
 import { Mark } from "@/components/shell/mark";
 import { Nav } from "@/components/shell/nav";
 import { Toaster } from "@/components/ui/sonner";
@@ -28,7 +29,10 @@ export const viewport: Viewport = {
 };
 
 const Live = async ({ children }: { children: ReactNode }) => (
-  <LiveProvider initial={await readLive()}>{children}</LiveProvider>
+  <LiveProvider initial={await readLive()}>
+    <Lost />
+    {children}
+  </LiveProvider>
 );
 
 const RootLayout = ({ children }: { children: ReactNode }) => (

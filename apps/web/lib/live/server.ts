@@ -5,7 +5,7 @@ import { Effect, Stream } from "effect";
 import { connection } from "next/server";
 
 import { decodeLiveEvent } from "@/lib/live/decode";
-import { applyChange } from "@/lib/live/event";
+import { applyChange, lose, regain } from "@/lib/live/event";
 import type { Live, LiveChange, LiveEvent } from "@/lib/live/event";
 import { Proxy, runtime } from "@/lib/proxy/proxy";
 import type { Source } from "@/lib/proxy/proxy";
@@ -17,12 +17,15 @@ interface Hub {
   readonly arrived: (value: boolean) => void;
 }
 
-const empty: Live = { accounts: {}, pool: null, sessions: {} };
+const empty: Live = { accounts: {}, lost: {}, pool: null, sessions: {} };
 
 const owned = (source: Source, live: Live, snapshot: Live): Live =>
-  source === "proxy"
-    ? { ...live, accounts: snapshot.accounts, pool: snapshot.pool }
-    : { ...live, sessions: snapshot.sessions };
+  regain(
+    source === "proxy"
+      ? { ...live, accounts: snapshot.accounts, pool: snapshot.pool }
+      : { ...live, sessions: snapshot.sessions },
+    source,
+  );
 
 const ownChange = (source: Source, change: LiveChange): LiveChange =>
   source === "proxy" ? { ...change, sessions: {} } : { ...change, accounts: {}, pool: null };
@@ -58,6 +61,15 @@ const createHub = (): Hub => {
     }
   };
 
+  const drop = (source: Source) => {
+    const live = hub.live ?? empty;
+
+    if (live.lost?.[source] === undefined) {
+      hub.live = lose(live, source, Date.now());
+      broadcast({ live: hub.live, type: "snapshot" });
+    }
+  };
+
   const follow = (source: Source) =>
     runtime.runFork(
       Effect.gen(function* () {
@@ -74,6 +86,11 @@ const createHub = (): Hub => {
             }),
           ),
           Effect.ignore,
+          Effect.andThen(
+            Effect.sync(() => {
+              drop(source);
+            }),
+          ),
           Effect.andThen(Effect.sleep("2 seconds")),
           Effect.forever,
         );

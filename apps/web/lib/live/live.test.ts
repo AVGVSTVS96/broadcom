@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { decodeLiveEvent } from "@/lib/live/decode";
-import { applyChange } from "@/lib/live/event";
+import { applyChange, lose, regain } from "@/lib/live/event";
 import type { Account } from "@/lib/proxy/schema";
 
 const window = {
@@ -44,13 +44,13 @@ describe("live events", () => {
     );
 
     expect(event).toEqual({
-      live: { accounts: { a1: account }, pool: null, sessions: {} },
+      live: { accounts: { a1: account }, lost: {}, pool: null, sessions: {} },
       type: "snapshot",
     });
   });
 
   test("a patch replaces, adds and removes accounts", () => {
-    const before = { accounts: { a1: account }, pool: null, sessions: {} };
+    const before = { accounts: { a1: account }, lost: { usage: 5 }, pool: null, sessions: {} };
     const second = { ...account, id: "a2" };
 
     const after = applyChange(before, {
@@ -60,6 +60,7 @@ describe("live events", () => {
     });
 
     expect(after.accounts).toEqual({ a2: second });
+    expect(after.lost).toEqual({ usage: 5 });
   });
 
   test("stale names the resources to refetch", () => {
@@ -67,5 +68,26 @@ describe("live events", () => {
       tags: ["usage"],
       type: "stale",
     });
+  });
+
+  test("a lost link keeps the time it first went down", () => {
+    const live = { accounts: {}, lost: {}, pool: null, sessions: {} };
+
+    expect(lose(lose(live, "proxy", 1), "proxy", 2).lost).toEqual({ proxy: 1 });
+  });
+
+  test("regaining a link clears only its own mark", () => {
+    const live = { accounts: {}, lost: { proxy: 1, usage: 2 }, pool: null, sessions: {} };
+
+    expect(regain(live, "proxy").lost).toEqual({ usage: 2 });
+  });
+
+  test("a snapshot from a server that predates lost marks still takes them", () => {
+    const older = { accounts: {}, pool: null, sessions: {} };
+    const patched = applyChange(older, { accounts: {}, pool: null, sessions: {} });
+
+    expect(patched.lost).toBeUndefined();
+    expect(lose(patched, "dashboard", 1).lost).toEqual({ dashboard: 1 });
+    expect(regain(older, "proxy").lost).toEqual({});
   });
 });
