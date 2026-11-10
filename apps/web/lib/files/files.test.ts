@@ -13,6 +13,7 @@ import {
   resolveLink,
   splitPatch,
 } from "@/lib/files/files";
+import { timeIn } from "@/lib/time/zone";
 
 describe("parseWorktrees", () => {
   test("reads branches, detached heads and skips prunable entries", () => {
@@ -130,27 +131,30 @@ test("resolveLink stays inside the repo", () => {
   expect(resolveLink("a.md", "#section")).toBeNull();
 });
 
-const commitAt = (at: Date) => ({
-  at: at.getTime(),
+const pacific = timeIn("America/Los_Angeles");
+
+const commitAt = (at: number) => ({
+  at,
   author: "",
   body: "",
-  sha: String(at.getTime()),
+  sha: String(at),
   short: "",
   signed: true,
   subject: "",
 });
 
-test("dayGroups names today and yesterday by the local clock", () => {
-  const now = new Date(2026, 10, 5, 10);
+test("dayGroups names today and yesterday by the viewer's clock", () => {
+  const now = pacific.instant(2026, 10, 5, 10);
 
   const groups = dayGroups(
     [
-      commitAt(new Date(2026, 10, 5, 9)),
-      commitAt(new Date(2026, 10, 5, 0, 5)),
-      commitAt(new Date(2026, 10, 4, 23)),
-      commitAt(new Date(2026, 10, 1, 12)),
+      commitAt(pacific.instant(2026, 10, 5, 9)),
+      commitAt(pacific.instant(2026, 10, 5, 0, 5)),
+      commitAt(pacific.instant(2026, 10, 4, 23)),
+      commitAt(pacific.instant(2026, 10, 1, 12)),
     ],
     now,
+    pacific,
   );
 
   expect(groups.map((group) => [group.day, group.commits.length])).toEqual([

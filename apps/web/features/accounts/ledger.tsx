@@ -34,7 +34,8 @@ import { creditTone, windowTone } from "@/lib/pool/tone";
 import type { Tone } from "@/lib/pool/tone";
 import type { Outcome } from "@/lib/proxy/attempt";
 import type { LimitWindow } from "@/lib/proxy/schema";
-import { ago, dollars, percent, plural, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { ago, dollars, percent, plural } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const dots = {
@@ -250,6 +251,8 @@ const UsageWindow = ({
   window: LimitWindow | null;
   now: number;
 }) => {
+  const { when } = useTime();
+
   if (window === null || window.used === null) {
     return <Cell label={label} value="–" note="No reading" />;
   }
@@ -275,6 +278,7 @@ const UsageWindow = ({
 };
 
 const SignedIn = ({ row, now }: { row: Row; now: number }) => {
+  const { when } = useTime();
   const { login } = row;
   const until = row.account?.signInUntil ?? null;
   const ending = endsSoon(row, now);
@@ -331,6 +335,7 @@ export const PlanLine = ({ row, now }: { row: Row; now: number }) => {
 };
 
 export const CreditLine = ({ row, now }: { row: Row; now: number }) => {
+  const { when } = useTime();
   const { credit } = row;
 
   if (credit === null) {

@@ -4,8 +4,8 @@ import { HatchPattern, forecastHatchId, hatchId } from "@/components/viz/hatch";
 import { At } from "@/components/viz/plot";
 import { HOUR } from "@/lib/pool/history";
 import type { Cell, Span, Spiral, Turn } from "@/lib/pool/spiral";
-import { addDays } from "@/lib/time/calendar";
-import { date, weekday } from "@/lib/time/format";
+import type { Calendar } from "@/lib/time/calendar";
+import { useTime } from "@/lib/time/client";
 import { cn } from "@/lib/utils";
 
 import { fillLevel, planSteps } from "./cells";
@@ -141,7 +141,7 @@ const hourRuns = (usual: readonly boolean[]) => {
 const turnOf = (rings: Rings, timeAt: number) =>
   rings.turns.findIndex((turn) => timeAt >= turn.from && timeAt < turn.to);
 
-const dayLabels = (turn: Turn | undefined) =>
+const dayLabels = (turn: Turn | undefined, { addDays }: Calendar) =>
   turn === undefined
     ? []
     : Array.from({ length: 7 }, (_, index) => {
@@ -179,14 +179,16 @@ const locate = (rings: Rings, x: number, y: number): Focus | null => {
   };
 };
 
-const Usual = ({ rings, turn, usual }: { rings: Rings; turn: Turn; usual: readonly boolean[] }) =>
-  hourRuns(usual).flatMap(([from, to]) =>
+const Usual = ({ rings, turn, usual }: { rings: Rings; turn: Turn; usual: readonly boolean[] }) => {
+  const { addDays, addHours } = useTime();
+
+  return hourRuns(usual).flatMap(([from, to]) =>
     Array.from({ length: 7 }, (_, day) => {
       const dayStart = addDays(turn.from, day);
 
       const parts = sweep(
-        fraction(turn, dayStart + from * HOUR),
-        fraction(turn, dayStart + to * HOUR),
+        fraction(turn, addHours(dayStart, from)),
+        fraction(turn, addHours(dayStart, to)),
       );
 
       return (
@@ -209,6 +211,7 @@ const Usual = ({ rings, turn, usual }: { rings: Rings; turn: Turn; usual: readon
       );
     }),
   );
+};
 
 const percent = ([x, y]: XY) => ({
   x: (x / size) * 100,
@@ -218,6 +221,7 @@ const percent = ([x, y]: XY) => ({
 const nowGap = 0.05;
 
 const Labels = ({ rings, now }: { rings: Rings; now: number }) => {
+  const time = useTime();
   const last = rings.turns.length - 1;
   const current = rings.turns[last];
 
@@ -229,7 +233,7 @@ const Labels = ({ rings, now }: { rings: Rings; now: number }) => {
 
   return (
     <>
-      {dayLabels(current)
+      {dayLabels(current, time)
         .filter(({ part }) => Math.abs(part - nowPart) > nowGap)
         .map(({ from, part }) => (
           <At
@@ -237,7 +241,7 @@ const Labels = ({ rings, now }: { rings: Rings; now: number }) => {
             {...percent(polar(outer + 18, part))}
             className="pointer-events-none text-xs text-muted-foreground"
           >
-            {weekday(from)}
+            {time.weekday(from)}
           </At>
         ))}
       <At
@@ -399,8 +403,10 @@ const WeekButtons = ({
   rings: Rings;
   selected: number;
   onSelect: (index: number) => void;
-}) =>
-  rings.turns.map((turn, index) => {
+}) => {
+  const { date } = useTime();
+
+  return rings.turns.map((turn, index) => {
     const [x, y] = at(rings, index, 0);
 
     return (
@@ -426,6 +432,7 @@ const WeekButtons = ({
       </button>
     );
   });
+};
 
 export const Coil = ({
   spiral,

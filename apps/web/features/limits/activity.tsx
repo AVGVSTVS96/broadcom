@@ -8,7 +8,8 @@ import { activity, activityPlans, busiest } from "@/lib/pool/activity";
 import type { Day, Hour } from "@/lib/pool/activity";
 import type { Points } from "@/lib/pool/history";
 import type { Plan } from "@/lib/pool/pool";
-import { clock, hour as hourOf, plural, weekday } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { hourLabel, plural } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 import { legendLevels, level, steps } from "./cells";
@@ -34,6 +35,7 @@ const Matrix = ({
   names: ReadonlyMap<string, string>;
   peak: readonly number[];
 }) => {
+  const { clock, dayOfMonth, weekday } = useTime();
   const [focus, setFocus] = useState<Hour | null>(null);
   const top = Math.max(...peak, 1);
   const average = peak.map((used) => used / days.length);
@@ -58,7 +60,7 @@ const Matrix = ({
         <div className="relative h-5 text-xs text-muted-foreground">
           {hourMarks.map((mark) => (
             <span key={mark} className="absolute" style={{ left: `${(mark / 24) * 100}%` }}>
-              {hourOf(new Date(2026, 0, 1, mark).getTime())}
+              {hourLabel(mark)}
             </span>
           ))}
         </div>
@@ -66,7 +68,7 @@ const Matrix = ({
         {days.map((day) => (
           <div key={day.from} className="contents">
             <div className="py-0.5 text-xs leading-5 text-muted-foreground">
-              {weekday(day.from)} {new Date(day.from).getDate()}
+              {weekday(day.from)} {dayOfMonth(day.from)}
             </div>
             <div className="grid grid-cols-24 gap-0.5 py-0.5">
               {day.hours.map((cell) => (
@@ -142,7 +144,7 @@ export const ActivityView = ({
   history: Readonly<Record<string, Points>>;
   now: number;
 }) => {
-  const days = activity(activityPlans(plans, history), now);
+  const days = activity(activityPlans(plans, history), now, useTime());
   const { byHour, start, end } = busiest(days);
 
   const runOuts = days.flatMap((day) => day.hours).flatMap((cell) => cell.runOuts).length;
@@ -151,7 +153,7 @@ export const ActivityView = ({
 
   return (
     <Section
-      title={`Busiest ${hourOf(new Date(2026, 0, 1, start).getTime())} to ${hourOf(new Date(2026, 0, 1, end).getTime())}`}
+      title={`Busiest ${hourLabel(start)} to ${hourLabel(end)}`}
       detail={`${plural(runOuts, "run-out")} in 7 days.`}
     >
       <Matrix days={days} names={names} peak={byHour} />

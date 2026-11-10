@@ -13,7 +13,9 @@ import { lockedFor, outcome } from "@/lib/pool/pace";
 import type { Pace } from "@/lib/pool/pace";
 import { byPace } from "@/lib/pool/pool";
 import type { Paced, Plan } from "@/lib/pool/pool";
-import { duration, percent, times, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { duration, percent, times } from "@/lib/time/format";
+import type { Time } from "@/lib/time/zone";
 import { cn } from "@/lib/utils";
 
 const fraction = (pace: Pace, at: number) =>
@@ -41,7 +43,7 @@ const projectionOf = (pace: Pace, now: number): XY[] | null => {
     : [from, [fraction(pace, pace.runsOut), 100 - pace.cutoff]];
 };
 
-const verdict = (ranked: readonly Paced[], now: number) => {
+const verdict = (ranked: readonly Paced[], now: number, { when }: Time) => {
   const open = ranked.filter((plan) => !plan.pace.locked);
   const locked = ranked.length - open.length;
 
@@ -99,6 +101,8 @@ const Readout = ({
 );
 
 const Outlook = ({ pace, now }: { pace: Pace; now: number }) => {
+  const { when } = useTime();
+
   if (pace.locked) {
     return (
       <>
@@ -121,6 +125,7 @@ const Outlook = ({ pace, now }: { pace: Pace; now: number }) => {
 };
 
 const Focus = ({ plan, now }: { plan: Paced; now: number }) => {
+  const { when } = useTime();
   const { pace } = plan;
 
   return (
@@ -257,12 +262,14 @@ const xTicks = [
 const yTicks = [0, 25, 50, 75, 100] as const;
 
 export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: number }) => {
+  const time = useTime();
+  const { when } = time;
   const ranked = byPace(plans);
 
   const [focusId, setFocusId] = useState<string | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const [plotRef, size] = useSize();
-  const { title, detail, subject } = verdict(ranked, now);
+  const { title, detail, subject } = verdict(ranked, now, time);
   const focus = ranked.find((plan) => plan.id === focusId) ?? subject;
 
   if (focus === undefined) {
@@ -575,7 +582,7 @@ export const PaceSection = ({ plans, now }: { plans: readonly Plan[]; now: numbe
           <Focus plan={focus} now={now} />
           <div className="space-y-1 border-t pt-5">
             {ranked.map((plan) => {
-              const result = outcome(plan.pace, now);
+              const result = outcome(plan.pace, now, time);
 
               return (
                 <button

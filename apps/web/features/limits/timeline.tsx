@@ -9,8 +9,8 @@ import type { Plan } from "@/lib/pool/pool";
 import { windows } from "@/lib/pool/timeline";
 import { windowTone } from "@/lib/pool/tone";
 import type { LimitWindow } from "@/lib/proxy/schema";
-import { addDays, startOfDay } from "@/lib/time/calendar";
-import { date, percent, weekday, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { percent } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const pastDays = 6;
@@ -43,6 +43,7 @@ const Row = ({
   x: (at: number) => number;
   now: number;
 }) => {
+  const { date, when } = useTime();
   const { account, pace } = plan;
 
   if (pace === null) {
@@ -160,6 +161,7 @@ export const TimelineView = ({
   history: Readonly<Record<string, Points>>;
   now: number;
 }) => {
+  const { addDays, date, dayOfMonth, startOfDay, weekday, when } = useTime();
   const from = addDays(startOfDay(now), -pastDays);
   const to = addDays(from, spanDays);
 
@@ -196,7 +198,7 @@ export const TimelineView = ({
               <div className="max-sm:hidden">{weekday(day)}</div>
               <div className="truncate">
                 <span className="max-sm:hidden">{date(day)}</span>
-                <span className="sm:hidden">{new Date(day).getDate()}</span>
+                <span className="sm:hidden">{dayOfMonth(day)}</span>
               </div>
             </div>
           ))}

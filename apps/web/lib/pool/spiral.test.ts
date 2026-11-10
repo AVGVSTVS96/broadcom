@@ -4,9 +4,12 @@ import { DAY, HOUR } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import { lockedHours, locksFrom, shiftOf, spiralOf } from "@/lib/pool/spiral";
 import type { Turn } from "@/lib/pool/spiral";
+import { timeIn } from "@/lib/time/zone";
+
+const pacific = timeIn("America/Los_Angeles");
 
 const day = (month: number, date: number, hour = 0, minute = 0) =>
-  new Date(2026, month, date, hour, minute).getTime();
+  pacific.instant(2026, month, date, hour, minute);
 
 const points: Points = [
   [day(9, 29, 9, 17), 100],
@@ -20,6 +23,7 @@ const points: Points = [
 
 const spiral = spiralOf({
   accountSince: null,
+  calendar: pacific,
   daily: { days: [[day(9, 20), 24]], id: "a" },
   now: day(10, 5, 12),
   pace: null,
@@ -89,6 +93,7 @@ describe("spiral", () => {
 
     const longer = spiralOf({
       accountSince: null,
+      calendar: pacific,
       daily: { days: [], id: "a" },
       now: day(10, 12, 12),
       pace: null,
@@ -122,7 +127,7 @@ describe("spiral", () => {
   test("locked hours count the usual ones apart", () => {
     const usual = Array.from({ length: 24 }, (_, hour) => hour >= 9);
 
-    expect(lockedHours([[day(10, 3, 7), day(10, 3, 11)]], usual)).toEqual({
+    expect(lockedHours([[day(10, 3, 7), day(10, 3, 11)]], usual, pacific)).toEqual({
       all: 4 * HOUR,
       usual: 2,
     });

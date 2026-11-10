@@ -8,6 +8,8 @@ import { ConnectButton, DeployButton, SourceFiles } from "@/features/executor/pa
 import { executorUrl, readOverview, readSource } from "@/lib/executor/api";
 import { needs, releasesBehind, sameSource, shortRelease } from "@/lib/executor/executor";
 import type { ExecutorApp, Health } from "@/lib/executor/executor";
+import { readZone } from "@/lib/time/server";
+import { timeIn } from "@/lib/time/zone";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Executor" };
@@ -31,13 +33,6 @@ const Dot = ({ health }: { health: Health }) => (
   />
 );
 
-const day = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "short",
-});
-
-const onDay = (at: string | null) => (at === null ? null : day.format(new Date(at)));
-
 const plural = (value: number, word: string) => `${value} ${word}${value === 1 ? "" : "s"}`;
 
 const OpenExecutor = () => (
@@ -52,9 +47,11 @@ const OpenExecutor = () => (
   </a>
 );
 
-const Meta = ({ app, framework }: { app: ExecutorApp; framework: string | null }) => {
+const Meta = async ({ app, framework }: { app: ExecutorApp; framework: string | null }) => {
+  const { zone } = await readZone();
+  const { date } = timeIn(zone);
   const behind = releasesBehind(app, framework);
-  const deployed = onDay(app.deployedAt);
+  const deployed = app.deployedAt === null ? null : date(Date.parse(app.deployedAt));
 
   return (
     <div className="text-xs text-muted-foreground sm:text-right">

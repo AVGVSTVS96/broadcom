@@ -1,7 +1,8 @@
 import { DAY, HOUR, WEEK, firstReaching, lastDrop, since, valueAt } from "@/lib/pool/history";
 import type { Point, Points } from "@/lib/pool/history";
 import type { LimitWindow } from "@/lib/proxy/schema";
-import { percent, times, when } from "@/lib/time/format";
+import { percent, times } from "@/lib/time/format";
+import type { Time } from "@/lib/time/zone";
 
 export interface Pace {
   readonly start: number;
@@ -134,7 +135,7 @@ export const lockedFor = (pace: Pace) => {
   return from === null ? 0 : Math.max(0, pace.resetsAt - from);
 };
 
-export const outcome = (pace: Pace, now: number) => {
+export const outcome = (pace: Pace, now: number, { when }: Time) => {
   if (pace.locked) {
     return {
       bad: true,

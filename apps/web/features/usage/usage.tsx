@@ -28,7 +28,8 @@ import {
 import { useLive } from "@/lib/live/client";
 import { useSubscription } from "@/lib/outside";
 import type { SessionState } from "@/lib/proxy/schema";
-import { dollars, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { dollars } from "@/lib/time/format";
 import { format, isLimit } from "@/lib/usage/usage";
 import type { Unit } from "@/lib/usage/usage";
 import { cn } from "@/lib/utils";
@@ -489,6 +490,7 @@ const Limits = ({ row }: { row: Selected }) =>
   );
 
 const Sessions = ({ usage, row }: { usage: Usage; row: Selected }) => {
+  const { when } = useTime();
   const { go } = useNav();
   const { drill } = row;
   const { unit } = usage.query;
@@ -532,39 +534,43 @@ const Sessions = ({ usage, row }: { usage: Usage; row: Selected }) => {
   );
 };
 
-const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => (
-  <div className="space-y-4 rounded-2xl border p-4">
-    <p className="text-sm break-words text-muted-foreground">
-      {[row.detail, `last active ${when(row.lastActiveAt, usage.now)}`]
-        .filter((part) => part !== "")
-        .join(" · ")}
-      {row.href === null ? null : (
-        <>
-          {" · "}
-          <a
-            href={row.href}
-            target="_blank"
-            rel="noreferrer"
-            className="text-foreground underline-offset-4 hover:underline"
-          >
-            Open
-          </a>
-        </>
-      )}
-    </p>
-    <Values usage={usage} row={row} />
-    {row.agentSdk < 0.05 ? null : (
-      <p className="text-sm text-pretty">
-        <span className="text-over">{Math.round(row.agentSdk * 100)}% on the Agent SDK.</span>{" "}
-        <span className="text-muted-foreground">
-          5-hour limits count it {usage.agentSdk.factor}×.
-        </span>
+const Detail = ({ usage, row }: { usage: Usage; row: Selected }) => {
+  const { when } = useTime();
+
+  return (
+    <div className="space-y-4 rounded-2xl border p-4">
+      <p className="text-sm break-words text-muted-foreground">
+        {[row.detail, `last active ${when(row.lastActiveAt, usage.now)}`]
+          .filter((part) => part !== "")
+          .join(" · ")}
+        {row.href === null ? null : (
+          <>
+            {" · "}
+            <a
+              href={row.href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-foreground underline-offset-4 hover:underline"
+            >
+              Open
+            </a>
+          </>
+        )}
       </p>
-    )}
-    <Limits row={row} />
-    <Sessions usage={usage} row={row} />
-  </div>
-);
+      <Values usage={usage} row={row} />
+      {row.agentSdk < 0.05 ? null : (
+        <p className="text-sm text-pretty">
+          <span className="text-over">{Math.round(row.agentSdk * 100)}% on the Agent SDK.</span>{" "}
+          <span className="text-muted-foreground">
+            5-hour limits count it {usage.agentSdk.factor}×.
+          </span>
+        </p>
+      )}
+      <Limits row={row} />
+      <Sessions usage={usage} row={row} />
+    </div>
+  );
+};
 
 const Line = ({
   usage,
@@ -581,6 +587,7 @@ const Line = ({
   state: SessionState | null;
   picked: boolean;
 }) => {
+  const { when } = useTime();
   const { params, go } = useNav();
   const { unit } = usage.query;
   const value = row.values[unit];

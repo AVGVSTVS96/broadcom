@@ -8,11 +8,12 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "bun test --conditions react-server",
+    "test": "TZ=Pacific/Chatham bun test --conditions react-server",
     "typegen": "next typegen"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "@date-fns/tz": "1.5.0",
     "@pierre/diffs": "1.6.4",
     "@pierre/trees": "1.0.0-beta.6",
     "class-variance-authority": "0.7.1",

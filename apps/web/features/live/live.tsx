@@ -15,7 +15,8 @@ import { byState, threadHref, waiting } from "@/lib/pool/live";
 import type { Handoff, Handoffs } from "@/lib/pool/live";
 import { nameOf, namesOf } from "@/lib/pool/names";
 import type { Account, LiveSession, MoveCause, SessionState } from "@/lib/proxy/schema";
-import { duration, plural, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { duration, plural } from "@/lib/time/format";
 import { cn } from "@/lib/utils";
 
 const dots = {
@@ -335,12 +336,8 @@ const shadeOf = (count: number, peak: number) =>
 
 const hour = 3_600_000;
 
-const hourClock = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
 const Group = ({ group, name, now }: { group: Handoff; name: Name; now: number }) => {
+  const { when } = useTime();
   const shown = group.labels.slice(0, 2);
   const more = group.labels.length - shown.length;
 
@@ -393,6 +390,7 @@ const Moves = ({
   keys: ReadonlySet<string>;
   now: number;
 }) => {
+  const { clock24, when } = useTime();
   const accounts = useLive((live) => live.accounts);
   const pool = useLive((live) => live.pool);
 
@@ -441,7 +439,7 @@ const Moves = ({
   const detail = over ? `Between ${between(bounce.between, name, keys)}. ${counts}` : counts;
 
   const describe = (lane: Handoffs["lanes"][number], index: number) =>
-    `${hourClock.format(moves.from + index * 3_600_000)}: ${lane.started[index] ?? 0} started, ${lane.arrived[index] ?? 0} moved in, ${lane.left[index] ?? 0} moved off a limit`;
+    `${clock24(moves.from + index * 3_600_000)}: ${lane.started[index] ?? 0} started, ${lane.arrived[index] ?? 0} moved in, ${lane.left[index] ?? 0} moved off a limit`;
 
   const pickedLane = lanes.find((lane) => lane.account === picked?.account);
 
@@ -460,7 +458,7 @@ const Moves = ({
             <span className="hidden sm:block" />
             <div className="grid grid-cols-4 text-[11px] text-muted-foreground">
               {marks.map((at) => (
-                <span key={at}>{hourClock.format(at)}</span>
+                <span key={at}>{clock24(at)}</span>
               ))}
             </div>
             {lanes.map((lane) => {

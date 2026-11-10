@@ -20,13 +20,6 @@ export const ago = (at: number, now = Date.now()) => {
   return elapsed < 60_000 ? "now" : relative.format(-Math.floor(elapsed / size), unit);
 };
 
-const clock = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-});
-
-export const timeOfDay = (at: number) => clock.format(at);
-
 export const bytes = (size: number) => {
   if (size < 1024) {
     return `${size} B`;

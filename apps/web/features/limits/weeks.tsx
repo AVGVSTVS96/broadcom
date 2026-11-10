@@ -7,8 +7,9 @@ import { outcome } from "@/lib/pool/pace";
 import type { Plan } from "@/lib/pool/pool";
 import { evenPerDay, outlookOf, weeksOf, withHistory } from "@/lib/pool/weeks";
 import type { Daily, Mark, Week, WeekDay } from "@/lib/pool/weeks";
-import { addDays, startOfDay } from "@/lib/time/calendar";
-import { date, times, weekday } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { times } from "@/lib/time/format";
+import type { Time } from "@/lib/time/zone";
 import { cn } from "@/lib/utils";
 
 const ratioLabel = (week: Week, base: number | null) => {
@@ -31,28 +32,32 @@ const lockStyle = (mark: Mark) => {
 
 const height = (value: number, top: number) => `${Math.max(3, (value / top) * 100)}%`;
 
-const Bar = ({ day, top }: { day: WeekDay; top: number }) => (
-  <span
-    title={`${weekday(day.from)} ${date(day.from)}: ${Math.round((day.used ?? 0) + day.forecast)} points`}
-    className="flex h-full flex-1 flex-col justify-end"
-  >
-    {day.forecast > 0 ? (
-      <span
-        className={cn(
-          "rounded-t-[3px] border border-dashed border-muted-foreground/60",
-          day.used !== null && day.used > 0 && "border-b-0",
-        )}
-        style={{ height: height(day.forecast, top) }}
-      />
-    ) : null}
-    {day.used === null || (day.used === 0 && day.forecast > 0) ? null : (
-      <span
-        className={cn("bg-foreground/40", day.forecast > 0 ? "" : "rounded-t-[3px]")}
-        style={{ height: height(day.used, top) }}
-      />
-    )}
-  </span>
-);
+const Bar = ({ day, top }: { day: WeekDay; top: number }) => {
+  const { date, weekday } = useTime();
+
+  return (
+    <span
+      title={`${weekday(day.from)} ${date(day.from)}: ${Math.round((day.used ?? 0) + day.forecast)} points`}
+      className="flex h-full flex-1 flex-col justify-end"
+    >
+      {day.forecast > 0 ? (
+        <span
+          className={cn(
+            "rounded-t-[3px] border border-dashed border-muted-foreground/60",
+            day.used !== null && day.used > 0 && "border-b-0",
+          )}
+          style={{ height: height(day.forecast, top) }}
+        />
+      ) : null}
+      {day.used === null || (day.used === 0 && day.forecast > 0) ? null : (
+        <span
+          className={cn("bg-foreground/40", day.forecast > 0 ? "" : "rounded-t-[3px]")}
+          style={{ height: height(day.used, top) }}
+        />
+      )}
+    </span>
+  );
+};
 
 const Cell = ({ week, base, top }: { week: Week; base: number | null; top: number }) => (
   <div className="min-w-0 space-y-1.5">
@@ -93,7 +98,7 @@ const Cell = ({ week, base, top }: { week: Week; base: number | null; top: numbe
   </div>
 );
 
-const weekNote = (week: Week, base: Week | undefined, since: number) => {
+const weekNote = (week: Week, base: Week | undefined, since: number, { weekday }: Time) => {
   if (week.part) {
     return `from ${weekday(since)}`;
   }
@@ -120,6 +125,7 @@ export const WeeksView = ({
   history: Readonly<Record<string, Points>>;
   now: number;
 }) => {
+  const time = useTime();
   const since = daily?.since ?? null;
 
   if (daily === null || since === null) {
@@ -137,10 +143,11 @@ export const WeeksView = ({
     return {
       plan,
       weeks: weeksOf(
-        withHistory(own, points, now),
+        withHistory(own, points, now, time),
         since,
         now,
         outlookOf(plan.pace, points, plan.account.since, now),
+        time,
       ),
     };
   });
@@ -162,10 +169,10 @@ export const WeeksView = ({
     <Section
       title={`${ranOut} of ${plans.length} plans ran out this week`}
       detail={[
-        baseWeek === undefined ? null : `Against the week of ${date(baseWeek.from)}.`,
+        baseWeek === undefined ? null : `Against the week of ${time.date(baseWeek.from)}.`,
         exact === undefined
           ? null
-          : `Days before ${date(addDays(startOfDay(exact), 1))} are estimates.`,
+          : `Days before ${time.date(time.addDays(time.startOfDay(exact), 1))} are estimates.`,
       ]
         .filter((part) => part !== null)
         .join(" ")}
@@ -176,8 +183,8 @@ export const WeeksView = ({
           <div className="grid gap-3" style={columns(header?.weeks.weeks.length ?? 1)}>
             {header?.weeks.weeks.map((week) => (
               <span key={week.from} className="min-w-0 truncate">
-                {week.current ? "This week" : date(week.from)}
-                <span className="block">{weekNote(week, baseWeek, since)}</span>
+                {week.current ? "This week" : time.date(week.from)}
+                <span className="block">{weekNote(week, baseWeek, since, time)}</span>
               </span>
             ))}
           </div>
@@ -191,7 +198,7 @@ export const WeeksView = ({
             ),
           );
 
-          const result = plan.pace === null ? null : outcome(plan.pace, now);
+          const result = plan.pace === null ? null : outcome(plan.pace, now, time);
 
           return (
             <div

@@ -15,7 +15,9 @@ import { useNow } from "@/lib/live/now";
 import { useImperative } from "@/lib/outside";
 import { accountRows, endsSoon, needsYou } from "@/lib/pool/accounts";
 import type { Credit, Login, Row, State } from "@/lib/pool/accounts";
-import { dollars, plural, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { dollars, plural } from "@/lib/time/format";
+import type { Time } from "@/lib/time/zone";
 
 const needs: Partial<Record<State["is"], string>> = {
   disabled: "is disabled",
@@ -48,7 +50,7 @@ const backFirst = (rows: readonly Row[]) =>
     )
     .toSorted((left, right) => left.until - right.until)[0];
 
-const firstSignOut = (logins: readonly Row[], now: number) => {
+const firstSignOut = (logins: readonly Row[], now: number, { when }: Time) => {
   const [first] = logins
     .flatMap((row) => {
       const until = row.account?.signInUntil ?? null;
@@ -62,7 +64,7 @@ const firstSignOut = (logins: readonly Row[], now: number) => {
   return first === undefined ? null : `${first.name}'s sign-in ends ${when(first.until, now)}`;
 };
 
-const plansTitle = (plans: readonly Row[], now: number) => {
+const plansTitle = (plans: readonly Row[], now: number, { when }: Time) => {
   const first = backFirst(plans);
 
   if (first !== undefined) {
@@ -108,6 +110,7 @@ export const Accounts = ({
   at: number;
 }) => {
   const now = useNow(at);
+  const time = useTime();
   const accounts = useLive((live) => live.accounts);
   const pool = useLive((live) => live.pool);
 
@@ -122,7 +125,7 @@ export const Accounts = ({
 
   const plans = rows.filter((row) => row.credit === null);
   const keys = rows.filter((row) => row.credit !== null);
-  const ending = firstSignOut(plans, now);
+  const ending = firstSignOut(plans, now, time);
 
   const next =
     plans.find((row) => row.state.is === "next") ?? plans.find((row) => row.state.is === "open");
@@ -151,7 +154,7 @@ export const Accounts = ({
       <Problems problems={problems} />
 
       <Section
-        title={plansTitle(plans, now)}
+        title={plansTitle(plans, now, time)}
         actions={
           <div className="flex gap-2">
             <SignIn

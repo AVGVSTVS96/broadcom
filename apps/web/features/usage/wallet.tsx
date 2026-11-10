@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 
 import { Section } from "@/components/viz/section";
 import { Stat } from "@/components/viz/stat";
-import { dollars, plural, times, when } from "@/lib/time/format";
+import { useTime } from "@/lib/time/client";
+import { dollars, plural, times } from "@/lib/time/format";
 import type { Part, Source, Wallet } from "@/lib/usage/wallet";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ const Tile = ({
 );
 
 const Tiles = ({ wallet, now }: { wallet: Wallet; now: number }) => {
+  const { when } = useTime();
   const { credit } = wallet;
 
   return (
