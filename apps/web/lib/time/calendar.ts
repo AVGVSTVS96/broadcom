@@ -70,14 +70,23 @@ export const calendarIn = (zone: string) => {
     );
   };
 
-  const startOfWeek = (ms: number) => {
-    const sinceMonday = (wall(ms).getUTCDay() + 6) % 7;
-
-    return addDays(startOfDay(ms), -sinceMonday);
-  };
-
   const lastDays = (now: number, count: number) =>
     Array.from({ length: count }, (_, index) => addDays(startOfDay(now), index - count + 1));
+
+  const daysIn = (from: number, to: number) => {
+    const starts: number[] = [];
+
+    for (let at = startOfDay(from); at < to; at = addDays(at, 1)) {
+      starts.push(at);
+    }
+
+    return starts;
+  };
+
+  const namedDay = (from: number, to: number) =>
+    daysIn(from, to)
+      .map((dayStart) => addHours(dayStart, 12))
+      .find((noon) => noon >= from && noon < to) ?? from;
 
   const instant = (year: number, month: number, date: number, hour = 0, mins = 0, secs = 0) =>
     fromWall(Date.UTC(year, month, date, hour, mins, secs));
@@ -86,11 +95,12 @@ export const calendarIn = (zone: string) => {
     addDays,
     addHours,
     dayOfMonth: (ms: number) => wall(ms).getUTCDate(),
+    daysIn,
     hourOfDay: (ms: number) => wall(ms).getUTCHours(),
     instant,
     lastDays,
+    namedDay,
     startOfDay,
-    startOfWeek,
   };
 };
 

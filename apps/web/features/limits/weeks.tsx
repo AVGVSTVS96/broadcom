@@ -5,11 +5,10 @@ import { Section } from "@/components/viz/section";
 import type { Points } from "@/lib/pool/history";
 import { outcome } from "@/lib/pool/pace";
 import type { Plan } from "@/lib/pool/pool";
-import { evenPerDay, outlookOf, weeksOf, withHistory } from "@/lib/pool/weeks";
+import { evenPerDay, outlookOf, weeksOf } from "@/lib/pool/weeks";
 import type { Daily, Mark, Week, WeekDay } from "@/lib/pool/weeks";
 import { useTime } from "@/lib/time/client";
 import { times } from "@/lib/time/format";
-import type { Time } from "@/lib/time/zone";
 import { cn } from "@/lib/utils";
 
 const ratioLabel = (week: Week, base: number | null) => {
@@ -33,11 +32,12 @@ const lockStyle = (mark: Mark) => {
 const height = (value: number, top: number) => `${Math.max(3, (value / top) * 100)}%`;
 
 const Bar = ({ day, top }: { day: WeekDay; top: number }) => {
-  const { date, weekday } = useTime();
+  const { date, namedDay, weekday } = useTime();
+  const named = namedDay(day.from, day.to);
 
   return (
     <span
-      title={`${weekday(day.from)} ${date(day.from)}: ${Math.round((day.used ?? 0) + day.forecast)} points`}
+      title={`${weekday(named)} ${date(named)}: ${Math.round((day.used ?? 0) + day.forecast)} points`}
       className="flex h-full flex-1 flex-col justify-end"
     >
       {day.forecast > 0 ? (
@@ -98,16 +98,12 @@ const Cell = ({ week, base, top }: { week: Week; base: number | null; top: numbe
   </div>
 );
 
-const weekNote = (week: Week, base: Week | undefined, since: number, { weekday }: Time) => {
-  if (week.part) {
-    return `from ${weekday(since)}`;
+const weeksAgo = (back: number) => {
+  if (back === 0) {
+    return "This week";
   }
 
-  if (week === base) {
-    return "Base";
-  }
-
-  return week.current ? "Forecast" : "\u00A0";
+  return back === 1 ? "Last week" : `${back} weeks ago`;
 };
 
 const columns = (count: number) => ({
@@ -142,24 +138,27 @@ export const WeeksView = ({
 
     return {
       plan,
-      weeks: weeksOf(
-        withHistory(own, points, now, time),
-        since,
+      weeks: weeksOf({
+        daily: own,
         now,
-        outlookOf(plan.pace, points, plan.account.since, now),
-        time,
-      ),
+        outlook: outlookOf(plan.pace, points, plan.account.since, now),
+        points,
+        since,
+      }),
     };
   });
 
-  const [header] = rows;
+  const count = Math.max(1, ...rows.map(({ weeks }) => weeks.weeks.length));
+
+  const aligned = (weeks: readonly Week[]) => [
+    ...Array.from({ length: count - weeks.length }, () => null),
+    ...weeks,
+  ];
 
   const ranOut = rows.filter(
     ({ weeks }) =>
       weeks.weeks.at(-1)?.days.some((day) => day.out === "real" || day.lock === "real") === true,
   ).length;
-
-  const baseWeek = header?.weeks.weeks.find((week) => !week.part && !week.current);
 
   const [exact] = plans
     .flatMap((plan) => history[plan.id]?.[0]?.[0] ?? [])
@@ -169,7 +168,9 @@ export const WeeksView = ({
     <Section
       title={`${ranOut} of ${plans.length} plans ran out this week`}
       detail={[
-        baseWeek === undefined ? null : `Against the week of ${time.date(baseWeek.from)}.`,
+        rows.some(({ weeks }) => weeks.base !== null)
+          ? "Against each plan's first full week."
+          : null,
         exact === undefined
           ? null
           : `Days before ${time.date(time.addDays(time.startOfDay(exact), 1))} are estimates.`,
@@ -178,17 +179,16 @@ export const WeeksView = ({
         .join(" ")}
     >
       <div className="space-y-1">
-        <div className="grid gap-3 pb-1 text-xs text-muted-foreground sm:grid-cols-[9rem_minmax(0,1fr)_10rem]">
-          <span className="max-sm:hidden" />
-          <div className="grid gap-3" style={columns(header?.weeks.weeks.length ?? 1)}>
-            {header?.weeks.weeks.map((week) => (
-              <span key={week.from} className="min-w-0 truncate">
-                {week.current ? "This week" : time.date(week.from)}
-                <span className="block">{weekNote(week, baseWeek, since, time)}</span>
+        <div className="grid gap-3 pb-1 text-xs text-muted-foreground md:grid-cols-[9rem_minmax(0,1fr)_10rem]">
+          <span className="max-md:hidden" />
+          <div className="grid gap-3" style={columns(count)}>
+            {Array.from({ length: count }, (_, index) => (
+              <span key={index} className="min-w-0 truncate">
+                {weeksAgo(count - 1 - index)}
               </span>
             ))}
           </div>
-          <span className="max-sm:hidden" />
+          <span className="max-md:hidden" />
         </div>
         {rows.map(({ plan, weeks }) => {
           const top = Math.max(
@@ -203,13 +203,17 @@ export const WeeksView = ({
           return (
             <div
               key={plan.id}
-              className="grid items-center gap-3 border-t py-3 sm:grid-cols-[9rem_minmax(0,1fr)_10rem]"
+              className="grid items-center gap-3 border-t py-3 md:grid-cols-[9rem_minmax(0,1fr)_10rem]"
             >
               <div className="truncate text-sm">{plan.name}</div>
-              <div className="grid gap-3" style={columns(weeks.weeks.length)}>
-                {weeks.weeks.map((week) => (
-                  <Cell key={week.from} week={week} base={weeks.base} top={top} />
-                ))}
+              <div className="grid gap-3" style={columns(count)}>
+                {aligned(weeks.weeks).map((week, index) =>
+                  week === null ? (
+                    <span key={index} />
+                  ) : (
+                    <Cell key={week.from} week={week} base={weeks.base} top={top} />
+                  ),
+                )}
               </div>
               <div className="text-sm">
                 {result === null ? null : (

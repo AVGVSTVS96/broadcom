@@ -1,7 +1,7 @@
-import { HOUR, drops, isLocked, lockedSpans, usedBetween, valueAt } from "@/lib/pool/history";
+import { HOUR, drops, isLocked, usedBetween, valueAt } from "@/lib/pool/history";
 import type { Point, Points } from "@/lib/pool/history";
 import type { Pace } from "@/lib/pool/pace";
-import { outlookOf, weeksOf, withHistory } from "@/lib/pool/weeks";
+import { outlookOf, weeksOf } from "@/lib/pool/weeks";
 import type { Daily, WeekDay } from "@/lib/pool/weeks";
 import type { Calendar } from "@/lib/time/calendar";
 
@@ -17,6 +17,7 @@ export interface Turn {
   readonly from: number;
   readonly to: number;
   readonly current: boolean;
+  readonly part: boolean;
   readonly cells: readonly Cell[];
   readonly days: readonly WeekDay[];
   readonly locks: readonly Span[];
@@ -60,10 +61,9 @@ const cellsOf = (
   points: Points,
   exactFrom: number | null,
   now: number,
-  { addDays }: Calendar,
 ): Cell[] =>
   days.flatMap((day): Cell[] => {
-    const end = Math.min(addDays(day.from, 1), now);
+    const end = Math.min(day.to, now);
 
     if (day.from >= end) {
       return [];
@@ -114,8 +114,7 @@ const usualOf = (
 
 const lineOf = (points: Points, from: number, to: number): Points => {
   const inside = points.filter(([at]) => at >= from && at <= to);
-  const before = valueAt(points, from);
-  const start: Point[] = before === null ? [] : [[from, before]];
+  const start: Point[] = valueAt(points, from) === null ? [] : [[from, 0]];
 
   return [...start, ...inside];
 };
@@ -137,12 +136,17 @@ export const spiralOf = ({
   now: number;
   calendar: Calendar;
 }): Spiral => {
-  const { addDays } = calendar;
   const first = points[0]?.[0];
   const exactFrom = first === undefined ? null : first - (first % HOUR);
   const cutoff = pace?.cutoff ?? 100;
 
-  const locks = lockedSpans(points, cutoff, pace?.locked === true ? pace.resetsAt : now);
+  const { locks, weeks } = weeksOf({
+    daily,
+    now,
+    outlook: outlookOf(pace, points, accountSince, now),
+    points,
+    since,
+  });
 
   const [opening] = points;
   const lockedAtStart = opening !== undefined && opening[1] >= cutoff;
@@ -154,26 +158,19 @@ export const spiralOf = ({
     ...(pace !== null && pace.resetsAt > now ? [pace.resetsAt] : []),
   ];
 
-  const { weeks } = weeksOf(
-    withHistory(daily, points, now, calendar),
-    since,
-    now,
-    outlookOf(pace, points, accountSince, now),
-    calendar,
-  );
-
   const all = weeks.map((week): Turn => {
-    const to = addDays(week.from, 7);
+    const { to } = week;
 
     const inside = runOuts.filter((at) => at >= week.from && at < to);
 
     return {
-      cells: cellsOf(week.days, points, exactFrom, now, calendar),
+      cells: cellsOf(week.days, points, exactFrom, now),
       current: week.current,
       days: week.days,
       from: week.from,
       line: lineOf(points, week.from, to),
       locks: clip(locks, week.from, to),
+      part: week.part,
       ranOut: inside[0] ?? null,
       resets: resets.filter((at) => at >= week.from && at < to),
       runOuts: inside,
