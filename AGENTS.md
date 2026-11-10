@@ -1,8 +1,8 @@
 # BROADCOM
 
-A Claude account pool and its dashboard: which account takes new work, how much each plan and API credit has left, how fast it's going, who spent it, and adding or removing accounts. Also hosts pages for the machine it runs on (Files, Plugins, Executor).
+A Claude account pool and its dashboard: which account takes new work, how much each plan and free credit has left, how fast it's going, how many tokens it has spent and who spent them, and adding or removing accounts. Also hosts pages for the machine it runs on (Files, Plugins, Executor).
 
-The pool spends cheapest first: plans, then free credit, then paid extra usage. Free credit costs nothing: API keys holding the monthly API credit a Max or Ultra plan includes, in an organization with no card, so they need no extra-usage switch. Paid extra usage bills money, and only on an account whose owner turned extra usage on. Call each by those names; "API credit" alone doesn't say which.
+The pool spends cheapest first: plans, then free credit, then paid extra usage. Free credit costs nothing: the monthly API credit a Max or Ultra plan includes, and any promotional or cloud credit, held in API keys in an organization with no card, so they need no extra-usage switch. Paid extra usage bills money, and only on an account whose owner turned extra usage on. Call each by those names; "API credit" alone doesn't say which.
 
 ## Commands
 
@@ -41,7 +41,7 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 
 ## Look
 
-Bloomberg terminal × Vercel × Linear, Swiss Helvetica, drawn heavily from the inspiration board (`~/Developer/pages/pages/broadcom-inspiration/`, mostly Headroom by @Niyxuis): a chart should visibly come from one of those images, in this app's style.
+Bloomberg terminal × Vercel × Linear, Swiss Helvetica, drawn heavily from the inspiration board (`~/Developer/pages/pages/broadcom-inspiration/`): a chart should visibly come from one of those images, in this app's style.
 
 - A section is a `Section` card (`components/viz/section.tsx`). Its title is the verdict, a sentence with the number in it ("Max 20x is 1.5× ahead of even pace"), and the line under it is the evidence. View toggles sit top right.
 - Numbers are big, light and tabular, with the unit small and muted beside them (`Stat`). Meters are thick rounded bars (`Meter`) or tick rows (`Ticks`).
