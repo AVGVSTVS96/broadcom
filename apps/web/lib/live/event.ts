@@ -8,7 +8,12 @@ export interface Live {
   readonly accounts: Readonly<Record<string, AccountType>>;
   readonly sessions: Readonly<Record<string, LiveSessionType>>;
   readonly pool: PoolType | null;
+  readonly lost?: LostSince;
 }
+
+export type LostSince = Readonly<Partial<Record<Link, number>>>;
+
+export type Link = "proxy" | "usage" | "dashboard";
 
 export interface LiveChange {
   readonly accounts: Readonly<Record<string, AccountType | null>>;
@@ -27,7 +32,16 @@ export const present = <A>(entries: Readonly<Record<string, A | null>>) =>
   );
 
 export const applyChange = (live: Live, change: LiveChange): Live => ({
+  ...live,
   accounts: present({ ...live.accounts, ...change.accounts }),
   pool: change.pool ?? live.pool,
   sessions: present({ ...live.sessions, ...change.sessions }),
+});
+
+export const lose = (live: Live, link: Link, at: number): Live =>
+  live.lost?.[link] === undefined ? { ...live, lost: { ...live.lost, [link]: at } } : live;
+
+export const regain = (live: Live, link: Link): Live => ({
+  ...live,
+  lost: Object.fromEntries(Object.entries(live.lost ?? {}).filter(([name]) => name !== link)),
 });

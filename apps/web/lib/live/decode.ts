@@ -85,7 +85,7 @@ export const decodeLiveEvent = (data: string): LiveEvent | null => {
   }
 
   return {
-    live: { accounts: present(accounts), pool, sessions: present(sessions) },
+    live: { accounts: present(accounts), lost: {}, pool, sessions: present(sessions) },
     type: "snapshot",
   };
 };
