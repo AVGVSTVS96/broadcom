@@ -4,7 +4,7 @@ import { activity, busiest, gaps } from "@/lib/pool/activity";
 import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import { namesOf } from "@/lib/pool/names";
-import { windowPace } from "@/lib/pool/pace";
+import { poolDry, windowPace } from "@/lib/pool/pace";
 import { logins, plansOf, poolOf, workingOn } from "@/lib/pool/pool";
 import { windows } from "@/lib/pool/timeline";
 import { weeksOf, withHistory } from "@/lib/pool/weeks";
@@ -488,5 +488,50 @@ describe("weeks", () => {
       [novemberDay(1), 4],
       [novemberDay(3), 99],
     ]);
+  });
+});
+
+const paced = (used: number, perHour: number, givesBack: number[] = [], hours = 24) => {
+  const pace = windowPace(window(used), ramp(0, hours, perHour), at(hours));
+
+  if (pace === null) {
+    throw new Error("no pace");
+  }
+
+  return {
+    account: {
+      ...account("a", "a@x.com"),
+      heldResets: givesBack.map((back) => ({
+        expiresAt: null,
+        givesBack: back,
+        kind: "fable",
+        left: 1,
+      })),
+    },
+    pace,
+  };
+};
+
+describe("poolDry", () => {
+  test("the points left run out at the pool's combined pace", () => {
+    const dry = poolDry([paced(48, 2), paced(48, 2)], at(24));
+
+    expect(dry?.perHour).toBeCloseTo(4, 0);
+    expect(Math.abs((dry?.at ?? 0) - at(24 + 100 / 4))).toBeLessThan(2 * HOUR);
+  });
+
+  test("resets push it out by what they give back, once per account", () => {
+    const dry = poolDry([paced(48, 2, [20, 20, 20]), paced(48, 2, [10])], at(24));
+
+    expect(dry?.back).toBe(30);
+    expect(dry?.resets).toBe(2);
+    expect(Math.abs((dry?.at ?? 0) - at(24 + 130 / 4))).toBeLessThan(2 * HOUR);
+  });
+
+  test("a reset the pool won't spend before a week comes back isn't counted", () => {
+    const dry = poolDry([paced(90, 0.6, [20], 150)], at(150));
+
+    expect(dry?.resets).toBe(0);
+    expect(dry?.back).toBe(0);
   });
 });

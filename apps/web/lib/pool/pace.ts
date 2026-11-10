@@ -1,6 +1,6 @@
 import { DAY, HOUR, WEEK, firstReaching, lastDrop, since, valueAt } from "@/lib/pool/history";
 import type { Point, Points } from "@/lib/pool/history";
-import type { LimitWindow } from "@/lib/proxy/schema";
+import type { Account, LimitWindow } from "@/lib/proxy/schema";
 import { percent, times } from "@/lib/time/format";
 import type { Time } from "@/lib/time/zone";
 
@@ -149,4 +149,54 @@ export const outcome = (pace: Pace, now: number, { when }: Time) => {
   return pace.runsOut === null
     ? { bad: false, note, text: `~${percent(pace.atReset)} at reset` }
     : { bad: true, note, text: `Runs out ${when(pace.runsOut, now)}` };
+};
+
+export interface Dry {
+  readonly at: number;
+  readonly left: number;
+  readonly back: number;
+  readonly resets: number;
+  readonly perHour: number;
+}
+
+// WHY: the proxy spends a reset only when no week comes back for 12 hours (poolDrySpell).
+const drySpell = 12 * HOUR;
+
+export const poolDry = (
+  plans: readonly { readonly pace: Pace; readonly account: Account }[],
+  now: number,
+): Dry | null => {
+  const open = plans.filter(({ pace }) => !pace.locked);
+  const left = open.reduce((sum, { pace }) => sum + Math.max(0, pace.cutoff - pace.used), 0);
+  const rate = open.reduce((sum, { pace }) => sum + pace.rate, 0);
+  const firstBack = Math.min(...plans.map(({ pace }) => pace.resetsAt));
+
+  // WHY: an account's resets share one week, so only its biggest gives back this week.
+  const gives = plans
+    .flatMap(({ account }) => {
+      const most = Math.max(0, ...account.heldResets.map((reset) => reset.givesBack ?? 0));
+
+      return most > 0 ? [most] : [];
+    })
+    .toSorted((a, b) => b - a);
+
+  if (rate === 0) {
+    return null;
+  }
+
+  let at = now + left / rate;
+  let back = 0;
+  let resets = 0;
+
+  for (const give of gives) {
+    if (firstBack - at < drySpell) {
+      break;
+    }
+
+    at += give / rate;
+    back += give;
+    resets += 1;
+  }
+
+  return at >= firstBack ? null : { at, back, left, perHour: rate * HOUR, resets };
 };

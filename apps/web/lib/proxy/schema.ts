@@ -34,6 +34,7 @@ export const Account = Schema.Struct({
   heldResets: Schema.Array(
     Schema.Struct({
       expiresAt: Schema.NullOr(Millis),
+      givesBack: Schema.optionalKey(Schema.Number),
       kind: Schema.String,
       left: Schema.Number,
     }),
