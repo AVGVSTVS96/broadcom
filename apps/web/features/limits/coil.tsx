@@ -141,15 +141,13 @@ const hourRuns = (usual: readonly boolean[]) => {
 const turnOf = (rings: Rings, timeAt: number) =>
   rings.turns.findIndex((turn) => timeAt >= turn.from && timeAt < turn.to);
 
-const dayLabels = (turn: Turn | undefined, { addDays }: Calendar) =>
+const dayLabels = (turn: Turn | undefined, { namedDay }: Calendar) =>
   turn === undefined
     ? []
-    : Array.from({ length: 7 }, (_, index) => {
-        const from = addDays(turn.from, index);
-        const middle = (from + addDays(from, 1)) / 2;
-
-        return { from, part: fraction(turn, middle) };
-      });
+    : turn.days.map((day) => ({
+        from: namedDay(day.from, day.to),
+        part: fraction(turn, (day.from + day.to) / 2),
+      }));
 
 export interface Focus {
   readonly turn: number;
@@ -180,20 +178,22 @@ const locate = (rings: Rings, x: number, y: number): Focus | null => {
 };
 
 const Usual = ({ rings, turn, usual }: { rings: Rings; turn: Turn; usual: readonly boolean[] }) => {
-  const { addDays, addHours } = useTime();
+  const { addHours, daysIn } = useTime();
 
   return hourRuns(usual).flatMap(([from, to]) =>
-    Array.from({ length: 7 }, (_, day) => {
-      const dayStart = addDays(turn.from, day);
+    daysIn(turn.from, turn.to).flatMap((dayStart) => {
+      const start = Math.max(addHours(dayStart, from), turn.from);
+      const end = Math.min(addHours(dayStart, to), turn.to);
 
-      const parts = sweep(
-        fraction(turn, addHours(dayStart, from)),
-        fraction(turn, addHours(dayStart, to)),
-      );
+      if (start >= end) {
+        return [];
+      }
+
+      const parts = sweep(fraction(turn, start), fraction(turn, end));
 
       return (
         <path
-          key={`${day}-${from}`}
+          key={`${dayStart}-${from}`}
           d={parts
             .map((part, step) => {
               const [x, y] = polar(

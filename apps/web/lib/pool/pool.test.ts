@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import { activity, busiest, gaps } from "@/lib/pool/activity";
-import { HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/pool/history";
+import { DAY, HOUR, WEEK, compact, lastDrop, lockedSpans, usedBetween } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import { namesOf } from "@/lib/pool/names";
 import { poolDry, windowPace } from "@/lib/pool/pace";
 import { logins, plansOf, poolOf, workingOn } from "@/lib/pool/pool";
 import { windows } from "@/lib/pool/timeline";
-import { weeksOf, withHistory } from "@/lib/pool/weeks";
+import { limitWeeks, weeksOf } from "@/lib/pool/weeks";
 import type { Outlook } from "@/lib/pool/weeks";
 import type { Account, Grant, LiveSession } from "@/lib/proxy/schema";
 import { duration } from "@/lib/time/format";
@@ -399,8 +399,6 @@ describe("windows", () => {
   });
 });
 
-const novemberDay = (date: number, hour = 0) => pacific.instant(2026, 10, date, hour);
-
 const outlook = (overrides: Partial<Outlook>): Outlook => ({
   cutoff: 98,
   locks: [],
@@ -412,103 +410,116 @@ const outlook = (overrides: Partial<Outlook>): Outlook => ({
 });
 
 describe("weeks", () => {
-  const since = pacific.instant(2026, 9, 17);
-  const now = pacific.instant(2026, 10, 5, 12);
+  const reset = Date.UTC(2026, 10, 8, 2);
+  const since = Date.UTC(2026, 9, 17, 7);
+  const now = Date.UTC(2026, 10, 5, 20);
+  const weekStart = reset - WEEK;
 
   const daily = {
     days: [
-      [pacific.instant(2026, 9, 17), 10],
-      [pacific.instant(2026, 9, 20), 30],
-      [pacific.instant(2026, 10, 3), 20],
+      [Date.UTC(2026, 9, 17, 7), 10],
+      [Date.UTC(2026, 9, 24, 7), 24],
+      [Date.UTC(2026, 9, 25, 7), 0],
+      [Date.UTC(2026, 10, 3, 8), 20],
     ] as const,
     id: "a",
   };
 
-  test("weeks split Monday to Sunday, the first one partial", () => {
-    const result = weeksOf(
-      daily,
-      since,
-      now,
-      outlook({ rate: 20 / 7 / (24 * HOUR), room: 5 }),
-      pacific,
+  const weeksFor = (overrides: Partial<Outlook>, points: Points = []) =>
+    weeksOf({ daily, now, outlook: outlook({ resetsAt: reset, ...overrides }), points, since });
+
+  test("weeks run from one reset to the next, the first one partial", () => {
+    const { weeks } = weeksFor({});
+
+    expect(weeks.map((week) => [week.from, week.to])).toEqual(
+      [4, 3, 2, 1].map((back) => [reset - back * WEEK, reset - (back - 1) * WEEK]),
     );
-
-    expect(result.weeks).toHaveLength(4);
-    expect(result.weeks[0]?.part).toBe(true);
-    expect(result.weeks[0]?.days[3]?.used).toBeNull();
-    expect(result.base).toBe(30);
-    expect(result.weeks[3]?.current).toBe(true);
-    expect(result.weeks[3]?.expected).toBeCloseTo(25);
+    expect(weeks[0]?.part).toBe(true);
+    expect(weeks[1]?.part).toBe(false);
+    expect(weeks[3]?.current).toBe(true);
+    expect(weeks[3]?.days.map((day) => day.from)).toEqual(
+      Array.from({ length: 7 }, (_, index) => weekStart + index * DAY),
+    );
   });
 
-  test("the forecast starts now, so today's run-out lands on today", () => {
-    const week = weeksOf(
-      daily,
-      since,
-      now,
-      outlook({ rate: 10 / (24 * HOUR), room: 3 }),
-      pacific,
-    ).weeks.at(-1);
+  test("a week whose history starts minutes after its reset still counts as full", () => {
+    const late = reset - 3 * WEEK + 3 * 60_000;
 
-    expect(week?.days[3]?.forecast).toBeCloseTo(3);
-    expect(week?.days[3]?.out).toBe("forecast");
-    expect(week?.days[4]?.lock).toBe("forecast");
+    const { weeks } = weeksOf({
+      daily,
+      now,
+      outlook: outlook({ resetsAt: reset }),
+      points: [],
+      since: late,
+    });
+
+    expect(weeks[0]?.from).toBe(reset - 3 * WEEK);
+    expect(weeks[0]?.part).toBe(false);
   });
 
-  test("room comes back at the reset", () => {
-    const week = weeksOf(
-      daily,
-      since,
-      now,
-      outlook({
-        locks: [[pacific.instant(2026, 10, 3, 10), pacific.instant(2026, 10, 7, 18)]],
-        rate: 10 / (24 * HOUR),
-        resetsAt: pacific.instant(2026, 10, 7, 18),
-      }),
-      pacific,
-    ).weeks.at(-1);
+  test("with no live reset, the last reset in the history anchors the weeks", () => {
+    const seen: Points = [
+      [weekStart - HOUR, 80],
+      [weekStart + HOUR, 0],
+    ];
 
-    expect(week?.expected).toBeCloseTo(20 + 2.5 + 10);
-    expect(week?.days[1]?.out).toBe("real");
-    expect(week?.days[5]?.lock).toBe("real");
-    expect(week?.days[6]?.lock).toBeNull();
+    expect(limitWeeks(seen, null, since, now).at(-1)).toEqual([weekStart + HOUR, reset + HOUR]);
+  });
+
+  test("a day's estimate splits where a reset cuts through it", () => {
+    const { weeks } = weeksFor({});
+
+    expect(weeks[1]?.days[6]?.used).toBeCloseTo(19);
+    expect(weeks[2]?.days[0]?.used).toBeCloseTo(5);
+  });
+
+  test("hourly readings count exactly, so this week adds up to what the plan used", () => {
+    const points: Points = [
+      [weekStart + HOUR, 0],
+      [weekStart + 30 * HOUR, 20],
+      [weekStart + 50 * HOUR, 45],
+    ];
+
+    const current = weeksFor({}, points).weeks.at(-1);
+
+    expect(current?.days[1]?.used).toBe(20);
+    expect(current?.days[2]?.used).toBe(25);
+    expect(current?.total).toBe(45);
+  });
+
+  test("estimates before the first reading add up to what that reading says was used", () => {
+    const points: Points = [
+      [weekStart + 2 * DAY + 6 * HOUR, 30],
+      [weekStart + 3 * DAY, 40],
+    ];
+
+    const current = weeksFor({}, points).weeks.at(-1);
+
+    expect(current?.days[2]?.used).toBeCloseTo(30);
+    expect(current?.total).toBeCloseTo(40);
+  });
+
+  test("a lock that the next reading shows over stops at the reset", () => {
+    const { weeks } = weeksFor({ locks: [[weekStart - DAY, weekStart + 10 * 60_000]] });
+
+    expect(weeks[2]?.days[6]?.lock).toBe("real");
+    expect(weeks[3]?.days[0]?.lock).toBeNull();
+  });
+
+  test("the forecast starts now, so today's run-out lands in today's slot", () => {
+    const week = weeksFor({ rate: 10 / DAY, room: 2 }).weeks.at(-1);
+    const today = Math.floor((now - weekStart) / DAY);
+
+    expect(week?.days[today]?.forecast).toBeCloseTo(2);
+    expect(week?.days[today]?.out).toBe("forecast");
+    expect(week?.days[today + 1]?.lock).toBe("forecast");
   });
 
   test("days before the account existed stay empty", () => {
-    const week = weeksOf(
-      { days: [[pacific.instant(2026, 10, 2), 0.002]], id: "a" },
-      since,
-      now,
-      outlook({ since: pacific.instant(2026, 10, 4, 22) }),
-      pacific,
-    ).weeks.at(-1);
+    const week = weeksFor({ since: weekStart + 2 * DAY + HOUR }).weeks.at(-1);
 
-    expect(week?.days[0]?.used).toBeNull();
-    expect(week?.days[2]?.used).toBe(0);
-  });
-
-  test("limit history replaces the usage estimate for the days it covers", () => {
-    const merged = withHistory(
-      {
-        days: [
-          [novemberDay(1), 4],
-          [novemberDay(3), 1],
-        ],
-        id: "a",
-      },
-      [
-        [novemberDay(2, 12), 0],
-        [novemberDay(3, 9), 60],
-        [novemberDay(3, 20), 99],
-      ],
-      novemberDay(3, 21),
-      pacific,
-    );
-
-    expect(merged.days).toEqual([
-      [novemberDay(1), 4],
-      [novemberDay(3), 99],
-    ]);
+    expect(week?.days[1]?.used).toBeNull();
+    expect(week?.days[2]?.used).toBeCloseTo(15);
   });
 });
 

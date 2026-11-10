@@ -67,12 +67,6 @@ describe("calendar", () => {
     ]);
   });
 
-  test("a week across fall back still starts on Monday's midnight", () => {
-    expect(pacific.startOfWeek(Date.UTC(2026, 10, 1, 20))).toBe(Date.UTC(2026, 9, 26, 7));
-    expect(pacific.startOfWeek(Date.UTC(2026, 10, 4, 20))).toBe(Date.UTC(2026, 10, 2, 8));
-    expect(pacific.startOfWeek(Date.UTC(2026, 10, 9, 20))).toBe(Date.UTC(2026, 10, 9, 8));
-  });
-
   test("every hour of 2026 matches Temporal in zones with odd offsets and DST rules", () => {
     const zones = ["America/Los_Angeles", "Europe/Berlin", "Australia/Lord_Howe", "Asia/Kathmandu"];
 

@@ -218,7 +218,7 @@ const Curve = ({
   ahead: Span | null;
   now: number;
 }) => {
-  const { weekday } = useTime();
+  const { namedDay, weekday } = useTime();
   const line: Points = turn.line;
   const cutoff = pace?.cutoff ?? 100;
   const forecast = line.length === 0 ? null : forecastOf(turn, pace, now);
@@ -309,7 +309,7 @@ const Curve = ({
       <div />
       <div className="grid grid-cols-7 pt-1.5 text-center text-xs text-muted-foreground">
         {turn.days.map((day) => (
-          <span key={day.from}>{weekday(day.from)}</span>
+          <span key={day.from}>{weekday(namedDay(day.from, day.to))}</span>
         ))}
       </div>
     </div>
@@ -364,7 +364,7 @@ const DayBar = ({ day, top }: { day: WeekDay; top: number }) => {
 };
 
 const PerDay = ({ turn }: { turn: Turn }) => {
-  const { weekday } = useTime();
+  const { namedDay, weekday } = useTime();
   const top = Math.max(evenPerDay * 2, ...turn.days.map((day) => (day.used ?? 0) + day.forecast));
 
   return (
@@ -387,7 +387,7 @@ const PerDay = ({ turn }: { turn: Turn }) => {
       </div>
       <div className="grid grid-cols-7 gap-2 text-center text-xs text-muted-foreground">
         {turn.days.map((day) => (
-          <span key={day.from}>{weekday(day.from)}</span>
+          <span key={day.from}>{weekday(namedDay(day.from, day.to))}</span>
         ))}
       </div>
       <Legend
@@ -521,7 +521,7 @@ const Panel = ({
 const hasUse = (turn: Turn) => turn.cells.some((cell) => (cell.used ?? 0) > 0);
 
 const depth = (spiral: Spiral) =>
-  spiral.turns.filter(hasUse).length * 100 +
+  spiral.turns.filter((turn) => !turn.part && hasUse(turn)).length * 100 +
   spiral.turns.reduce((sum, turn) => sum + turn.runOuts.length, 0);
 
 const Picker = ({

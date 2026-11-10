@@ -1,7 +1,6 @@
-import { lockedSpans, usedBetween } from "@/lib/pool/history";
+import { DAY, HOUR, WEEK, lastDrop, lockedSpans, usedBetween } from "@/lib/pool/history";
 import type { Points } from "@/lib/pool/history";
 import type { Pace } from "@/lib/pool/pace";
-import type { Calendar } from "@/lib/time/calendar";
 
 export interface Daily {
   readonly id: string;
@@ -21,6 +20,7 @@ export type Mark = "real" | "forecast" | null;
 
 export interface WeekDay {
   readonly from: number;
+  readonly to: number;
   readonly used: number | null;
   readonly forecast: number;
   readonly lock: Mark;
@@ -29,6 +29,7 @@ export interface WeekDay {
 
 export interface Week {
   readonly from: number;
+  readonly to: number;
   readonly days: readonly WeekDay[];
   readonly total: number;
   readonly part: boolean;
@@ -40,6 +41,7 @@ export interface AccountWeeks {
   readonly id: string;
   readonly weeks: readonly Week[];
   readonly base: number | null;
+  readonly locks: Outlook["locks"];
 }
 
 const daysInWeek = 7;
@@ -48,14 +50,54 @@ const meaningfulBase = 1;
 
 export const evenPerDay = 100 / daysInWeek;
 
-export const weekStarts = (since: number, now: number, { addDays, startOfWeek }: Calendar) => {
-  const starts: number[] = [];
+const nextReset = (points: Points, resetsAt: number | null, now: number) => {
+  const anchor = resetsAt ?? lastDrop(points);
 
-  for (let at = startOfWeek(since); at <= now; at = addDays(at, daysInWeek)) {
-    starts.push(at);
+  if (anchor === null) {
+    return null;
   }
 
-  return starts;
+  return anchor > now ? anchor : anchor + (Math.floor((now - anchor) / WEEK) + 1) * WEEK;
+};
+
+export const limitWeeks = (
+  points: Points,
+  resetsAt: number | null,
+  since: number,
+  now: number,
+): (readonly [from: number, to: number])[] => {
+  const weeks: (readonly [number, number])[] = [];
+
+  for (let end = nextReset(points, resetsAt, now); end !== null && end > since; end -= WEEK) {
+    weeks.unshift([end - WEEK, end]);
+  }
+
+  return weeks;
+};
+
+type Span = readonly [from: number, to: number];
+
+const insideWeeks = (spans: readonly Span[], weeks: readonly Span[]): Span[] =>
+  spans.map(([start, end]) => {
+    const week = weeks.find(([from, to]) => start >= from && start < to);
+
+    return [start, week === undefined ? end : Math.min(end, week[1])] as const;
+  });
+
+const estimateIn = (daily: Daily, from: number, to: number) => {
+  let estimated = 0;
+
+  for (const [index, [at, used]] of daily.days.entries()) {
+    const next = daily.days[index + 1]?.[0];
+    const end = next !== undefined && next - at <= DAY + HOUR ? next : at + DAY;
+    const overlap = Math.min(end, to) - Math.max(at, from);
+
+    if (overlap > 0) {
+      estimated += (used * overlap) / (end - at);
+    }
+  }
+
+  return estimated;
 };
 
 const overlaps = (spans: Outlook["locks"], from: number, to: number) =>
@@ -68,7 +110,7 @@ export const outlookOf = (
   now: number,
 ): Outlook => ({
   cutoff: pace?.cutoff ?? 100,
-  locks: pace === null ? [] : lockedSpans(points, pace.cutoff, pace.locked ? pace.resetsAt : now),
+  locks: lockedSpans(points, pace?.cutoff ?? 100, pace?.locked === true ? pace.resetsAt : now),
   rate: pace?.rate ?? 0,
   resetsAt: pace?.resetsAt ?? null,
   room: pace === null || pace.locked ? 0 : Math.max(0, pace.cutoff - pace.used),
@@ -122,24 +164,49 @@ const forecaster = (outlook: Outlook) => {
   };
 };
 
-export const weeksOf = (
-  daily: Daily,
-  since: number,
-  now: number,
-  outlook: Outlook,
-  calendar: Calendar,
-): AccountWeeks => {
-  const { addDays, startOfDay } = calendar;
-  const first = startOfDay(Math.max(since, outlook.since ?? since));
-  const today = startOfDay(now);
+export const weeksOf = ({
+  daily,
+  points,
+  since,
+  now,
+  outlook,
+}: {
+  daily: Daily;
+  points: Points;
+  since: number;
+  now: number;
+  outlook: Outlook;
+}): AccountWeeks => {
+  const first = Math.max(since, outlook.since ?? since);
+  const [opening] = points;
+  const exactFrom = opening?.[0] ?? Infinity;
   const forecast = forecaster(outlook);
+  const spans = limitWeeks(points, outlook.resetsAt, since, now);
+  const locks = insideWeeks(outlook.locks, spans);
 
-  const used = new Map(daily.days.map(([at, value]) => [startOfDay(at), value]));
+  const weeks = spans.map(([from, to]): Week => {
+    const slots = Array.from({ length: daysInWeek }, (_, index) => {
+      const day = from + index * DAY;
+      const next = day + DAY;
+      const start = Math.max(day, first);
+      const end = Math.min(next, now);
+      const counted = next > first && day <= now;
 
-  const weeks = weekStarts(since, now, calendar).map((from): Week => {
-    const days = Array.from({ length: daysInWeek }, (_, index): WeekDay => {
-      const day = addDays(from, index);
-      const next = addDays(day, 1);
+      return {
+        counted,
+        day,
+        estimate: counted ? estimateIn(daily, start, Math.min(end, exactFrom)) : 0,
+        exact:
+          counted && end > exactFrom ? usedBetween(points, Math.max(start, exactFrom), end) : 0,
+        next,
+      };
+    });
+
+    const opensHere = opening !== undefined && from < exactFrom && exactFrom < to;
+    const estimated = slots.reduce((sum, slot) => sum + slot.estimate, 0);
+    const scale = opensHere && estimated > 0 ? opening[1] / estimated : 1;
+
+    const days = slots.map(({ day, next, counted, estimate, exact }): WeekDay => {
       const ahead = next > now;
 
       const outlookDay = ahead
@@ -154,58 +221,36 @@ export const weeksOf = (
         outlookDay.ranOut < next &&
         (outlookDay.lockedUntil === null || outlookDay.lockedUntil > day);
 
-      const realLock = overlaps(outlook.locks, day, next);
-
-      const realOut = outlook.locks.some(([start]) => start >= day && start < next);
+      const unseen =
+        opensHere && estimated === 0 && exactFrom >= day && exactFrom < next ? opening[1] : 0;
 
       return {
         forecast: outlookDay.spent,
         from: day,
-        lock: markOf(realLock, forecastLock),
-        out: markOf(realOut, forecastOut),
-        used: day < first || day > today ? null : (used.get(day) ?? 0),
+        lock: markOf(overlaps(locks, day, next), forecastLock),
+        out: markOf(
+          locks.some(([start]) => start >= day && start < next),
+          forecastOut,
+        ),
+        to: next,
+        used: counted ? estimate * scale + exact + unseen : null,
       };
     });
 
     const total = days.reduce((sum, day) => sum + (day.used ?? 0), 0);
 
     return {
-      current: addDays(from, daysInWeek) > now,
+      current: to > now,
       days,
       expected: total + days.reduce((sum, day) => sum + day.forecast, 0),
       from,
-      part: from < startOfDay(since),
+      part: since - from > HOUR,
+      to,
       total,
     };
   });
 
   const base = weeks.find((week) => !week.part && !week.current && week.total >= meaningfulBase);
 
-  return { base: base?.total ?? null, id: daily.id, weeks };
-};
-
-export const withHistory = (
-  daily: Daily,
-  points: Points,
-  now: number,
-  { addDays, startOfDay }: Calendar,
-): Daily => {
-  const [first] = points;
-
-  if (first === undefined) {
-    return daily;
-  }
-
-  const exact: (readonly [number, number])[] = [];
-
-  for (let day = addDays(startOfDay(first[0]), 1); day <= now; day = addDays(day, 1)) {
-    exact.push([day, usedBetween(points, day, addDays(day, 1))]);
-  }
-
-  const covered = exact[0]?.[0] ?? Infinity;
-
-  return {
-    days: [...daily.days.filter(([at]) => startOfDay(at) < covered), ...exact],
-    id: daily.id,
-  };
+  return { base: base?.total ?? null, id: daily.id, locks, weeks };
 };
