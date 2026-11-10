@@ -8,20 +8,39 @@ use super::sessions::Prepared;
 use super::timeframe::{month_start, next_month, parse_millis};
 
 /// One paid subscription seat on a plan.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Seat {
+    /// The pooled account it is; none for a configured plan.
+    pub account: Option<String>,
     pub label: String,
     pub tier: String,
     pub monthly_usd: f64,
-    pub since: f64,
+    /// None until the account's profile reports when it started, and Plan $ leaves it out until then.
+    pub since: Option<f64>,
 }
 
 /// A subscription that covers its providers' usage.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
 pub struct Plan {
     pub name: String,
     pub providers: Vec<String>,
     pub seats: Vec<Seat>,
+}
+
+/// A pooled account on a tier no price is known for.
+#[derive(Debug, Clone, PartialEq, Serialize, schemars::JsonSchema)]
+pub struct UnpricedSeat {
+    pub account: String,
+    pub label: String,
+    pub tier: String,
+}
+
+/// Every plan and its seats, and the pooled accounts left out for want of a price.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, schemars::JsonSchema)]
+pub struct PlansView {
+    pub plans: Vec<Plan>,
+    pub unpriced: Vec<UnpricedSeat>,
 }
 
 /// A plan from config (`usage.plans`), like a ChatGPT subscription.
@@ -34,22 +53,34 @@ pub struct ConfiguredPlan {
     pub since: String,
 }
 
-fn claude_tier(tier: &str) -> Option<(&'static str, f64)> {
-    match tier {
-        "default_claude_max_20x" => Some(("Max 20x", 200.0)),
-        "default_claude_max_5x" => Some(("Max 5x", 100.0)),
-        "default_claude_ai" => Some(("Pro", 20.0)),
-        _ => None,
-    }
+/// A Claude plan tier's name and monthly price, by the tier id its profile reports.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Tier {
+    pub tier: String,
+    pub name: String,
+    #[serde(rename = "monthlyUSD")]
+    pub monthly_usd: f64,
 }
 
-fn tier_id(name: &str) -> &'static str {
-    match name {
-        "max 20x" => "default_claude_max_20x",
-        "max 5x" => "default_claude_max_5x",
-        "pro" => "default_claude_ai",
-        _ => "",
-    }
+/// The built-in tiers, under the configured ones.
+fn tiers_over(configured: &[Tier]) -> Vec<Tier> {
+    let built_in = [
+        ("default_claude_max_20x", "Max 20x", 200.0),
+        ("default_claude_max_5x", "Max 5x", 100.0),
+        ("default_claude_ai", "Pro", 20.0),
+    ]
+    .map(|(tier, name, monthly_usd)| Tier {
+        tier: tier.into(),
+        name: name.into(),
+        monthly_usd,
+    });
+    let mut tiers = configured.to_vec();
+    tiers.extend(
+        built_in
+            .into_iter()
+            .filter(|b| !configured.iter().any(|c| c.tier == b.tier)),
+    );
+    tiers
 }
 
 pub(crate) fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Option<T> {
@@ -80,56 +111,67 @@ struct SavedPlan {
     since: Option<f64>,
 }
 
-/// The pooled Claude accounts' plans, from the pool's account list (accounts.json)
-/// and the plan each profile reported (`<state>/plans/<id>.json`), then the configured plans.
+/// The pooled Claude accounts' plans, from the pool's account list (accounts.json) and the
+/// tier each profile reported (`<state>/plans/<id>.json`), priced by `tiers` over the
+/// built-in ones; then the configured plans.
 pub fn read_plans(
     accounts_file: Option<&Path>,
     state_dir: Option<&Path>,
     configured: &[ConfiguredPlan],
-) -> Vec<Plan> {
+    tiers: &[Tier],
+) -> PlansView {
+    let tiers = tiers_over(tiers);
     let list: AccountList = accounts_file.and_then(read_json).unwrap_or_default();
+    let mut view = PlansView::default();
     let mut seats = Vec::new();
     for account in list.accounts {
         let saved: SavedPlan = state_dir
             .and_then(|dir| read_json(&dir.join("plans").join(format!("{}.json", account.id))))
             .unwrap_or_default();
-        let tier = match (saved.tier, &account.tier) {
-            (Some(tier), _) => tier,
-            (None, Some(name)) => tier_id(name).to_string(),
-            (None, None) => String::new(),
+        let priced = match (&saved.tier, &account.tier) {
+            (Some(id), _) => tiers.iter().find(|t| t.tier == *id),
+            (None, Some(name)) => tiers.iter().find(|t| t.name.eq_ignore_ascii_case(name)),
+            (None, None) => None,
         };
-        if let (Some((name, monthly)), Some(since)) =
-            (claude_tier(&tier), saved.since.filter(|s| *s != 0.0))
-        {
-            seats.push(Seat {
-                label: account.email,
-                tier: name.into(),
-                monthly_usd: monthly,
-                since,
-            });
-        }
+        let Some(tier) = priced else {
+            if let Some(tier) = saved.tier.or(account.tier).filter(|t| !t.is_empty()) {
+                view.unpriced.push(UnpricedSeat {
+                    account: account.id,
+                    label: account.email,
+                    tier,
+                });
+            }
+            continue;
+        };
+        seats.push(Seat {
+            account: Some(account.id),
+            label: account.email,
+            tier: tier.name.clone(),
+            monthly_usd: tier.monthly_usd,
+            since: saved.since.filter(|s| *s != 0.0),
+        });
     }
-    let mut plans = Vec::new();
     if !seats.is_empty() {
-        plans.push(Plan {
+        view.plans.push(Plan {
             name: "Claude".into(),
             providers: vec!["anthropic".into()],
             seats,
         });
     }
     for plan in configured {
-        plans.push(Plan {
+        view.plans.push(Plan {
             name: plan.name.clone(),
             providers: plan.providers.clone(),
             seats: vec![Seat {
+                account: None,
                 label: plan.name.clone(),
                 tier: plan.name.clone(),
                 monthly_usd: plan.monthly_usd,
-                since: parse_millis(&plan.since),
+                since: Some(parse_millis(&plan.since)),
             }],
         });
     }
-    plans
+    view
 }
 
 /// Go's math.Min and Max, where NaN wins.
@@ -159,8 +201,22 @@ fn overlap(start: f64, end: f64, from: f64, to: f64) -> f64 {
     go_max(0.0, go_min(end, to) - go_max(start, from))
 }
 
+/// A seat with a known start, as pricing needs it.
+#[derive(Debug, Clone, Copy)]
+struct Started {
+    monthly_usd: f64,
+    since: f64,
+}
+
+/// A plan's providers and its seats that have started.
+#[derive(Debug, Clone)]
+struct Covering {
+    providers: Vec<String>,
+    seats: Vec<Started>,
+}
+
 /// A seat accrues its monthly price evenly across each calendar month it was active.
-fn seat_fees(seat: &Seat, m: Month, from: f64, to: f64) -> f64 {
+fn seat_fees(seat: Started, m: Month, from: f64, to: f64) -> f64 {
     seat.monthly_usd * overlap(m.start, m.end, go_max(from, seat.since), to) / (m.end - m.start)
 }
 
@@ -174,7 +230,7 @@ fn is_api_key(event: &Prepared) -> bool {
 /// event of each month it prices, and every event after now.
 #[derive(Debug, Clone)]
 pub struct PlanPricing {
-    active: Vec<Plan>,
+    active: Vec<Covering>,
     covers: Vec<f64>,
     months: Vec<Month>,
     grants: Vec<ApiCredit>,
@@ -194,13 +250,29 @@ impl PlanPricing {
         let now = now as f64;
         let mut active = Vec::new();
         let mut covers = Vec::new();
-        for plan in plans.iter().filter(|plan| !plan.seats.is_empty()) {
+        for plan in plans {
+            let seats: Vec<Started> = plan
+                .seats
+                .iter()
+                .filter_map(|seat| {
+                    Some(Started {
+                        monthly_usd: seat.monthly_usd,
+                        since: seat.since?,
+                    })
+                })
+                .collect();
+            if seats.is_empty() {
+                continue;
+            }
             covers.push(
-                plan.seats
+                seats
                     .iter()
                     .fold(f64::INFINITY, |cover, seat| go_min(cover, seat.since)),
             );
-            active.push(plan.clone());
+            active.push(Covering {
+                providers: plan.providers.clone(),
+                seats,
+            });
         }
         let from = covers.iter().fold(now, |from, cover| go_min(from, *cover));
         let mut months = Vec::new();
@@ -246,7 +318,7 @@ impl PlanPricing {
                         let fees: f64 = plan
                             .seats
                             .iter()
-                            .fold(0.0, |fees, seat| fees + seat_fees(seat, *m, m.start, now));
+                            .fold(0.0, |fees, seat| fees + seat_fees(*seat, *m, m.start, now));
                         if *api > 0.0 { fees / api } else { 0.0 }
                     })
                     .collect()
@@ -328,10 +400,11 @@ mod tests {
             name: "Claude".into(),
             providers: vec!["anthropic".into()],
             seats: vec![Seat {
+                account: None,
                 label: String::new(),
                 tier: String::new(),
                 monthly_usd: 310.0,
-                since,
+                since: Some(since),
             }],
         }];
         let event = |model: &str, at: &str, cost: f64| Event {
@@ -366,10 +439,11 @@ mod tests {
             name: "Claude".into(),
             providers: vec!["anthropic".into()],
             seats: vec![Seat {
+                account: None,
                 label: String::new(),
                 tier: String::new(),
                 monthly_usd: 300.0,
-                since,
+                since: Some(since),
             }],
         }];
         let event = |account: &str, cost: f64| Event {
@@ -397,5 +471,104 @@ mod tests {
         assert!((p.price(&prepared[0]) - 300.0).abs() < 1e-9);
         assert_eq!(p.price(&prepared[1]), 0.0);
         assert_eq!(p.price(&prepared[2]), 80.0);
+    }
+
+    #[test]
+    fn seats_are_priced_by_tier_and_unknown_tiers_are_listed() {
+        let root = std::env::temp_dir().join(format!("views-plans-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("plans")).unwrap();
+        let accounts = root.join("accounts.json");
+        std::fs::write(
+            &accounts,
+            r#"{"accounts":[{"id":"a","email":"a@x","tier":"max 5x"},{"id":"b","email":"b@x"},{"id":"c","email":"c@x"},{"id":"d","email":"d@x"}]}"#,
+        )
+        .unwrap();
+        for (id, saved) in [
+            ("b", r#"{"tier":"default_claude_max_20x","since":5}"#),
+            ("c", r#"{"tier":"default_claude_team","since":5}"#),
+        ] {
+            std::fs::write(root.join(format!("plans/{id}.json")), saved).unwrap();
+        }
+        let seats = |view: &PlansView| {
+            view.plans[0]
+                .seats
+                .iter()
+                .map(|s| {
+                    (
+                        s.account.clone().unwrap(),
+                        s.tier.clone(),
+                        s.monthly_usd,
+                        s.since,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let view = read_plans(Some(&accounts), Some(&root), &[], &[]);
+        assert_eq!(
+            seats(&view),
+            [
+                ("a".into(), "Max 5x".into(), 100.0, None),
+                ("b".into(), "Max 20x".into(), 200.0, Some(5.0)),
+            ]
+        );
+        assert_eq!(
+            view.unpriced,
+            [UnpricedSeat {
+                account: "c".into(),
+                label: "c@x".into(),
+                tier: "default_claude_team".into(),
+            }]
+        );
+
+        let team = Tier {
+            tier: "default_claude_team".into(),
+            name: "Team".into(),
+            monthly_usd: 30.0,
+        };
+        let view = read_plans(Some(&accounts), Some(&root), &[], &[team]);
+        assert_eq!(
+            seats(&view)[2],
+            ("c".into(), "Team".into(), 30.0, Some(5.0))
+        );
+        assert_eq!(view.unpriced, []);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_seat_with_no_start_adds_no_fees() {
+        let utc: Tz = "UTC".parse().unwrap();
+        let now = utc.with_ymd_and_hms(2026, 10, 16, 0, 0, 0).unwrap();
+        let seat = |since: Option<f64>| Seat {
+            account: Some(String::new()),
+            label: String::new(),
+            tier: String::new(),
+            monthly_usd: 200.0,
+            since,
+        };
+        let since = utc
+            .with_ymd_and_hms(2026, 9, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_millis() as f64;
+        let plan = |seats| Plan {
+            name: "Claude".into(),
+            providers: vec!["anthropic".into()],
+            seats,
+        };
+        let events = [Event {
+            model: "claude-opus-4-5".into(),
+            timestamp: "2026-09-10T00:00:00Z".into(),
+            cost_usd: 400.0,
+            cost_known: true,
+            ..Default::default()
+        }];
+        let rows = events.map(|e| Row::from(&e));
+        let prepared = prepare(&rows);
+        let price = |plans: &[Plan]| {
+            PlanPricing::new(plans, &[], &prepared, utc, now.timestamp_millis()).price(&prepared[0])
+        };
+        let one = price(&[plan(vec![seat(Some(since))])]);
+        assert!((one - 200.0).abs() < 1e-9);
+        assert_eq!(price(&[plan(vec![seat(Some(since)), seat(None)])]), one);
     }
 }

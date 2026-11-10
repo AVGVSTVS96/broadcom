@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlansView",
+  "description": "Every plan and its seats, and the pooled accounts left out for want of a price.",
+  "type": "object",
+  "properties": {
+    "plans": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Plan"
+      }
+    },
+    "unpriced": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/UnpricedSeat"
+      }
+    }
+  },
+  "required": [
+    "plans",
+    "unpriced"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Plan": {
+      "description": "A subscription that covers its providers' usage.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Seat"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "providers",
+        "seats"
+      ],
+      "additionalProperties": false
+    },
+    "Seat": {
+      "description": "One paid subscription seat on a plan.",
+      "type": "object",
+      "properties": {
+        "account": {
+          "description": "The pooled account it is; none for a configured plan.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string"
+        },
+        "monthlyUsd": {
+          "type": "number",
+          "format": "double"
+        },
+        "since": {
+          "description": "None until the account's profile reports when it started, and Plan $ leaves it out until then.",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "required": [
+        "account",
+        "label",
+        "tier",
+        "monthlyUsd",
+        "since"
+      ],
+      "additionalProperties": false
+    },
+    "UnpricedSeat": {
+      "description": "A pooled account on a tier no price is known for.",
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "account",
+        "label",
+        "tier"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

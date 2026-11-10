@@ -1,11 +1,5 @@
 import { plural, utcDate } from "@/lib/time/format";
 
-const planPrices = new Map([
-  ["Max 20x", 200],
-  ["Max 5x", 100],
-  ["Pro", 20],
-]);
-
 const harnessOf = new Map([
   ["anthropic", "claude"],
   ["openai", "codex"],
@@ -16,7 +10,9 @@ export interface WalletInput {
     readonly id: string;
     readonly name: string;
     readonly plan: string;
+    readonly monthly: number;
   }[];
+  readonly unpriced: readonly string[];
   readonly plans: readonly {
     readonly name: string;
     readonly monthly: number;
@@ -83,11 +79,7 @@ const byValue = (a: { value: number }, b: { value: number }) => b.value - a.valu
 
 export const walletOf = (input: WalletInput): Wallet => {
   const spent = (id: string) => input.byAccount[id] ?? 0;
-  const priced = input.seats.filter((seat) => planPrices.has(seat.plan));
-
-  const unpriced = input.seats
-    .filter((seat) => seat.plan !== "" && !planPrices.has(seat.plan))
-    .map((seat) => seat.plan);
+  const { seats } = input;
 
   const creditParts = input.grants
     .map((grant) => ({
@@ -99,28 +91,28 @@ export const walletOf = (input: WalletInput): Wallet => {
 
   const creditRan = sum(creditParts.map((part) => part.value));
 
-  const seatParts = priced
+  const seatParts = seats
     .map((seat) => ({ key: seat.id, label: seat.name, value: spent(seat.id) }))
     .toSorted(byValue);
 
   const claudeRan = Math.max(0, (input.byHarness.claude ?? 0) - creditRan);
   const unrecorded = claudeRan - sum(seatParts.map((part) => part.value));
-  const claudePlan = sum(priced.map((seat) => planPrices.get(seat.plan) ?? 0));
+  const claudePlan = sum(seats.map((seat) => seat.monthly));
 
   const claude: Source[] =
-    priced.length === 0 && claudeRan <= 0
+    seats.length === 0 && claudeRan <= 0
       ? []
       : [
           {
             credit: null,
-            detail: counted(priced.map((seat) => seat.plan)).join(", "),
+            detail: counted(seats.map((seat) => seat.plan)).join(", "),
             key: "claude",
             name: "Claude",
             parts:
               unrecorded > 0.005
                 ? [...seatParts, { key: "none", label: "No account", value: unrecorded }]
                 : seatParts,
-            plan: priced.length === 0 ? null : claudePlan,
+            plan: seats.length === 0 ? null : claudePlan,
             ran: claudeRan,
             share: 0,
           },
@@ -202,11 +194,11 @@ export const walletOf = (input: WalletInput): Wallet => {
     monthly,
     perDollar: monthly > 0 ? (input.total - creditRan) / monthly : null,
     plans: [
-      ...counted(priced.map((seat) => `Claude ${seat.plan}`)),
+      ...counted(seats.map((seat) => `Claude ${seat.plan}`)),
       ...input.plans.map((plan) => plan.name),
     ],
     ran: input.total,
     sources,
-    unpriced,
+    unpriced: input.unpriced,
   };
 };

@@ -20,7 +20,7 @@ pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, read_grants};
 pub use identity::{Names, Past, Who, load_names, read_past};
 pub use limits::{AppendLog, Binding, LimitReading, parse_binding, parse_reading};
 pub use live::{Live, LiveSession, Processes, live_map, read_processes, seats_of};
-pub use plans::{ConfiguredPlan, Plan, PlanPricing, read_plans};
+pub use plans::{ConfiguredPlan, Plan, PlanPricing, PlansView, Tier, read_plans};
 pub use row::Row;
 pub use schema::schemas;
 pub use sessions::{Amount, LimitInputs, Prepared, Session, SessionUsage, prepare, session_usage};

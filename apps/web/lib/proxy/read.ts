@@ -9,7 +9,15 @@ import type { Daily } from "@/lib/pool/weeks";
 import { attempt, attemptCached, outcome } from "@/lib/proxy/attempt";
 import type { Outcome } from "@/lib/proxy/attempt";
 import { Proxy, ProxyError, runtime } from "@/lib/proxy/proxy";
-import { Config, Credentials, Credits, History, LimitUsage, TokensView } from "@/lib/proxy/schema";
+import {
+  Config,
+  Credentials,
+  Credits,
+  History,
+  LimitUsage,
+  PlansView,
+  TokensView,
+} from "@/lib/proxy/schema";
 import { redact } from "@/lib/settings/redact";
 import { valuesOf } from "@/lib/settings/settings";
 
@@ -84,6 +92,26 @@ export const readTokens = async () =>
       return yield* (yield* Proxy).get("/deck/tokens", TokensView);
     }),
   );
+
+export const plansOutcome = outcome(
+  Effect.gen(function* () {
+    return yield* (yield* Proxy).get("/deck/plans", PlansView);
+  }),
+);
+
+export const planFailure = (reason: string) => `Plan prices didn't load: ${reason}`;
+
+export const planProblem = (read: Outcome<PlansView>) => {
+  if (!read.ok) {
+    return planFailure(read.reason);
+  }
+
+  const tiers = [...new Set(read.value.unpriced.map((seat) => seat.tier))];
+
+  return tiers.length === 0
+    ? null
+    : `Plan $ leaves out ${tiers.join(", ")}: no known price, add it to tiers in the usage config`;
+};
 
 export const creditFailure = (reason: string) => `API credit didn't load: ${reason}`;
 

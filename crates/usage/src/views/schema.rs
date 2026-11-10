@@ -2,7 +2,7 @@ use schemars::generate::SchemaSettings;
 use schemars::transform::RecursiveTransform;
 use schemars::{JsonSchema, Schema};
 
-use super::{CreditsView, LiveSession, SessionUsage, TokensView, UsageView};
+use super::{CreditsView, LiveSession, PlansView, SessionUsage, TokensView, UsageView};
 
 /// Every field of every answer is always present, and nothing else is.
 fn exact(schema: &mut Schema) {
@@ -25,12 +25,13 @@ fn schema_of<T: JsonSchema>() -> Schema {
 }
 
 /// The JSON Schema of each answer, by the file name it's published under in api/.
-pub fn schemas() -> [(&'static str, Schema); 5] {
+pub fn schemas() -> [(&'static str, Schema); 6] {
     [
         ("usage", schema_of::<UsageView>()),
         ("sessions", schema_of::<SessionUsage>()),
         ("credits", schema_of::<CreditsView>()),
         ("tokens", schema_of::<TokensView>()),
+        ("plans", schema_of::<PlansView>()),
         ("live-session", schema_of::<LiveSession>()),
     ]
 }
@@ -88,6 +89,7 @@ mod tests {
             ("sessions", "sessions.json"),
             ("credits", "credits.json"),
             ("tokens", "tokens.json"),
+            ("plans", "plans.json"),
         ] {
             check(name, file, &read(&examples.join(file)));
         }

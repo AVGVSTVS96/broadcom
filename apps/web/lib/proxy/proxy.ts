@@ -23,7 +23,13 @@ const usageBase = process.env.BROADCOM_USAGE ?? "http://127.0.0.1:8320";
 
 export type Source = "proxy" | "usage";
 
-const usagePaths = ["/deck/usage", "/deck/sessions", "/deck/credits", "/deck/tokens"];
+const usagePaths = [
+  "/deck/usage",
+  "/deck/sessions",
+  "/deck/credits",
+  "/deck/tokens",
+  "/deck/plans",
+];
 
 const sourceOf = (at: string): Source =>
   usagePaths.some((prefix) => at.startsWith(prefix)) ? "usage" : "proxy";

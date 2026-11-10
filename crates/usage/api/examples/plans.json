@@ -1,0 +1,48 @@
+{
+  "plans": [
+    {
+      "name": "Claude",
+      "providers": [
+        "anthropic"
+      ],
+      "seats": [
+        {
+          "account": "account-1",
+          "label": "label-1",
+          "tier": "Max 20x",
+          "monthlyUsd": 200,
+          "since": 1767225600000
+        },
+        {
+          "account": "account-2",
+          "label": "label-2",
+          "tier": "Max 5x",
+          "monthlyUsd": 100,
+          "since": null
+        }
+      ]
+    },
+    {
+      "name": "plan-1",
+      "providers": [
+        "openai"
+      ],
+      "seats": [
+        {
+          "account": null,
+          "label": "plan-1",
+          "tier": "plan-1",
+          "monthlyUsd": 200,
+          "since": 1767225600000
+        }
+      ]
+    }
+  ],
+  "unpriced": [
+    {
+      "account": "account-3",
+      "label": "label-3",
+      "tier": "default_claude_team"
+    }
+  ]
+}
