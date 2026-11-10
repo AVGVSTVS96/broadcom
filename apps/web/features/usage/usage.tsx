@@ -69,7 +69,7 @@ const Sdk = ({ share }: { share: number }) =>
   share < 0.05 ? null : (
     <span
       title={`${Math.round(share * 100)}% ran on the Agent SDK or claude -p`}
-      className="shrink-0 rounded-[5px] border border-over/50 px-1 text-[10px] leading-4 font-medium tracking-wide text-over-ink"
+      className="shrink-0 rounded-[5px] border border-over-ink/40 px-1 text-[10px] leading-4 font-medium tracking-wide text-over-ink"
     >
       SDK{share < 0.95 ? ` ${Math.round(share * 100)}%` : ""}
     </span>
