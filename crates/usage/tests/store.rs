@@ -444,7 +444,7 @@ fn journals_follow_withdrawals_and_rewrites() {
         path: journal.clone(),
         device: device("mac"),
         format: Format::Journal,
-        whole: true,
+        shared: false,
     };
     let (x, y) = (record("x", 1), record("y", 1));
     std::fs::write(
@@ -475,4 +475,162 @@ fn journals_follow_withdrawals_and_rewrites() {
     std::fs::rename(&fresh, &journal).unwrap();
     follow::catch_up(&store, &followed).unwrap();
     assert_eq!(visible_ids(&store), ["z"]);
+}
+
+/// A journal for a device Go last heard from at 1000, and a push here at 2000.
+fn moved_device(dir: &std::path::Path) -> (Store, broadcom_usage::follow::Followed) {
+    use broadcom_usage::follow::{Followed, Format};
+    let store = open(dir);
+    let followed = Followed {
+        path: dir.join("mac.ndjson"),
+        device: Device {
+            synced_at: Some(1000),
+            ..device("mac")
+        },
+        format: Format::Journal,
+        shared: false,
+    };
+    (store, followed)
+}
+
+fn push(store: &Store, events: Vec<Event>) {
+    let mut pushed = batch("mac", events, &[]);
+    pushed.device.synced_at = Some(2000);
+    store.apply(&pushed, false).unwrap();
+}
+
+fn append(path: &std::path::Path, text: &str) {
+    use std::io::Write;
+    std::fs::OpenOptions::new()
+        .append(true)
+        .open(path)
+        .unwrap()
+        .write_all(text.as_bytes())
+        .unwrap();
+}
+
+/// Replaces a file the way Go compacts a journal, so it gets a new inode.
+fn rewrite(path: &std::path::Path, text: &str) {
+    let fresh = path.with_extension("fresh");
+    std::fs::write(&fresh, text).unwrap();
+    std::fs::rename(&fresh, path).unwrap();
+}
+
+fn outputs(store: &Store) -> Vec<(String, i64)> {
+    let mut out: Vec<_> = store
+        .device_records("mac")
+        .unwrap()
+        .into_iter()
+        .map(|e| (e.id, e.output_tokens))
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn a_journal_read_again_keeps_what_its_device_pushed_here() {
+    use broadcom_usage::follow::{self, Followed};
+    let dir = tempdir();
+    let (store, followed) = moved_device(&dir);
+    let text = journal_line(&record("x", 1)) + &journal_line(&record("y", 1));
+    std::fs::write(&followed.path, &text).unwrap();
+    follow::catch_up(&store, &followed).unwrap();
+
+    push(&store, vec![record("x", 5), record("p", 1)]);
+    let held = [("p".into(), 1), ("x".into(), 5), ("y".into(), 1)];
+    rewrite(&followed.path, &text);
+    follow::catch_up(&store, &followed).unwrap();
+    assert_eq!(outputs(&store), held, "a copied journal changes nothing");
+
+    let elsewhere = dir.join("same-journal.ndjson");
+    std::fs::hard_link(&followed.path, &elsewhere).unwrap();
+    let lost_cursor = Followed {
+        path: elsewhere,
+        device: followed.device.clone(),
+        format: followed.format,
+        shared: false,
+    };
+    follow::catch_up(&store, &lost_cursor).unwrap();
+    assert_eq!(
+        outputs(&store),
+        held,
+        "a journal without a cursor changes nothing"
+    );
+}
+
+#[test]
+fn a_device_mid_move_takes_what_go_still_writes() {
+    use broadcom_usage::follow;
+    let dir = tempdir();
+    let (store, followed) = moved_device(&dir);
+    std::fs::write(&followed.path, journal_line(&record("x", 1))).unwrap();
+    follow::catch_up(&store, &followed).unwrap();
+    push(&store, vec![record("p", 1)]);
+
+    append(
+        &followed.path,
+        &(journal_line(&record("q", 1)) + "{\"d\":\"x\"}\n"),
+    );
+    follow::catch_up(&store, &followed).unwrap();
+    assert_eq!(
+        outputs(&store),
+        [("p".into(), 1), ("q".into(), 1)],
+        "appended lines apply as written"
+    );
+
+    append(&followed.path, &journal_line(&record("q", 7)));
+    rewrite(
+        &followed.path,
+        &(journal_line(&record("q", 7)) + &journal_line(&record("r", 1))),
+    );
+    follow::catch_up(&store, &followed).unwrap();
+    assert_eq!(
+        outputs(&store),
+        [("p".into(), 1), ("q".into(), 1), ("r".into(), 1)],
+        "a compaction only adds what the store lacks"
+    );
+}
+
+#[test]
+fn a_journal_read_after_its_device_pushed_here_adds_only_last_versions() {
+    use broadcom_usage::follow;
+    let dir = tempdir();
+    let (store, followed) = moved_device(&dir);
+    push(&store, vec![record("x", 5)]);
+    let text = journal_line(&record("x", 1))
+        + "{\"d\":\"x\"}\n"
+        + &journal_line(&record("x", 2))
+        + &journal_line(&record("z", 1))
+        + "{\"d\":\"z\"}\n"
+        + &journal_line(&record("y", 1))
+        + &journal_line(&record("y", 3));
+    std::fs::write(&followed.path, &text).unwrap();
+    follow::catch_up(&store, &followed).unwrap();
+    assert_eq!(outputs(&store), [("x".into(), 5), ("y".into(), 3)]);
+}
+
+#[test]
+fn a_journal_for_a_repository_fetched_here_keeps_what_was_fetched() {
+    use broadcom_usage::follow;
+    let dir = tempdir();
+    let store = open(&dir);
+    std::fs::create_dir_all(dir.join("events")).unwrap();
+    std::fs::write(
+        dir.join("devices.json"),
+        r#"[{"id":"github:o/r","label":"GitHub o/r","syncedAt":1000}]"#,
+    )
+    .unwrap();
+    let journals = follow::go_journals(&dir, &device("server"), |d| d.id == "github:o/r");
+    let text = journal_line(&record("x", 1));
+    std::fs::write(&journals[0].path, &text).unwrap();
+    follow::catch_up(&store, &journals[0]).unwrap();
+
+    let mut fetched = batch("github:o/r", vec![record("g", 1)], &[]);
+    fetched.device.synced_at = Some(500);
+    store.apply(&fetched, true).unwrap();
+    rewrite(&journals[0].path, &text);
+    follow::catch_up(&store, &journals[0]).unwrap();
+    let mut ids: Vec<_> = store.device_ids("github:o/r").unwrap();
+    ids.sort();
+    assert_eq!(ids, ["g", "x"]);
 }

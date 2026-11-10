@@ -39,15 +39,23 @@ impl App {
     fn followed(&self) -> Vec<Followed> {
         let mut out = Vec::new();
         if let Some(dir) = &self.config.go_usage_dir {
-            let shared_local = self.config.collects() || self.config.receipts.is_some();
-            out.extend(follow::go_journals(dir, self.local(), shared_local));
+            let collects = self.config.collects() || self.config.receipts.is_some();
+            let shared = |device: &Device| {
+                (device.id == self.local().id && collects)
+                    || self
+                        .config
+                        .github_repos
+                        .iter()
+                        .any(|repo| device.id.strip_prefix("github:") == Some(repo))
+            };
+            out.extend(follow::go_journals(dir, self.local(), shared));
         }
         if let Some(path) = &self.config.receipts {
             out.push(Followed {
                 path: path.clone(),
                 device: self.local().clone(),
                 format: Format::Receipts,
-                whole: false,
+                shared: false,
             });
         }
         out

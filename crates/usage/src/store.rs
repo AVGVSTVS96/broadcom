@@ -211,7 +211,7 @@ impl Store {
         let synced = batch.device.synced_at.or((!fill).then(now_millis));
         tx.execute(
             "INSERT INTO devices (id, label, synced_at) VALUES (?1, ?2, ?3) ON CONFLICT (id) DO UPDATE SET \
-             label = CASE WHEN ?2 <> '' AND ?1 <> ?4 THEN ?2 ELSE label END, synced_at = coalesce(?3, synced_at)",
+             label = CASE WHEN ?2 <> '' AND ?1 <> ?4 THEN ?2 ELSE label END, synced_at = max(coalesce(?3, synced_at), coalesce(synced_at, ?3))",
             params![id, if id == self.local.id { "" } else { label }, synced, self.local.id],
         )?;
         let mut touched = BTreeSet::new();
@@ -437,6 +437,16 @@ impl Store {
         }];
         out.append(&mut others);
         Ok(out)
+    }
+
+    /// When the store last heard from a device, by any path.
+    pub fn synced_at(&self, device: &str) -> Result<Option<i64>> {
+        let db = self.read.lock();
+        Ok(db
+            .prepare_cached("SELECT synced_at FROM devices WHERE id = ?1")?
+            .query_row([device], |r| r.get(0))
+            .optional()?
+            .flatten())
     }
 
     /// One device's stored records, as it sent them.
