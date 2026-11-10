@@ -35,6 +35,13 @@ export class ProxyError extends Data.TaggedError("ProxyError")<{
   readonly reason: string;
 }> {}
 
+class KeyError extends Data.TaggedError("KeyError")<{ readonly message: string }> {}
+
+const readKey = Effect.try({
+  catch: () => new KeyError({ message: `can't read the key in ${keyFile}` }),
+  try: () => readFileSync(/*turbopackIgnore: true*/ keyFile, "utf-8").trim(),
+});
+
 type Decodable = Schema.Top & { readonly DecodingServices: never };
 
 export class Proxy extends Context.Service<
@@ -68,22 +75,20 @@ const refusal = (at: string, status: number, body: Schema.Json) =>
 export const ProxyLive = Layer.effect(
   Proxy,
   Effect.gen(function* () {
-    const key = yield* Effect.sync(() =>
-      readFileSync(/*turbopackIgnore: true*/ keyFile, "utf-8").trim(),
-    );
-
     const http = yield* HttpClient.HttpClient;
 
     const clientFor = (base: string) =>
       http.pipe(
         HttpClient.mapRequest(HttpClientRequest.prependUrl(`${base}/v8/management`)),
-        HttpClient.mapRequest(HttpClientRequest.bearerToken(key)),
+        HttpClient.mapRequestEffect((request) =>
+          readKey.pipe(Effect.map((key) => HttpClientRequest.bearerToken(request, key))),
+        ),
       );
 
     const clients = {
       proxy: clientFor(proxyBase),
       usage: clientFor(usageBase),
-    } satisfies Record<Source, HttpClient.HttpClient>;
+    };
 
     const decode = <S extends Decodable>(
       at: string,
