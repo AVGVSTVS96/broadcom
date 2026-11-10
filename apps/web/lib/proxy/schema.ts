@@ -30,6 +30,8 @@ export const Account = Schema.Struct({
       used: NullableNumber,
     }),
   ),
+  fable: Schema.optionalKey(LimitWindow),
+  fableShare: Schema.optionalKey(NullableNumber),
   fiveHour: LimitWindow,
   heldResets: Schema.Array(
     Schema.Struct({

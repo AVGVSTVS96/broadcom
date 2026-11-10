@@ -114,6 +114,45 @@ const Weekly = ({ plan, now }: { plan: Plan; now: number }) => {
   );
 };
 
+const Fable = ({
+  window,
+  share,
+  now,
+}: {
+  window: LimitWindow;
+  share: number | null;
+  now: number;
+}) => {
+  const { when } = useTime();
+  const tone = windowTone(window);
+  const out = window.used !== null && window.used >= window.cutoff;
+  const left = 100 - (window.used ?? 0);
+
+  const note = () => {
+    if (window.used === null) {
+      return "No reading";
+    }
+
+    if (out) {
+      return window.resetsAt === null ? (
+        "Out"
+      ) : (
+        <Nowrap lead="Back">{when(window.resetsAt, now)}</Nowrap>
+      );
+    }
+
+    return share === null
+      ? `${percent(left)} left`
+      : `${Math.round(left * share)} of ${Math.round(100 * share)} points left`;
+  };
+
+  return (
+    <Cell label="Fable" value={used(window)} tone={tone} note={note()}>
+      <Bar value={window.used ?? 0} tone={tone} locked={out} />
+    </Cell>
+  );
+};
+
 const Credit = ({ plan }: { plan: Plan }) => {
   const left = creditLeft(plan.grants);
   const total = creditTotal(plan.grants);
@@ -173,9 +212,14 @@ export const PlanRows = ({
             ].join(" · ")}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
           {plan.hasPlan ? <Session plan={plan} now={now} /> : <div />}
           {plan.hasPlan ? <Weekly plan={plan} now={now} /> : <div />}
+          {plan.hasPlan && plan.account.fable !== undefined ? (
+            <Fable window={plan.account.fable} share={plan.account.fableShare ?? null} now={now} />
+          ) : (
+            <div />
+          )}
           {plan.grants.length === 0 ? <div /> : <Credit plan={plan} />}
         </div>
         <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 max-sm:hidden" />
