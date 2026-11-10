@@ -1,6 +1,5 @@
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
-import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 import { hatchStyle } from "@/components/viz/hatch";
@@ -199,22 +198,21 @@ export const PlanRows = ({
       <Link
         key={plan.id}
         href={`/accounts#${plan.id}`}
-        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[17rem_minmax(0,1fr)_1rem] lg:px-2"
+        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[13rem_minmax(0,1fr)_1rem] lg:px-2"
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2 truncate">
             {plan.id === next ? <span className="size-2 shrink-0 rounded-full bg-brand" /> : null}
             <span className={cn("truncate", plan.id === next && "text-brand")}>{plan.name}</span>
           </div>
-          <div className="text-sm text-muted-foreground">
+          <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
             {[
               plan.account.plan || "API key",
               ...facts(plan, working.get(plan.id)?.length ?? 0, now),
-            ].map((fact, i) => (
-              <Fragment key={fact}>
-                {i > 0 ? " · " : null}
-                <span className="whitespace-nowrap">{fact}</span>
-              </Fragment>
+            ].map((fact) => (
+              <span key={fact} className="whitespace-nowrap">
+                {fact}
+              </span>
             ))}
           </div>
         </div>
