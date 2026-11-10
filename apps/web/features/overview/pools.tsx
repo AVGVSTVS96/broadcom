@@ -90,7 +90,7 @@ export const Pools = ({
             "No API keys"
           ) : (
             <>
-              {credit.empty} of {credit.parts.length} keys empty ·{" "}
+              {credit.empty} of {credit.parts.length} keys empty,{" "}
               <span className="whitespace-nowrap">ends {when(credit.endsAt, now)}</span>
             </>
           ))}
