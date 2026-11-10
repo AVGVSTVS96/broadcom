@@ -35,8 +35,9 @@ pub struct Config {
     pub agent_sdk_entrypoints: Vec<String>,
     pub hex: PathBuf,
     pub claude: PathBuf,
-    /// The Go proxy's usage folder, whose journals are followed read-only: its history
-    /// loads once into an empty store, and anything it still writes follows.
+    /// The Go proxy's usage folder, whose journals are followed read-only: each device's
+    /// history loads into the store, and a journal speaks for its device until the store
+    /// hears from the device itself, after which it only adds what the store lacks.
     pub go_usage_dir: Option<PathBuf>,
     /// Collect this machine's transcripts here; by default only when no Go proxy collects them
     /// (no `goUsageDir`).
