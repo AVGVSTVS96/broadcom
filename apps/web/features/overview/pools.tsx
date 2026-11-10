@@ -63,7 +63,7 @@ export const Pools = ({
           `All ${subscriptions.length} plans have room`
         ) : (
           <>
-            {firstBack.name} is back first,{" "}
+            {firstBack.name} back{" "}
             <span className="whitespace-nowrap">
               {when(firstBack.account.week.resetsAt ?? 0, now)}
             </span>
@@ -90,8 +90,8 @@ export const Pools = ({
             "No API keys"
           ) : (
             <>
-              {credit.empty} of {credit.parts.length} keys empty · ends{" "}
-              <span className="whitespace-nowrap">{when(credit.endsAt, now)}</span>
+              {credit.empty} of {credit.parts.length} keys empty ·{" "}
+              <span className="whitespace-nowrap">ends {when(credit.endsAt, now)}</span>
             </>
           ))}
       </Column>

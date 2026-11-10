@@ -199,7 +199,7 @@ export const PlanRows = ({
       <Link
         key={plan.id}
         href={`/accounts#${plan.id}`}
-        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[11rem_minmax(0,1fr)_1rem] lg:px-2"
+        className="group grid grid-cols-[minmax(0,1fr)_1rem] items-center gap-x-6 gap-y-3 py-4 transition-colors hover:bg-muted/40 lg:grid-cols-[17rem_minmax(0,1fr)_1rem] lg:px-2"
       >
         <div className="min-w-0">
           <div className="flex items-center gap-2 truncate">

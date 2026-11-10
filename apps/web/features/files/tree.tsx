@@ -21,7 +21,7 @@ const look = `
     --trees-border-radius-override: 8px;
     --trees-git-added-color-override: var(--ok);
     --trees-git-untracked-color-override: var(--ok);
-    --trees-git-modified-color-override: var(--over);
+    --trees-git-modified-color-override: var(--over-ink);
     --trees-git-deleted-color-override: var(--bad);
     --trees-selected-bg-override: var(--accent);
     --trees-search-bg-override: var(--muted);
