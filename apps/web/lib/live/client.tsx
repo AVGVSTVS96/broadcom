@@ -13,6 +13,7 @@ const reopenAfter = 2000;
 
 interface Store {
   readonly read: () => Live;
+  readonly rendered: Live;
   readonly subscribe: (listener: () => void) => () => void;
   readonly apply: (event: LiveEvent) => void;
   readonly lose: (at: number) => void;
@@ -41,6 +42,7 @@ const createStore = (initial: Live): Store => {
       set(lose(live, "dashboard", at));
     },
     read: () => live,
+    rendered: initial,
     subscribe: (listener) => {
       listeners.add(listener);
 
@@ -134,7 +136,7 @@ export const useLive = <A,>(select: (live: Live) => A): A => {
   return useSyncExternalStore(
     store.subscribe,
     () => select(store.read()),
-    () => select(store.read()),
+    () => select(store.rendered),
   );
 };
 
