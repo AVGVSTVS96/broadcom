@@ -11,6 +11,7 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 - `bun --filter @broadcom/web dev`: the dashboard, with `BROADCOM_PROXY` set.
 - `scripts/deploy.sh`: builds `apps/web` from `origin/main` into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service`.
 - `cargo install --path crates/usage` then restart `broadcom-usage.service`: ships the usage service.
+- `uv run --with numpy python -I scripts/limit-weights.py`: how much weekly or five-hour limit each model uses per token next to Opus 5.5, fit from meter readings and proxy receipts.
 - `git tag vX.Y.Z && git push origin vX.Y.Z`: the release workflow builds the macOS and Linux downloads `scripts/install.sh` fetches (both binaries, the standalone dashboard, the Bun that runs it, `scripts/broadcom`), smoke-tests each and publishes them. `cargo publish -p broadcom-proxy` after bumping its version.
 
 ## Map
