@@ -49,7 +49,10 @@ export const Pools = ({
   now: number;
 }) => {
   const { when } = useTime();
-  const { credit, firstBack, open, session, sessionReset, subscriptions } = summary;
+  const { credit, firstBack, open, session, sessionReset, subscriptions, weeklyResets } = summary;
+
+  const held =
+    weeklyResets === 0 ? "" : `${weeklyResets} ${weeklyResets === 1 ? "reset" : "resets"} held · `;
 
   return (
     <div className="grid divide-y border-y sm:grid-cols-[1fr_1fr_1.1fr] sm:divide-x sm:divide-y-0 wide:grid-cols-3">
@@ -60,9 +63,10 @@ export const Pools = ({
         totals={summary.week}
       >
         {firstBack === undefined ? (
-          `All ${subscriptions.length} plans have room`
+          `${held}All ${subscriptions.length} plans have room`
         ) : (
           <>
+            {held}
             {firstBack.name} back{" "}
             <span className="whitespace-nowrap">
               {when(firstBack.account.week.resetsAt ?? 0, now)}

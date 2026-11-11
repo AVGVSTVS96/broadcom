@@ -232,6 +232,8 @@ const reading = (id: string, used: number | null): Account => ({
   fiveHour: window(used),
 });
 
+const held = (kind: string, weekly: boolean) => ({ expiresAt: null, kind, left: 1, weekly });
+
 describe("session pool", () => {
   test("a plan with no reading stays out of the sum and the total", () => {
     const plans = plansOf(
@@ -278,6 +280,25 @@ describe("session pool", () => {
 
     expect(week.total).toBe(100);
     expect(week.left).toBe(70);
+  });
+
+  test("a held weekly reset counts as a whole week left, a Fable reset as none", () => {
+    const plans = plansOf(
+      {
+        a: { ...reading("a", 8), heldResets: [held("weekly", true)], week: window(100) },
+        b: { ...reading("b", 8), heldResets: [held("fable", false)], week: window(98) },
+      },
+      [],
+      {},
+      resetsAt,
+    );
+
+    const { week, weeklyResets } = poolOf(plans);
+
+    expect(weeklyResets).toBe(1);
+    expect(week.total).toBe(300);
+    expect(week.left).toBe(102);
+    expect(week.tone).toBe("ok");
   });
 
   test("no readings at all leaves no parts", () => {
