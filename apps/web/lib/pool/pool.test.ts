@@ -560,7 +560,7 @@ describe("poolDry", () => {
     expect(Math.abs((dry?.at ?? 0) - at(24 + 130 / 4))).toBeLessThan(2 * HOUR);
   });
 
-  test("a reset the pool won't spend before a week comes back isn't counted", () => {
+  test("a reset whose own week is almost over isn't counted", () => {
     const dry = poolDry([paced(90, 0.6, [20], 150)], at(150));
 
     expect(dry?.resets).toBe(0);

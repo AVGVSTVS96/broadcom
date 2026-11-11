@@ -159,8 +159,8 @@ export interface Dry {
   readonly perHour: number;
 }
 
-// WHY: the proxy spends a reset only when no week comes back for 12 hours (poolDrySpell).
-const drySpell = 12 * HOUR;
+// WHY: the proxy keeps a reset whose own week ends within 12 hours (poolRunway).
+const runway = 12 * HOUR;
 
 export const poolDry = (
   plans: readonly { readonly pace: Pace; readonly account: Account }[],
@@ -173,12 +173,12 @@ export const poolDry = (
 
   // WHY: an account's resets share one week, so only its biggest gives back this week.
   const gives = plans
-    .flatMap(({ account }) => {
-      const most = Math.max(0, ...account.heldResets.map((reset) => reset.givesBack ?? 0));
+    .flatMap(({ account, pace }) => {
+      const give = Math.max(0, ...account.heldResets.map((reset) => reset.givesBack ?? 0));
 
-      return most > 0 ? [most] : [];
+      return give > 0 ? [{ ends: pace.resetsAt, give }] : [];
     })
-    .toSorted((a, b) => b - a);
+    .toSorted((a, b) => b.give - a.give || b.ends - a.ends);
 
   if (rate === 0) {
     return null;
@@ -188,9 +188,13 @@ export const poolDry = (
   let back = 0;
   let resets = 0;
 
-  for (const give of gives) {
-    if (firstBack - at < drySpell) {
+  for (const { ends, give } of gives) {
+    if (at >= firstBack) {
       break;
+    }
+
+    if (ends - at < runway) {
+      continue;
     }
 
     at += give / rate;
