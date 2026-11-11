@@ -39,6 +39,7 @@ export const Account = Schema.Struct({
       givesBack: Schema.optionalKey(Schema.Number),
       kind: Schema.String,
       left: Schema.Number,
+      weekly: Schema.optionalKey(Schema.Boolean),
     }),
   ),
   id: Schema.String,

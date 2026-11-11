@@ -46,6 +46,9 @@ export const hasRoom = (account: Account) =>
 
 export const left = (used: number | null) => (used === null ? null : Math.max(0, 100 - used));
 
+export const weeklyResets = (account: Account) =>
+  account.heldResets.reduce((held, reset) => held + (reset.weekly === true ? reset.left : 0), 0);
+
 export const creditLeft = (grants: readonly Grant[]) =>
   grants.reduce((total, grant) => total + Math.max(0, grant.remaining), 0);
 
@@ -112,6 +115,18 @@ export const poolOf = (plans: readonly Plan[]) => {
         ];
   });
 
+  const fresh = subscriptions.flatMap((plan) =>
+    Array.from({ length: weeklyResets(plan.account) }, (_, index): Part => ({
+      id: `${plan.id}-reset-${index}`,
+      label: `${plan.name} reset`,
+      locked: false,
+      tone: "ok",
+      value: 100,
+    })),
+  );
+
+  const weeks = week.length === 0 ? [] : [...week, ...fresh];
+
   const session = subscriptions.flatMap((plan): Part[] => {
     const room = hasRoom(plan.account);
     const { used } = plan.account.fiveHour;
@@ -158,7 +173,8 @@ export const poolOf = (plans: readonly Plan[]) => {
     session: columnOf(session, sum(session.map((part) => part.value)), session.length * 100),
     sessionReset,
     subscriptions,
-    week: columnOf(week, sum(week.map((part) => part.value)), week.length * 100),
+    week: columnOf(weeks, sum(weeks.map((part) => part.value)), weeks.length * 100),
+    weeklyResets: fresh.length,
   };
 };
 

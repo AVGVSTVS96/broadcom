@@ -166,7 +166,7 @@ pub fn snapshot(app: &App, policy: Policy, revision: &str) -> (Vec<Value>, Value
                 "week": window(reading.week, WEEK, policy.weekly_cutoff),
                 "working": row.working,
                 "idle": seated.saturating_sub(row.working),
-                "heldResets": a.resets.iter().map(|r| json!({"kind": r.kind, "left": r.left, "expiresAt": r.expires_at})).collect::<Vec<_>>(),
+                "heldResets": a.resets.iter().map(|r| json!({"kind": r.kind, "left": r.left, "expiresAt": r.expires_at, "weekly": r.weekly})).collect::<Vec<_>>(),
                 "resetsSpent": spent.get(&id).cloned().unwrap_or_default(),
                 "cloud": a.cloud,
                 "atLimit": a.at_limit,
