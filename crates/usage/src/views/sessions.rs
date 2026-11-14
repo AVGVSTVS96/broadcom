@@ -8,7 +8,7 @@ use chrono_tz::Tz;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use super::attribution::{AgentSdk, LimitCharge, attribute_limits};
+use super::attribution::{AgentSdk, LimitCharge, ModelWeights, attribute_limits};
 use super::limits::{
     AccountLookup, Binding, KINDS, LimitReading, binding_history, sorted_readings,
 };
@@ -210,19 +210,27 @@ fn device_of(event: &Row) -> &str {
     }
 }
 
-/// Limit readings, the pool's session bindings and the Agent SDK weighting, ready for attribution.
+/// Limit readings, the pool's session bindings and the Agent SDK and model weightings,
+/// ready for attribution.
 pub struct LimitInputs {
     pub readings: Vec<LimitReading>,
     pub lookup: AccountLookup,
     pub sdk: AgentSdk,
+    pub models: ModelWeights,
 }
 
 impl LimitInputs {
-    pub fn new(readings: &[LimitReading], bindings: &[Binding], sdk: AgentSdk) -> Self {
+    pub fn new(
+        readings: &[LimitReading],
+        bindings: &[Binding],
+        sdk: AgentSdk,
+        models: ModelWeights,
+    ) -> Self {
         LimitInputs {
             readings: sorted_readings(readings),
             lookup: AccountLookup::new(&binding_history(bindings)),
             sdk,
+            models,
         }
     }
 
@@ -274,7 +282,7 @@ pub fn session_usage(
     };
 
     let (windows, charges) = match limits {
-        Some(l) => attribute_limits(&l.readings, &l.lookup, events, &l.sdk),
+        Some(l) => attribute_limits(&l.readings, &l.lookup, events, &l.sdk, &l.models),
         None => (Vec::new(), Vec::new()),
     };
     let mut assigned_in_range = vec![0.0; windows.len()];

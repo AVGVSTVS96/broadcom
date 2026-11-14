@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 use super::limits::{AccountLookup, KINDS, LimitReading, sorted_readings};
@@ -59,16 +61,45 @@ impl AgentSdk {
     }
 }
 
+/// How much plan limit one API dollar of each model uses next to Opus 5.5, as the
+/// "per own $" column of `scripts/limit-weights.py` measures it on the weekly meter.
+/// Models not listed count 1.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModelWeights(pub BTreeMap<String, f64>);
+
+impl Default for ModelWeights {
+    fn default() -> Self {
+        ModelWeights(
+            [
+                ("claude-opus-5-5", 1.0),
+                ("claude-fable-5-2", 2.2),
+                ("claude-sonnet-5-5", 1.6),
+                ("claude-haiku-5-5", 7.0),
+            ]
+            .map(|(model, weight)| (model.to_string(), weight))
+            .into(),
+        )
+    }
+}
+
+impl ModelWeights {
+    pub fn weight(&self, model: &str) -> f64 {
+        self.0.get(model).copied().unwrap_or(1.0)
+    }
+}
+
 /// Splits every rise of an account's limit across the requests that caused it,
-/// weighted by API cost, and for the five-hour limit also by the Agent SDK factor,
-/// since that meter charges Agent SDK tokens `sdk.factor` times more. Per window,
-/// charges plus unassigned points equal the sampled rise exactly. Charges are
-/// indexed like `events`.
+/// weighted by API cost times the model's weight, and for the five-hour limit also
+/// by the Agent SDK factor, since that meter charges Agent SDK tokens `sdk.factor`
+/// times more. The five-hour meter uses the weekly weights: it can't be measured per
+/// model yet. Per window, charges plus unassigned points equal the sampled rise
+/// exactly. Charges are indexed like `events`.
 pub fn attribute_limits(
     readings: &[LimitReading],
     lookup: &AccountLookup,
     events: &[Prepared],
     sdk: &AgentSdk,
+    models: &ModelWeights,
 ) -> (Vec<LimitWindow>, Vec<Option<LimitCharge>>) {
     let earliest = readings
         .iter()
@@ -97,10 +128,11 @@ pub fn attribute_limits(
         let list = bound.get(window.account.as_str()).unwrap_or(&empty);
         let kind = window.kind;
         let cost = |e: &Prepared| {
+            let cost = e.cost_usd * models.weight(&e.model);
             if kind == 0 {
-                e.cost_usd * sdk.weight(&e.entrypoint)
+                cost * sdk.weight(&e.entrypoint)
             } else {
-                e.cost_usd
+                cost
             }
         };
         let low = list.partition_point(|&i| events[i].millis <= from);
@@ -311,6 +343,7 @@ mod tests {
                 factor: 1.0,
                 ..AgentSdk::default()
             },
+            &ModelWeights(BTreeMap::new()),
         );
         assert_eq!(windows.len(), 1);
         assert_eq!(charges[0].as_ref().unwrap().points[0], 2.0);
@@ -359,8 +392,42 @@ mod tests {
                 factor: 2.0,
                 ..AgentSdk::default()
             },
+            &ModelWeights(BTreeMap::new()),
         );
         let (sdk, tui) = (charges[0].as_ref().unwrap(), charges[1].as_ref().unwrap());
         assert_eq!((sdk.points, tui.points), ([2.0, 1.0], [1.0, 1.0]));
+    }
+
+    #[test]
+    fn model_weights_scale_each_request_on_both_limits() {
+        let events = [
+            Event {
+                model: "claude-fable-5-2".into(),
+                ..claude("fable", "1970-01-01T00:01:40.000Z", 1.0, "sdk-cli")
+            },
+            Event {
+                model: "claude-opus-5-5".into(),
+                ..claude("opus", "1970-01-01T00:01:50.000Z", 1.0, "cli")
+            },
+        ];
+        let readings = [
+            reading(50_000.0, 1.0, 1e9, Some((1.0, 2e9))),
+            reading(200_000.0, 8.0, 1e9, Some((4.0, 2e9))),
+        ];
+        let (_, charges) = attribute_limits(
+            &readings,
+            &started(&["fable", "opus"]),
+            &prepare(&events.map(|e| Row::from(&e))),
+            &AgentSdk {
+                factor: 1.5,
+                ..AgentSdk::default()
+            },
+            &ModelWeights::default(),
+        );
+        let (fable, opus) = (charges[0].as_ref().unwrap(), charges[1].as_ref().unwrap());
+        let total = |kind: usize| fable.points[kind] + opus.points[kind];
+        assert!((total(0) - 7.0).abs() < 1e-9 && (total(1) - 3.0).abs() < 1e-9);
+        assert!((fable.points[1] / opus.points[1] - 2.2).abs() < 1e-9);
+        assert!((fable.points[0] / opus.points[0] - 2.2 * 1.5).abs() < 1e-9);
     }
 }
