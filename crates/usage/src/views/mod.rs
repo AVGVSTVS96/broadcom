@@ -15,7 +15,7 @@ mod timeframe;
 mod tokens;
 mod view;
 
-pub use attribution::{AgentSdk, attribution_reach};
+pub use attribution::{AgentSdk, ModelWeights, attribution_reach};
 pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, read_grants};
 pub use identity::{Names, Past, Who, load_names, read_past};
 pub use limits::{AppendLog, Binding, LimitReading, parse_binding, parse_reading};

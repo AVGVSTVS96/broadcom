@@ -1,5 +1,6 @@
 //! The service's settings: one JSON file, every field optional.
 
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::views::{AgentSdk, ConfiguredPlan, Tier};
+use crate::views::{AgentSdk, ConfiguredPlan, ModelWeights, Tier};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -33,6 +34,10 @@ pub struct Config {
     /// How much more the five-hour meter charges these entrypoints per token than interactive use.
     pub agent_sdk_factor: f64,
     pub agent_sdk_entrypoints: Vec<String>,
+    /// Plan limit per API dollar by model id, next to Opus 5.5 = 1, from the "per own $"
+    /// column of `scripts/limit-weights.py`; it splits each limit rise between models.
+    /// Replaces the built-in weights whole; unlisted models count 1.
+    pub model_weights: BTreeMap<String, f64>,
     pub hex: PathBuf,
     pub claude: PathBuf,
     /// The Go proxy's usage folder, whose journals are followed read-only: each device's
@@ -90,6 +95,7 @@ impl Default for Config {
             tiers: Vec::new(),
             agent_sdk_factor: AgentSdk::default().factor,
             agent_sdk_entrypoints: AgentSdk::default().entrypoints,
+            model_weights: ModelWeights::default().0,
             hex: home.join("hex"),
             claude: home.join(".claude"),
             go_usage_dir: None,
@@ -136,6 +142,10 @@ impl Config {
             factor: self.agent_sdk_factor,
             entrypoints: self.agent_sdk_entrypoints.clone(),
         }
+    }
+
+    pub fn model_weights(&self) -> ModelWeights {
+        ModelWeights(self.model_weights.clone())
     }
 
     /// This machine's device id: configured, else saved in the state folder once.
