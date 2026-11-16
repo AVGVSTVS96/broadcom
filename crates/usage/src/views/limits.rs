@@ -73,6 +73,10 @@ pub fn parse_binding(line: &[u8]) -> Option<Binding> {
     if !matches!(event.as_str(), "start" | "failure" | "observe-live") {
         return None;
     }
+    // A subagent's binding can sit on another account than its session's own conversation.
+    if !text("agent").is_empty() {
+        return None;
+    }
     let account_id = match row.get("accountId") {
         Some(Value::String(account)) => Some(account.clone()),
         None | Some(Value::Null) if event == "observe-live" => None,
@@ -345,6 +349,12 @@ mod tests {
         assert_eq!(
             parse(
                 r#"{"at":"2026-10-14T06:00:03.181Z","sessionId":"s","accountId":null,"event":"start"}"#
+            ),
+            None
+        );
+        assert_eq!(
+            parse(
+                r#"{"at":"2026-10-14T06:00:03.181Z","sessionId":"s","accountId":"b","event":"start","agent":"a06b74126f7b5358a"}"#
             ),
             None
         );
