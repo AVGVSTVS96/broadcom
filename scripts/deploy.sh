@@ -4,7 +4,8 @@ cd "$(dirname "$0")/.."
 exec 9>/tmp/broadcom-deploy.lock
 flock 9
 state=~/.config/broadcom
-url=$(sed -n 's/^BROADCOM_URL=//p' "$state/env")
+mkdir -p "$state"
+url=http://127.0.0.1:4840/
 live=$(sed -n 's/^BROADCOM_DIST=//p' "$state/slot" 2>/dev/null || true)
 next=$([ "$live" = .next-a ] && echo .next-b || echo .next-a)
 if [ "${1:-}" != --no-pull ]; then
