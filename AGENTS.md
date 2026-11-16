@@ -9,7 +9,7 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 - `bun run check`: oxlint, oxfmt, typecheck and tests for the web app, then rustfmt, clippy and tests for the crates. CI and the pre-commit hook run it.
 - `bun run fix`: oxlint's fixes, oxfmt, cargo fmt.
 - `bun --filter @broadcom/web dev`: the dashboard, with `BROADCOM_PROXY` set.
-- `scripts/deploy.sh`: builds `apps/web` from `origin/main` into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service`.
+- `scripts/deploy.sh`: builds `apps/web` from `origin/main` (`--no-pull`: from the checkout as it is) into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service` when it runs on this machine.
 - `cargo install --path crates/usage` then restart `broadcom-usage.service`: ships the usage service.
 - `uv run --with numpy python -I scripts/limit-weights.py`: how much weekly or five-hour limit each model uses per token next to Opus 5.5, fit from meter readings and proxy receipts.
 - `git tag vX.Y.Z && git push origin vX.Y.Z`: the release workflow builds the macOS and Linux downloads `scripts/install.sh` fetches (both binaries, the standalone dashboard, the Bun that runs it, `scripts/broadcom`), smoke-tests each and publishes them. `cargo publish -p broadcom-proxy` after bumping its version.

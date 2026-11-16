@@ -7,13 +7,19 @@ state=~/.config/broadcom
 url=$(sed -n 's/^BROADCOM_URL=//p' "$state/env")
 live=$(sed -n 's/^BROADCOM_DIST=//p' "$state/slot" 2>/dev/null || true)
 next=$([ "$live" = .next-a ] && echo .next-b || echo .next-a)
-git fetch --quiet origin main
-git merge --ff-only --quiet origin/main
+if [ "${1:-}" != --no-pull ]; then
+  git fetch --quiet origin main
+  git merge --ff-only --quiet origin/main
+fi
 bun install --frozen-lockfile --silent
 rm -rf "apps/web/$next"
 BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
 previous=$(cat "$state/slot" 2>/dev/null || true)
 echo "BROADCOM_DIST=$next" >"$state/slot"
+if ! systemctl --user is-active --quiet broadcom.service; then
+  echo "built: $(git log -1 --format='%h %s') into $next, for broadcom's next start"
+  exit 0
+fi
 systemctl --user restart broadcom.service
 for _ in $(seq 20); do
   curl -sf -o /dev/null "$url" && { echo "live: $(git log -1 --format='%h %s') from $next"; exit 0; }
