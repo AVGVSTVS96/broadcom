@@ -12,11 +12,14 @@ if [ "${1:-}" != --no-pull ]; then
   git fetch --quiet origin main
   git merge --ff-only --quiet origin/main
 fi
+head=$(git rev-parse HEAD)
+[ "$(cat "$state/built" 2>/dev/null)" = "$head $live" ] && { echo "already built: $(git log -1 --format='%h %s') in $live"; exit 0; }
 bun install --frozen-lockfile --silent
 rm -rf "apps/web/$next"
 BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
 previous=$(cat "$state/slot" 2>/dev/null || true)
 echo "BROADCOM_DIST=$next" >"$state/slot"
+echo "$head $next" >"$state/built"
 if ! systemctl --user is-active --quiet broadcom.service; then
   echo "built: $(git log -1 --format='%h %s') into $next, for broadcom's next start"
   exit 0
@@ -27,6 +30,7 @@ for _ in $(seq 20); do
   sleep 0.5
 done
 echo "broadcom did not answer after restart, rolling back to ${live:-the previous build}" >&2
+rm -f "$state/built"
 if [ -n "$previous" ]; then echo "$previous" >"$state/slot"; else rm -f "$state/slot"; fi
 systemctl --user restart broadcom.service
 exit 1
