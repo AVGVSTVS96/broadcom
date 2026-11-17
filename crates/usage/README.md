@@ -1,8 +1,8 @@
 # broadcom-usage
 
 Collects AI coding-agent usage (Claude Code, Codex, Pi, Grok, Muse) from this machine,
-other machines' pushes, GitHub Actions artifacts and [broadcom-proxy](../proxy)'s
-per-request receipts, prices it, and answers [BROADCOM](../../apps/web)'s Usage,
+other machines' pushes, GitHub Actions artifacts and the account pool's per-request
+receipts, prices it, and answers [BROADCOM](../../apps/web)'s Usage,
 Sessions and Credits views and its live-sessions stream.
 
 ```
@@ -18,6 +18,12 @@ receipts ────┘   records → events  └─ GET /deck/events (SSE: s:<
   reads one indexed time range.
 - Inputs are followed from where they stopped. A file that was replaced is read again,
   which changes nothing already held.
+- The account pool ([broadcom-proxy](../proxy), or CLIProxyAPI) is read over its
+  management API at `pool` in the config, wherever it runs: its accounts and plans from
+  its live stream, and its receipts, limit readings, session moves and credit grants from
+  `deck/files/<name>`, each from where the last read stopped whenever the stream names it
+  in a `stale` event. While the pool can't be read, what was read stays, and the credits
+  view says why.
 - Shapes match the Go deck it replaces; see [api/](api/README.md).
 
 ## Run
