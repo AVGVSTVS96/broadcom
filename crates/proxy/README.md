@@ -73,7 +73,7 @@ Set `credentialsDir` to CLIProxyAPI's auth directory (`~/.cli-proxy-api` unless 
 ## What it writes and serves
 
 - `receipts.ndjson`: one line per upstream attempt, with Anthropic's usage object as sent. Also limit history, session moves and resets spent, all append-only in the state directory.
-- `/v8/management/...` with the management key: accounts, pool standing as a live SSE stream, policy, sign-ins from any device, reset spending. [BROADCOM](https://github.com/AVGVSTVS96/broadcom/tree/main/apps/web), in the same repo, is a dashboard built on it.
+- `/v8/management/...` with the management key: accounts, pool standing as a live SSE stream, policy, sign-ins from any device, reset spending, and the state files above at `deck/files/<name>`, from a byte offset with `Range`, each named in a `stale` event on the stream when it grows, so a usage service on another machine reads on from where it stopped. [BROADCOM](https://github.com/AVGVSTVS96/broadcom/tree/main/apps/web), in the same repo, is a dashboard built on it.
 
 How it works inside, and why: [DESIGN.md](DESIGN.md).
 

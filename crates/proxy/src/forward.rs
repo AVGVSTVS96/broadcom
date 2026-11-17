@@ -20,7 +20,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     app::{App, Inbound, Target},
-    files,
+    files, live,
     pool::{HOUR, MINUTE, SECOND, WEEK},
 };
 
@@ -362,6 +362,7 @@ async fn forward(
                     response.bytes_stream(),
                     receipt,
                     app.state_dir().to_path_buf(),
+                    app.live.clone(),
                     &response_headers,
                 );
                 let mut out = Response::new(Body::from_stream(stream));
@@ -372,7 +373,7 @@ async fn forward(
             let bytes = response.bytes().await.unwrap_or_default();
             if let Some(mut receipt) = receipt {
                 receipt.read_body(&bytes, false);
-                receipt.write(app.state_dir());
+                receipt.write(app.state_dir(), &app.live);
             }
             log.attempt(&target, status, &response_headers, &bytes);
             let mut answer = Response::new(Body::from(bytes.clone()));
@@ -583,7 +584,7 @@ impl Receipt {
         }
     }
 
-    fn write(&mut self, dir: &std::path::Path) {
+    fn write(&mut self, dir: &std::path::Path, live: &live::Stream) {
         let n = |path: &str| {
             self.usage
                 .pointer(path)
@@ -601,6 +602,7 @@ impl Receipt {
             .find_map(|k| self.usage.pointer(k).and_then(Value::as_str))
             .map(String::from);
         files::append(dir, "receipts.ndjson", self);
+        live.grew("receipts.ndjson");
     }
 }
 
@@ -610,6 +612,7 @@ struct Tap<S> {
     inner: S,
     receipt: Option<Receipt>,
     dir: std::path::PathBuf,
+    live: Arc<live::Stream>,
     sse: bool,
     /// The JSON answer so far, or the SSE line so far.
     buffer: Vec<u8>,
@@ -626,6 +629,7 @@ impl<S> Tap<S> {
         inner: S,
         receipt: Option<Receipt>,
         dir: std::path::PathBuf,
+        live: Arc<live::Stream>,
         headers: &HeaderMap,
     ) -> Self {
         let sse = headers
@@ -636,6 +640,7 @@ impl<S> Tap<S> {
             inner,
             receipt,
             dir,
+            live,
             sse,
             buffer: Vec::new(),
             stopped: false,
@@ -678,7 +683,7 @@ impl<S> Drop for Tap<S> {
             receipt.read_body(&self.buffer, false);
         }
         receipt.failed = !self.done || (self.sse && !self.stopped);
-        receipt.write(&self.dir);
+        receipt.write(&self.dir, &self.live);
     }
 }
 
@@ -920,7 +925,13 @@ mod tests {
             };
             let receipt = Receipt::new(&inbound, &plan(), StatusCode::OK, &HeaderMap::new(), NOW);
             let sse = headers(&[("content-type", "text/event-stream; charset=utf-8")]);
-            let mut tap = Tap::new((), Some(receipt), dir.path().to_path_buf(), &sse);
+            let mut tap = Tap::new(
+                (),
+                Some(receipt),
+                dir.path().to_path_buf(),
+                Arc::default(),
+                &sse,
+            );
             for chunk in stream.as_bytes().chunks(split) {
                 tap.feed(chunk);
             }
@@ -951,7 +962,13 @@ mod tests {
             NOW,
         );
         let json = headers(&[("content-type", "application/json")]);
-        let mut tap = Tap::new((), Some(receipt), dir.path().to_path_buf(), &json);
+        let mut tap = Tap::new(
+            (),
+            Some(receipt),
+            dir.path().to_path_buf(),
+            Arc::default(),
+            &json,
+        );
         tap.feed(br#"{"id":"msg_1","usage":{"input_tok"#);
         drop(tap);
         let text = std::fs::read_to_string(dir.path().join("receipts.ndjson")).unwrap();

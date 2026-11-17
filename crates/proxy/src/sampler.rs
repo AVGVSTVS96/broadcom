@@ -206,7 +206,7 @@ pub async fn read_usage(app: &App, account: &str, token: &str, now: i64) {
     };
     let (reading, stale) = a.settled(reading, now);
     a.reading = reading;
-    log_reading(app.state_dir(), a);
+    log_reading(app, a);
     if !stale {
         a.resets = body
             .cedar_ember

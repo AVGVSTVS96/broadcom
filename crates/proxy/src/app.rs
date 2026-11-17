@@ -4,7 +4,7 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use axum::http::HeaderMap;
@@ -50,7 +50,7 @@ pub struct App {
     pub state: Mutex<State>,
     /// Wakes the live stream when something it shows may have changed.
     pub changed: Notify,
-    pub live: Stream,
+    pub live: Arc<Stream>,
     pub sign_ins: SignIns,
     /// One token refresh at a time, so a token is never refreshed twice.
     pub refreshing: tokio::sync::Mutex<()>,
@@ -159,7 +159,7 @@ impl App {
             management_key,
             state: Mutex::new(state),
             changed: Notify::new(),
-            live: Stream::default(),
+            live: Arc::default(),
             sign_ins: SignIns::default(),
             refreshing: tokio::sync::Mutex::new(()),
             spending: tokio::sync::Mutex::new(()),
@@ -339,6 +339,7 @@ impl App {
                 row["cause"] = moved.unwrap_or(Cause::Limit).as_str().into();
             }
             files::append(self.state_dir(), "attribution.ndjson", &row);
+            self.live.grew("attribution.ndjson");
         }
         state.seats.insert(
             session.clone(),
@@ -361,7 +362,7 @@ impl App {
         let mut state = self.state();
         if let Some(a) = state.account_mut(account) {
             a.observe(reading, now);
-            log_reading(self.state_dir(), a);
+            log_reading(self, a);
         }
         drop(state);
         self.changed.notify_one();
@@ -477,7 +478,7 @@ pub fn header_reading(headers: &HeaderMap, now: i64) -> Option<Reading> {
 
 /// Appends a line to the limit history when either limit moved half a point, and at least
 /// every 15 minutes while readings keep arriving.
-pub fn log_reading(dir: &std::path::Path, a: &mut Account) {
+pub fn log_reading(app: &App, a: &mut Account) {
     let r = a.reading;
     let used = |w: Option<Window>| w.map(|w| w.used);
     let same = |x: Option<f64>, y: Option<f64>| match (x, y) {
@@ -496,9 +497,10 @@ pub fn log_reading(dir: &std::path::Path, a: &mut Account) {
     a.logged = r;
     let reset = |w: Option<Window>| w.map(|w| w.resets_at).filter(|&at| at > 0);
     files::append(
-        dir,
+        app.state_dir(),
         "usage-history.ndjson",
         &json!({"account": a.id(), "at": r.at, "fiveHour": used(r.five_hour), "week": used(r.week),
                 "fiveHourResetsAt": reset(r.five_hour), "weekResetsAt": reset(r.week)}),
     );
+    app.live.grew("usage-history.ndjson");
 }
