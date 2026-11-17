@@ -174,8 +174,12 @@ struct Wanted {
 
 impl Wanted {
     fn want(&self, files: impl IntoIterator<Item = File>) {
-        self.files.lock().extend(files);
-        self.ready.notify_one();
+        let mut wanted = self.files.lock();
+        let before = wanted.len();
+        wanted.extend(files);
+        if wanted.len() > before {
+            self.ready.notify_one();
+        }
     }
 }
 
@@ -251,11 +255,13 @@ async fn listen(app: &App, pool: &Pool, wanted: &Wanted, changed: &Changed) -> R
                 if snapshot {
                     wanted.want(File::ALL);
                 } else if frame.kind == "stale" {
-                    wanted.want(
-                        File::ALL
-                            .into_iter()
-                            .filter(|f| frame.tags.iter().any(|t| t == f.name())),
-                    );
+                    // CLIProxyAPI also says "accounts" when its readings or session moves grow.
+                    wanted.want(File::ALL.into_iter().filter(|f| {
+                        frame.tags.iter().any(|t| {
+                            t == f.name()
+                                || (t == "accounts" && matches!(f, File::Readings | File::Bindings))
+                        })
+                    }));
                 }
             }
         }
@@ -289,28 +295,30 @@ fn take_accounts(
 }
 
 async fn read_wanted(app: Arc<App>, pool: Pool, wanted: Arc<Wanted>, changed: Changed) {
+    let mut problems: BTreeMap<File, String> = BTreeMap::new();
     loop {
         wanted.ready.notified().await;
         let files = std::mem::take(&mut *wanted.files.lock());
-        let mut problems = Vec::new();
         let mut grew = false;
         for file in files {
-            match read(&app, &pool, file).await {
-                Ok(more) => grew |= more,
-                Err(e) if e.is::<NotServed>() => {
-                    problems.push(format!(
-                        "{} doesn't serve its {} yet",
-                        pool.base,
-                        file.name()
-                    ));
+            let problem = match read(&app, &pool, file).await {
+                Ok(more) => {
+                    grew |= more;
+                    problems.remove(&file);
+                    continue;
                 }
-                Err(e) => problems.push(format!("{} from {}: {e:#}", file.name(), pool.base)),
+                Err(e) if e.is::<NotServed>() => {
+                    format!("{} doesn't serve its {} yet", pool.base, file.name())
+                }
+                Err(e) => format!("{} from {}: {e:#}", file.name(), pool.base),
+            };
+            if problems.get(&file) != Some(&problem) {
+                tracing::warn!("{problem}");
+                problems.insert(file, problem);
             }
         }
-        for problem in &problems {
-            tracing::warn!("{problem}");
-        }
-        let problem = (!problems.is_empty()).then(|| problems.join("; "));
+        let problem = (!problems.is_empty())
+            .then(|| problems.values().cloned().collect::<Vec<_>>().join("; "));
         grew |= std::mem::replace(&mut app.deck.pool.lock().problem, problem.clone()) != problem;
         if grew {
             let changed = changed.clone();
