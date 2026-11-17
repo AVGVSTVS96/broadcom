@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use crate::config::Config;
 use crate::deck::Deck;
 use crate::event::{Batch, Device};
-use crate::follow::{self, Followed, Format};
+use crate::follow::{self, Followed};
 use crate::github::GitHub;
 use crate::pricing::Pricing;
 use crate::store::Store;
@@ -35,30 +35,21 @@ impl App {
         self.store.local()
     }
 
-    /// Every file this service follows into the store.
+    /// The Go proxy's journals this service follows into the store. This machine's records
+    /// also come from the pool's receipts.
     fn followed(&self) -> Vec<Followed> {
-        let mut out = Vec::new();
-        if let Some(dir) = &self.config.go_usage_dir {
-            let collects = self.config.collects() || self.config.receipts.is_some();
-            let shared = |device: &Device| {
-                (device.id == self.local().id && collects)
-                    || self
-                        .config
-                        .github_repos
-                        .iter()
-                        .any(|repo| device.id.strip_prefix("github:") == Some(repo))
-            };
-            out.extend(follow::go_journals(dir, self.local(), shared));
-        }
-        if let Some(path) = &self.config.receipts {
-            out.push(Followed {
-                path: path.clone(),
-                device: self.local().clone(),
-                format: Format::Receipts,
-                shared: false,
-            });
-        }
-        out
+        let Some(dir) = &self.config.go_usage_dir else {
+            return Vec::new();
+        };
+        let shared = |device: &Device| {
+            device.id == self.local().id
+                || self
+                    .config
+                    .github_repos
+                    .iter()
+                    .any(|repo| device.id.strip_prefix("github:") == Some(repo))
+        };
+        follow::go_journals(dir, self.local(), shared)
     }
 
     /// Reads what the followed files gained.
@@ -125,23 +116,13 @@ pub fn start(app: Arc<App>) {
             }
         }
     });
-    let pool = app.config.pool_dir.clone();
-    let receipts = app.config.receipts.clone();
-    if let Err(e) = std::fs::create_dir_all(pool.join("plans")) {
-        tracing::warn!("creating {}: {e}", pool.display());
-    }
-    spawn_watch(
-        &[(pool.clone(), false), (pool.join("plans"), false)],
-        Duration::from_secs(1),
-        move |path| receipts.as_deref() != Some(path),
-        {
-            let deck = deck.clone();
-            move || {
-                limits_changed.notify_one();
-                deck.publish();
-            }
-        },
-    );
+    tokio::spawn(crate::pool::follow(app.clone(), {
+        let deck = deck.clone();
+        move || {
+            limits_changed.notify_one();
+            deck.publish();
+        }
+    }));
     let claude = &app.config.claude;
     let (sessions, jobs) = (claude.join("sessions"), claude.join("jobs"));
     let hex_state = app.config.hex.join("state");

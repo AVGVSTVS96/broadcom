@@ -1,8 +1,4 @@
 use foldhash::{HashMap, HashMapExt, HashSet, HashSetExt};
-use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
-use std::path::PathBuf;
-
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -92,55 +88,59 @@ pub fn parse_binding(line: &[u8]) -> Option<Binding> {
     })
 }
 
-/// Follows an append-only ndjson file, parsing only the bytes added since the
-/// last read; a file that shrank is read again from the start.
+/// An append-only ndjson log read in pieces: the rows of its whole lines, and how far into
+/// the log they reach.
 pub struct AppendLog<T> {
-    path: PathBuf,
     parse: fn(&[u8]) -> Option<T>,
-    size: u64,
-    rest: Vec<u8>,
     rows: Vec<T>,
+    end: u64,
 }
 
 impl<T> AppendLog<T> {
-    pub fn new(path: impl Into<PathBuf>, parse: fn(&[u8]) -> Option<T>) -> Self {
+    pub fn new(parse: fn(&[u8]) -> Option<T>) -> Self {
         AppendLog {
-            path: path.into(),
             parse,
-            size: 0,
-            rest: Vec::new(),
             rows: Vec::new(),
+            end: 0,
         }
     }
 
-    /// Every row so far, and whether this read added or dropped any.
-    pub fn read(&mut self) -> (&[T], bool) {
-        let size = std::fs::metadata(&self.path).map_or(0, |m| m.len());
-        if size < self.size {
-            self.size = 0;
-            self.rest.clear();
+    pub fn rows(&self) -> &[T] {
+        &self.rows
+    }
+
+    pub fn end(&self) -> u64 {
+        self.end
+    }
+
+    /// Adds the whole lines of `bytes`, which start `from` bytes into the log; from its start,
+    /// they replace every row. Returns how many bytes it took.
+    pub fn extend(&mut self, from: u64, bytes: &[u8]) -> u64 {
+        if from == 0 {
             self.rows.clear();
         }
-        if size == self.size {
-            return (&self.rows, false);
-        }
-        let Ok(mut file) = File::open(&self.path) else {
-            return (&self.rows, false);
+        let whole = bytes.iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
+        self.rows
+            .extend(bytes[..whole].split(|&b| b == b'\n').filter_map(self.parse));
+        self.end = from + whole as u64;
+        whole as u64
+    }
+}
+
+impl AppendLog<LimitReading> {
+    /// Takes readings from a pool that serves only its recent history: they replace what's
+    /// held from the earliest of them on. Returns whether that changed any.
+    pub fn take_recent(&mut self, readings: Vec<LimitReading>) -> bool {
+        let Some(from) = readings.iter().map(|r| r.at).reduce(f64::min) else {
+            return false;
         };
-        let mut added = Vec::new();
-        if file.seek(SeekFrom::Start(self.size)).is_err()
-            || file.take(size - self.size).read_to_end(&mut added).is_err()
-        {
-            return (&self.rows, false);
-        }
-        self.size += added.len() as u64;
-        self.rest.extend_from_slice(&added);
-        if let Some(cut) = self.rest.iter().rposition(|&b| b == b'\n') {
-            let complete: Vec<u8> = self.rest.drain(..=cut).collect();
-            self.rows
-                .extend(complete.split(|&b| b == b'\n').filter_map(self.parse));
-        }
-        (&self.rows, true)
+        let (kept, replaced): (Vec<_>, Vec<_>) = std::mem::take(&mut self.rows)
+            .into_iter()
+            .partition(|r| r.at < from);
+        let changed = replaced != readings;
+        self.rows = kept;
+        self.rows.extend(readings);
+        changed
     }
 }
 
@@ -292,43 +292,57 @@ mod tests {
     }
 
     #[test]
-    fn append_log_reads_only_what_was_added() {
-        let dir = std::env::temp_dir().join(format!("views-append-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("usage-history.ndjson");
-        let write = |text: &str, append: bool| {
-            use std::io::Write;
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .append(append)
-                .truncate(!append)
-                .open(&path)
-                .unwrap();
-            file.write_all(text.as_bytes()).unwrap();
-        };
-        let mut log = AppendLog::new(&path, parse_reading);
-        write(
-            "{\"account\":\"a\",\"at\":1,\"fiveHour\":1,\"week\":2}\n{\"account\":\"a\",\"at\":2,",
-            false,
-        );
-        assert_eq!(log.read().0.len(), 1);
-        write(
-            "\"fiveHour\":null,\"week\":3}\nnot json\n{\"at\":3}\n",
-            true,
-        );
-        let rows = log.read().0;
+    fn append_log_takes_whole_lines_and_starts_over_from_zero() {
+        let mut log = AppendLog::new(parse_reading);
+        let first =
+            b"{\"account\":\"a\",\"at\":1,\"fiveHour\":1,\"week\":2}\n{\"account\":\"a\",\"at\":2,";
+        let took = log.extend(0, first);
+        assert_eq!((log.rows().len(), log.end()), (1, took));
+        let rest =
+            b"{\"account\":\"a\",\"at\":2,\"fiveHour\":null,\"week\":3}\nnot json\n{\"at\":3}\n";
+        log.extend(log.end(), rest);
+        let rows = log.rows();
         assert_eq!(
             (rows.len(), rows[1].five_hour, rows[1].week),
             (2, None, Some(3.0))
         );
-        write(
-            "{\"account\":\"b\",\"at\":9,\"fiveHour\":0,\"week\":0}\n",
-            false,
+        log.extend(
+            0,
+            b"{\"account\":\"b\",\"at\":9,\"fiveHour\":0,\"week\":0}\n",
         );
-        let rows = log.read().0;
-        assert_eq!((rows.len(), rows[0].account.as_str()), (1, "b"));
-        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!((log.rows().len(), log.rows()[0].account.as_str()), (1, "b"));
+    }
+
+    #[test]
+    fn recent_readings_replace_what_is_held_from_their_start() {
+        let reading = |at: f64, week: f64| LimitReading {
+            account: "a".into(),
+            at,
+            five_hour: None,
+            week: Some(week),
+            five_hour_resets_at: None,
+            week_resets_at: None,
+        };
+        let mut log = AppendLog::new(parse_reading);
+        assert!(log.take_recent(vec![
+            reading(1.0, 1.0),
+            reading(2.0, 2.0),
+            reading(3.0, 3.0)
+        ]));
+        assert!(log.take_recent(vec![
+            reading(3.0, 3.0),
+            reading(2.5, 2.5),
+            reading(4.0, 4.0)
+        ]));
+        let weeks: Vec<f64> = log.rows().iter().filter_map(|r| r.week).collect();
+        assert_eq!(weeks, [1.0, 2.0, 3.0, 2.5, 4.0]);
+        assert!(!log.take_recent(vec![
+            reading(3.0, 3.0),
+            reading(2.5, 2.5),
+            reading(4.0, 4.0)
+        ]));
+        assert!(!log.take_recent(Vec::new()));
+        assert_eq!(log.rows().len(), 5);
     }
 
     #[test]

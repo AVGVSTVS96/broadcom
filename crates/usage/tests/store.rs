@@ -435,7 +435,7 @@ fn visible_ids(store: &Store) -> Vec<String> {
 
 #[test]
 fn journals_follow_withdrawals_and_rewrites() {
-    use broadcom_usage::follow::{self, Followed, Format};
+    use broadcom_usage::follow::{self, Followed};
     use std::io::Write;
     let dir = tempdir();
     let store = open(&dir);
@@ -443,7 +443,6 @@ fn journals_follow_withdrawals_and_rewrites() {
     let followed = Followed {
         path: journal.clone(),
         device: device("mac"),
-        format: Format::Journal,
         shared: false,
     };
     let (x, y) = (record("x", 1), record("y", 1));
@@ -479,7 +478,7 @@ fn journals_follow_withdrawals_and_rewrites() {
 
 /// A journal for a device Go last heard from at 1000, and a push here at 2000.
 fn moved_device(dir: &std::path::Path) -> (Store, broadcom_usage::follow::Followed) {
-    use broadcom_usage::follow::{Followed, Format};
+    use broadcom_usage::follow::Followed;
     let store = open(dir);
     let followed = Followed {
         path: dir.join("mac.ndjson"),
@@ -487,7 +486,6 @@ fn moved_device(dir: &std::path::Path) -> (Store, broadcom_usage::follow::Follow
             synced_at: Some(1000),
             ..device("mac")
         },
-        format: Format::Journal,
         shared: false,
     };
     (store, followed)
@@ -547,7 +545,6 @@ fn a_journal_read_again_keeps_what_its_device_pushed_here() {
     let lost_cursor = Followed {
         path: elsewhere,
         device: followed.device.clone(),
-        format: followed.format,
         shared: false,
     };
     follow::catch_up(&store, &lost_cursor).unwrap();

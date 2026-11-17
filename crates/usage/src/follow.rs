@@ -1,6 +1,5 @@
-//! Follows append-only ndjson files into the store, from where the last read stopped:
-//! the Go proxy's per-device journals (`{"e":record}` and `{"d":id}` lines) while it
-//! still keeps usage, and a proxy's receipts file (one record per line).
+//! Follows the Go proxy's per-device usage journals (`{"e":record}` and `{"d":id}` lines)
+//! into the store, from where the last read stopped.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -14,22 +13,12 @@ use serde::Deserialize;
 use crate::event::{Batch, Device, Event};
 use crate::store::Store;
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Format {
-    /// Go's store journal: an upsert or a withdrawal per line, holding everything Go
-    /// had for its device.
-    Journal,
-    /// One record per line.
-    Receipts,
-}
-
 pub struct Followed {
     pub path: PathBuf,
     /// For a journal, `synced_at` is when Go last heard from the device.
     pub device: Device,
-    pub format: Format,
     /// This service writes the device's records from a source of its own too: this
-    /// machine's transcripts or receipts, or a GitHub repository it fetches.
+    /// machine's transcripts, the pool's receipts, or a GitHub repository it fetches.
     pub shared: bool,
 }
 
@@ -58,17 +47,11 @@ enum Change {
     Withdraw(String),
 }
 
-fn parse(line: &[u8], format: Format) -> Option<Change> {
-    match format {
-        Format::Receipts => serde_json::from_slice::<Event>(line)
-            .ok()
-            .filter(|e| !e.id.is_empty())
-            .map(|e| Change::Put(Box::new(e))),
-        Format::Journal => match serde_json::from_slice::<JournalLine>(line).ok()? {
-            JournalLine { e: Some(e), .. } => Some(Change::Put(Box::new(e))),
-            JournalLine { d: Some(id), .. } if !id.is_empty() => Some(Change::Withdraw(id)),
-            _ => None,
-        },
+fn parse(line: &[u8]) -> Option<Change> {
+    match serde_json::from_slice::<JournalLine>(line).ok()? {
+        JournalLine { e: Some(e), .. } => Some(Change::Put(Box::new(e))),
+        JournalLine { d: Some(id), .. } if !id.is_empty() => Some(Change::Withdraw(id)),
+        _ => None,
     }
 }
 
@@ -82,8 +65,7 @@ impl Change {
 }
 
 /// Reads what was appended since the cursor and applies it in order. A file that was
-/// replaced or shrank is read again from the start: a journal through `reread`, anything
-/// else line by line, where applying a record already held changes nothing.
+/// replaced or shrank is read again from the start, through `reread`.
 /// Returns how many lines were read.
 pub fn catch_up(store: &Store, followed: &Followed) -> Result<usize> {
     let key = followed.path.to_string_lossy().into_owned();
@@ -98,14 +80,14 @@ pub fn catch_up(store: &Store, followed: &Followed) -> Result<usize> {
     if offset == meta.len() {
         return Ok(0);
     }
-    if followed.format == Format::Journal && offset == 0 {
+    if offset == 0 {
         let (read, end) = reread(store, followed, &mut file)?;
         store.set_cursor(&key, inode, end)?;
         return Ok(read);
     }
     file.seek(SeekFrom::Start(offset))?;
     let mut read = 0;
-    each_chunk(&mut file, followed.format, |changes, end| {
+    each_chunk(&mut file, |changes, end| {
         read += changes.len();
         apply_in_order(store, &followed.device, changes, false)?;
         store.set_cursor(&key, inode, offset + end)
@@ -122,7 +104,7 @@ pub fn catch_up(store: &Store, followed: &Followed) -> Result<usize> {
 /// the read stopped.
 fn reread(store: &Store, followed: &Followed, file: &mut File) -> Result<(usize, u64)> {
     let (mut last, mut lines) = (HashMap::new(), 0);
-    let end = each_chunk(file, Format::Journal, |changes, _| {
+    let end = each_chunk(file, |changes, _| {
         for change in changes {
             last.insert(change.id().to_owned(), lines);
             lines += 1;
@@ -131,20 +113,16 @@ fn reread(store: &Store, followed: &Followed, file: &mut File) -> Result<(usize,
     })?;
     file.seek(SeekFrom::Start(0))?;
     let mut line = 0;
-    each_chunk(
-        &mut (&mut *file).take(end),
-        Format::Journal,
-        |changes, _| {
-            let latest = changes
-                .into_iter()
-                .filter(|change| {
-                    line += 1;
-                    last.get(change.id()) == Some(&(line - 1))
-                })
-                .collect();
-            apply_in_order(store, &followed.device, latest, followed.heard_here(store)?)
-        },
-    )?;
+    each_chunk(&mut (&mut *file).take(end), |changes, _| {
+        let latest = changes
+            .into_iter()
+            .filter(|change| {
+                line += 1;
+                last.get(change.id()) == Some(&(line - 1))
+            })
+            .collect();
+        apply_in_order(store, &followed.device, latest, followed.heard_here(store)?)
+    })?;
     if !followed.heard_here(store)? {
         let gone = store
             .device_ids(&followed.device.id)?
@@ -164,7 +142,6 @@ fn reread(store: &Store, followed: &Followed, file: &mut File) -> Result<(usize,
 /// where the last whole line ends.
 fn each_chunk(
     reader: &mut impl Read,
-    format: Format,
     mut f: impl FnMut(Vec<Change>, u64) -> Result<()>,
 ) -> Result<u64> {
     let mut done = 0;
@@ -181,7 +158,7 @@ fn each_chunk(
         };
         let changes = carry[..end]
             .split(|&b| b == b'\n')
-            .filter_map(|line| parse(line, format))
+            .filter_map(parse)
             .collect();
         done += end as u64 + 1;
         carry.drain(..=end);
@@ -250,7 +227,6 @@ pub fn go_journals(dir: &Path, local: &Device, shared: impl Fn(&Device) -> bool)
                     .join(format!("{}.ndjson", path_escape(&device.id))),
                 shared: shared(&device),
                 device,
-                format: Format::Journal,
             }
         })
         .collect()

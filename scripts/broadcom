@@ -27,10 +27,7 @@ if [ ! -f "$usage_config" ]; then
   mkdir -p "$(dirname "$usage_config")"
   cat >"$usage_config" <<'EOF'
 {
-  "keyFile": "~/.config/broadcom-proxy/management-key",
-  "poolDir": "~/.local/state/broadcom-proxy",
-  "accountsFile": "~/.local/state/broadcom-proxy/accounts.json",
-  "receipts": "~/.local/state/broadcom-proxy/receipts.ndjson"
+  "keyFile": "~/.config/broadcom-proxy/management-key"
 }
 EOF
 fi

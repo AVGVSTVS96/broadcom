@@ -16,11 +16,11 @@ mod tokens;
 mod view;
 
 pub use attribution::{AgentSdk, ModelWeights, attribution_reach};
-pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, read_grants};
+pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, parse_grants};
 pub use identity::{Names, Past, Who, load_names, read_past};
 pub use limits::{AppendLog, Binding, LimitReading, parse_binding, parse_reading};
 pub use live::{Live, LiveSession, Processes, live_map, read_processes, seats_of};
-pub use plans::{ConfiguredPlan, Plan, PlanPricing, PlansView, Tier, read_plans};
+pub use plans::{ConfiguredPlan, Plan, PlanPricing, PlansView, PoolAccount, Tier, plans_of};
 pub use row::Row;
 pub use schema::schemas;
 pub use sessions::{Amount, LimitInputs, Prepared, Session, SessionUsage, prepare, session_usage};
@@ -29,8 +29,6 @@ pub use tokens::{TokensView, tokens_view};
 pub use view::{
     Labels, Part, Query, UsageView, parse_query, parts_of, proxy_since, usage_view, with_live,
 };
-
-use std::path::Path;
 
 use chrono::TimeZone;
 use chrono_tz::Tz;
@@ -67,29 +65,24 @@ pub fn pricing_from(r: Range, zone: Tz, now: i64) -> f64 {
         as f64
 }
 
-/// Account labels: each account's email (accounts.json), and each API-credit key named
-/// for the account its credit belongs to (credits.json).
+/// Account labels: each pooled account's email, and each API-credit key named for the
+/// account its credit belongs to.
 pub fn account_labels(
-    accounts_file: &Path,
-    credits_file: Option<&Path>,
+    accounts: &[PoolAccount],
+    grants: &[ApiCredit],
 ) -> std::collections::HashMap<String, String> {
-    let mut labels: std::collections::HashMap<String, String> =
-        plans::read_json::<plans::AccountList>(accounts_file)
-            .unwrap_or_default()
-            .accounts
-            .into_iter()
-            .map(|a| (a.id, a.email))
-            .collect();
-    for grant in credits_file
-        .and_then(|f| credits::read_grants(f).ok())
-        .unwrap_or_default()
-    {
+    let mut labels: std::collections::HashMap<String, String> = accounts
+        .iter()
+        .filter(|a| !a.label.is_empty())
+        .map(|a| (a.id.clone(), a.label.clone()))
+        .collect();
+    for grant in grants {
         if let Some(email) = labels
             .get(&grant.account)
             .filter(|_| !labels.contains_key(&grant.credential_id))
         {
             let label = format!("{email} API credit");
-            labels.insert(grant.credential_id, label);
+            labels.insert(grant.credential_id.clone(), label);
         }
     }
     labels
@@ -99,23 +92,21 @@ pub fn account_labels(
 mod label_tests {
     #[test]
     fn api_credit_keys_take_their_accounts_name() {
-        let dir =
-            std::env::temp_dir().join(format!("broadcom-usage-labels-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let (accounts, credits) = (dir.join("accounts.json"), dir.join("credits.json"));
-        std::fs::write(
-            &accounts,
-            r#"{"accounts":[{"id":"acct","email":"me@example.com","tier":"max 20x"}]}"#,
+        let account = |id: &str, label: &str| super::PoolAccount {
+            id: id.into(),
+            label: label.into(),
+            ..Default::default()
+        };
+        let accounts = [
+            account("acct", "me@example.com"),
+            account("claude:apikey:abc", ""),
+        ];
+        let grants = super::parse_grants(
+            br#"[{"startsAt":0,"account":"acct","organization":"Org","credentialId":"claude:apikey:abc","remaining":1,"allowance":1,"monthlyCap":1,"observedAt":0,"expiresAt":0,"renewsAt":0}]"#,
         )
         .unwrap();
-        std::fs::write(
-            &credits,
-            r#"[{"startsAt":0,"account":"acct","organization":"Org","credentialId":"claude:apikey:abc","remaining":1,"allowance":1,"monthlyCap":1,"observedAt":0,"expiresAt":0,"renewsAt":0}]"#,
-        )
-        .unwrap();
-        let labels = super::account_labels(&accounts, Some(&credits));
+        let labels = super::account_labels(&accounts, &grants);
         assert_eq!(labels["acct"], "me@example.com");
         assert_eq!(labels["claude:apikey:abc"], "me@example.com API credit");
-        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

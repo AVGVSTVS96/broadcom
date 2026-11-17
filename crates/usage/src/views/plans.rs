@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 
@@ -83,72 +81,46 @@ fn tiers_over(configured: &[Tier]) -> Vec<Tier> {
     tiers
 }
 
-pub(crate) fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Option<T> {
-    serde_json::from_slice(&std::fs::read(path).ok()?).ok()
-}
-
-#[derive(Deserialize, Default)]
-pub(crate) struct AccountList {
-    #[serde(default)]
-    pub accounts: Vec<ListedAccount>,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct ListedAccount {
-    #[serde(default)]
+/// A pooled account as the pool's live stream shows it (`a:<id>`): its email, and its plan
+/// by name or tier id, empty for an API key.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(default)]
+pub struct PoolAccount {
     pub id: String,
-    #[serde(default)]
-    pub email: String,
-    #[serde(default)]
-    pub tier: Option<String>,
+    pub label: String,
+    pub plan: String,
+    pub since: Option<f64>,
 }
 
-#[derive(Deserialize, Default)]
-struct SavedPlan {
-    #[serde(default)]
-    tier: Option<String>,
-    #[serde(default)]
-    since: Option<f64>,
-}
-
-/// The pooled Claude accounts' plans, from the pool's account list (accounts.json) and the
-/// tier each profile reported (`<state>/plans/<id>.json`), priced by `tiers` over the
-/// built-in ones; then the configured plans.
-pub fn read_plans(
-    accounts_file: Option<&Path>,
-    state_dir: Option<&Path>,
+/// The pooled Claude accounts' plans, priced by `tiers` over the built-in ones, then the
+/// configured plans.
+pub fn plans_of(
+    accounts: &[PoolAccount],
     configured: &[ConfiguredPlan],
     tiers: &[Tier],
 ) -> PlansView {
     let tiers = tiers_over(tiers);
-    let list: AccountList = accounts_file.and_then(read_json).unwrap_or_default();
     let mut view = PlansView::default();
     let mut seats = Vec::new();
-    for account in list.accounts {
-        let saved: SavedPlan = state_dir
-            .and_then(|dir| read_json(&dir.join("plans").join(format!("{}.json", account.id))))
-            .unwrap_or_default();
-        let priced = match (&saved.tier, &account.tier) {
-            (Some(id), _) => tiers.iter().find(|t| t.tier == *id),
-            (None, Some(name)) => tiers.iter().find(|t| t.name.eq_ignore_ascii_case(name)),
-            (None, None) => None,
-        };
-        let Some(tier) = priced else {
-            if let Some(tier) = saved.tier.or(account.tier).filter(|t| !t.is_empty()) {
-                view.unpriced.push(UnpricedSeat {
-                    account: account.id,
-                    label: account.email,
-                    tier,
-                });
-            }
+    for account in accounts.iter().filter(|a| !a.plan.is_empty()) {
+        let plan = &account.plan;
+        let Some(tier) = tiers
+            .iter()
+            .find(|t| t.tier == *plan || t.name.eq_ignore_ascii_case(plan))
+        else {
+            view.unpriced.push(UnpricedSeat {
+                account: account.id.clone(),
+                label: account.label.clone(),
+                tier: plan.clone(),
+            });
             continue;
         };
         seats.push(Seat {
-            account: Some(account.id),
-            label: account.email,
+            account: Some(account.id.clone()),
+            label: account.label.clone(),
             tier: tier.name.clone(),
             monthly_usd: tier.monthly_usd,
-            since: saved.since.filter(|s| *s != 0.0),
+            since: account.since.filter(|s| *s != 0.0),
         });
     }
     if !seats.is_empty() {
@@ -475,20 +447,18 @@ mod tests {
 
     #[test]
     fn seats_are_priced_by_tier_and_unknown_tiers_are_listed() {
-        let root = std::env::temp_dir().join(format!("views-plans-{}", std::process::id()));
-        std::fs::create_dir_all(root.join("plans")).unwrap();
-        let accounts = root.join("accounts.json");
-        std::fs::write(
-            &accounts,
-            r#"{"accounts":[{"id":"a","email":"a@x","tier":"max 5x"},{"id":"b","email":"b@x"},{"id":"c","email":"c@x"},{"id":"d","email":"d@x"}]}"#,
-        )
-        .unwrap();
-        for (id, saved) in [
-            ("b", r#"{"tier":"default_claude_max_20x","since":5}"#),
-            ("c", r#"{"tier":"default_claude_team","since":5}"#),
-        ] {
-            std::fs::write(root.join(format!("plans/{id}.json")), saved).unwrap();
-        }
+        let account = |id: &str, plan: &str, since: Option<f64>| PoolAccount {
+            id: id.into(),
+            label: format!("{id}@x"),
+            plan: plan.into(),
+            since,
+        };
+        let accounts = [
+            account("a", "Max 5x", None),
+            account("b", "default_claude_max_20x", Some(5.0)),
+            account("c", "default_claude_team", Some(5.0)),
+            account("claude:apikey:k", "", None),
+        ];
         let seats = |view: &PlansView| {
             view.plans[0]
                 .seats
@@ -504,7 +474,7 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let view = read_plans(Some(&accounts), Some(&root), &[], &[]);
+        let view = plans_of(&accounts, &[], &[]);
         assert_eq!(
             seats(&view),
             [
@@ -526,13 +496,12 @@ mod tests {
             name: "Team".into(),
             monthly_usd: 30.0,
         };
-        let view = read_plans(Some(&accounts), Some(&root), &[], &[team]);
+        let view = plans_of(&accounts, &[], &[team]);
         assert_eq!(
             seats(&view)[2],
             ("c".into(), "Team".into(), 30.0, Some(5.0))
         );
         assert_eq!(view.unpriced, []);
-        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

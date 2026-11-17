@@ -3,7 +3,7 @@
 //! query over it is answered from that and cached.
 
 use parking_lot::Mutex;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -14,8 +14,9 @@ use crate::config::Config;
 use crate::store::{Store, now_millis};
 use crate::stream::Stream;
 use crate::views::{
-    self, AppendLog, Binding, CreditsView, Labels, LimitInputs, LimitReading, Live, Names, Past,
-    PlanPricing, PlansView, Processes, Range, Row, SessionUsage, TokensView, UsageView,
+    self, ApiCredit, AppendLog, Binding, CreditsView, Labels, LimitInputs, LimitReading, Live,
+    Names, Past, PlanPricing, PlansView, PoolAccount, Processes, Range, Row, SessionUsage,
+    TokensView, UsageView,
 };
 
 /// A range older than this reloads behind the request that finds it.
@@ -105,6 +106,23 @@ fn recent(at: Option<Instant>) -> bool {
     at.is_some_and(|at| at.elapsed() < VIEWED_FOR)
 }
 
+/// What the deck knows of the account pool, kept current by `pool::follow`.
+#[derive(Default)]
+pub struct PoolState {
+    /// Its accounts by id, from its live stream.
+    pub accounts: BTreeMap<String, PoolAccount>,
+    /// Its credit grants; none until read.
+    pub grants: Option<Vec<ApiCredit>>,
+    /// Why it can't be read, while it can't.
+    pub problem: Option<String>,
+}
+
+impl PoolState {
+    fn accounts(&self) -> Vec<PoolAccount> {
+        self.accounts.values().cloned().collect()
+    }
+}
+
 pub struct Deck {
     config: Config,
     zone: Tz,
@@ -112,8 +130,9 @@ pub struct Deck {
     pub stream: Stream,
     state: Mutex<State>,
     rows: Mutex<Rows>,
-    readings: Mutex<AppendLog<LimitReading>>,
-    bindings: Mutex<AppendLog<Binding>>,
+    pub pool: Mutex<PoolState>,
+    pub readings: Mutex<AppendLog<LimitReading>>,
+    pub bindings: Mutex<AppendLog<Binding>>,
     loader: tokio::sync::Mutex<()>,
     past: Mutex<Option<Past>>,
     tokens: Mutex<Option<(i64, Instant, Arc<TokensView>)>>,
@@ -141,16 +160,8 @@ impl Deck {
             .as_deref()
             .and_then(|z| z.parse().ok())
             .unwrap_or_else(local_zone);
-        let readings = AppendLog::new(
-            config.pool_dir.join("usage-history.ndjson"),
-            views::parse_reading,
-        );
         let mut ranges: HashMap<Range, RangeCache> = HashMap::new();
         ranges.entry(Range::Week).or_default().viewed = Some(Instant::now());
-        let bindings = AppendLog::new(
-            config.pool_dir.join("attribution.ndjson"),
-            views::parse_binding,
-        );
         Self {
             config,
             zone,
@@ -161,8 +172,9 @@ impl Deck {
                 ..Default::default()
             }),
             rows: Mutex::default(),
-            readings: Mutex::new(readings),
-            bindings: Mutex::new(bindings),
+            pool: Mutex::default(),
+            readings: Mutex::new(AppendLog::new(views::parse_reading)),
+            bindings: Mutex::new(AppendLog::new(views::parse_binding)),
             loader: tokio::sync::Mutex::new(()),
             past: Mutex::new(None),
             tokens: Mutex::new(None),
@@ -170,13 +182,13 @@ impl Deck {
     }
 
     fn bindings(&self) -> Vec<Binding> {
-        self.bindings.lock().read().0.to_vec()
+        self.bindings.lock().rows().to_vec()
     }
 
     /// Computes these ranges' session usage from one read of the span they need.
     fn load(&self, ranges: &[Range]) -> Result<Vec<SessionUsage>> {
         let now = now_millis();
-        let readings = self.readings.lock().read().0.to_vec();
+        let readings = self.readings.lock().rows().to_vec();
         let bindings = self.bindings();
         let (readings, bindings) = (&readings[..], &bindings[..]);
         let from = ranges
@@ -190,8 +202,7 @@ impl Deck {
         rows.sync(&self.store)?;
         let prepared = views::prepare(rows.since(from));
         let plans = self.plans().plans;
-        let grants =
-            views::read_grants(&self.config.pool_dir.join("credits.json")).unwrap_or_default();
+        let grants = self.pool.lock().grants.clone().unwrap_or_default();
         let pricing = PlanPricing::new(&plans, &grants, &prepared, self.zone, now);
         let limits = LimitInputs::new(
             readings,
@@ -291,10 +302,11 @@ impl Deck {
     }
 
     fn labels(&self, tracked: &SessionUsage) -> Labels {
+        let pool = self.pool.lock();
         Labels {
             accounts: views::account_labels(
-                &self.config.accounts_file,
-                Some(&self.config.pool_dir.join("credits.json")),
+                &pool.accounts(),
+                pool.grants.as_deref().unwrap_or_default(),
             ),
             devices: tracked
                 .devices
@@ -386,12 +398,8 @@ impl Deck {
 
     /// The pooled accounts' plan seats and the configured plans, as Plan $ prices them.
     pub fn plans(&self) -> PlansView {
-        views::read_plans(
-            Some(&self.config.accounts_file),
-            Some(&self.config.pool_dir),
-            &self.config.plans,
-            &self.config.tiers,
-        )
+        let accounts = self.pool.lock().accounts();
+        views::plans_of(&accounts, &self.config.plans, &self.config.tiers)
     }
 
     /// The API-credit grants, carried forward by the proxy's receipts since their reading.
@@ -414,10 +422,12 @@ impl Deck {
         let started = Instant::now();
         let deck = self.clone();
         let view = tokio::task::spawn_blocking(move || {
-            let path = deck.config.pool_dir.join("credits.json");
-            let grants = match views::read_grants(&path) {
-                Ok(grants) => grants,
-                Err(e) => return Err(e),
+            let grants = {
+                let pool = deck.pool.lock();
+                pool.grants.clone().ok_or_else(|| match &pool.problem {
+                    Some(problem) => format!("Can't read the pool's credit grants: {problem}"),
+                    None => "The pool's credit grants haven't loaded yet.".into(),
+                })?
             };
             let receipts = deck.store.receipts(&grants).map_err(|e| e.to_string())?;
             views::credits(&grants, &receipts, now_millis())
@@ -516,7 +526,7 @@ impl Deck {
 
     /// Sends the live keys that changed.
     pub fn publish(&self) {
-        let seats = views::seats_of(self.bindings.lock().read().0, now_millis());
+        let seats = views::seats_of(self.bindings.lock().rows(), now_millis());
         let entries = {
             let mut state = self.state.lock();
             let tracked = [Range::Week, Range::Today]
@@ -671,7 +681,6 @@ mod tests {
             "remaining": 100.0, "allowance": 200.0, "monthlyCap": 200.0,
             "observedAt": start + 1000, "expiresAt": start + 86_400_000_000i64, "renewsAt": 0
         }]);
-        std::fs::write(dir.join("credits.json"), grant.to_string()).unwrap();
         let local = Device {
             id: "server".into(),
             label: "server".into(),
@@ -680,11 +689,9 @@ mod tests {
         let store = Arc::new(
             Store::open(&dir.join("usage.db"), local, Arc::new(Policy::bundled())).unwrap(),
         );
-        let config = Config {
-            pool_dir: dir.clone(),
-            ..Default::default()
-        };
-        (Arc::new(Deck::new(config, store)), dir)
+        let deck = Deck::new(Config::default(), store);
+        deck.pool.lock().grants = Some(views::parse_grants(grant.to_string().as_bytes()).unwrap());
+        (Arc::new(deck), dir)
     }
 
     fn receipt(id: &str, at: &str) -> Event {
@@ -738,7 +745,7 @@ mod tests {
         let (deck, dir) = credits_deck("since", "2026-11-03T00:00:00Z");
         let old = receipt("old", "2026-11-01T00:00:00Z");
         apply(&deck.store, "server", vec![old], &[]);
-        let grants = views::read_grants(&dir.join("credits.json")).unwrap();
+        let grants = deck.pool.lock().grants.clone().unwrap();
         assert_eq!(deck.store.receipts(&grants).unwrap().len(), 0);
         std::fs::remove_dir_all(&dir).unwrap();
     }

@@ -23,9 +23,9 @@ pub struct Config {
     /// This machine in the store; keep the id the Go proxy used so its history stays one device.
     pub device_id: Option<String>,
     pub device_label: Option<String>,
-    /// The account pool's state: usage-history.ndjson, attribution.ndjson, plans/, credits.json.
-    pub pool_dir: PathBuf,
-    pub accounts_file: PathBuf,
+    /// The account pool's address: its management API, which takes the same key, serves its
+    /// accounts, receipts, limit readings, session moves and credit grants.
+    pub pool: String,
     pub timezone: Option<String>,
     /// Subscriptions the pool can't read from an account profile, like ChatGPT Pro for Codex.
     pub plans: Vec<ConfiguredPlan>,
@@ -47,8 +47,6 @@ pub struct Config {
     /// Collect this machine's transcripts here; by default only when no Go proxy collects them
     /// (no `goUsageDir`).
     pub collect: Option<bool>,
-    /// Per-request receipts a proxy appends, one record per line.
-    pub receipts: Option<PathBuf>,
     /// Repositories whose GitHub Actions upload claude-usage artifacts (autofork's capture step).
     pub github_repos: Vec<String>,
 }
@@ -88,8 +86,7 @@ impl Default for Config {
             key_file: home.join(".config/cliproxyapi/key"),
             device_id: None,
             device_label: None,
-            pool_dir: home.join(".local/state/cliproxyapi"),
-            accounts_file: home.join(".config/cliproxyapi/accounts.json"),
+            pool: "http://127.0.0.1:8317".into(),
             timezone: None,
             plans: Vec::new(),
             tiers: Vec::new(),
@@ -100,7 +97,6 @@ impl Default for Config {
             claude: home.join(".claude"),
             go_usage_dir: None,
             collect: None,
-            receipts: None,
             github_repos: Vec::new(),
         }
     }
@@ -117,17 +113,12 @@ impl Config {
         for p in [
             &mut config.state_dir,
             &mut config.key_file,
-            &mut config.pool_dir,
-            &mut config.accounts_file,
             &mut config.hex,
             &mut config.claude,
         ] {
             *p = expand(p);
         }
-        for p in [&mut config.go_usage_dir, &mut config.receipts]
-            .into_iter()
-            .flatten()
-        {
+        if let Some(p) = &mut config.go_usage_dir {
             *p = expand(p);
         }
         Ok(config)

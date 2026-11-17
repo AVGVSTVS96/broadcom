@@ -7,9 +7,12 @@ use serde_json::{Value, json};
 use super::attribution::AgentSdk;
 use super::identity::{Names, SessionRef, Who, label_of, row_of, who_of};
 use super::limits::Binding;
-use super::plans::read_json;
 use super::sessions::{Session, SessionUsage};
 use super::timeframe::{locale_compare, parse_millis};
+
+fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Option<T> {
+    serde_json::from_slice(&std::fs::read(path).ok()?).ok()
+}
 
 const DAY_MS: f64 = 86_400_000.0;
 

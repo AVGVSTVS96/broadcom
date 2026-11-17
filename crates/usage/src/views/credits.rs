@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use serde::{Deserialize, Serialize};
 
 use super::timeframe::parse_millis;
@@ -44,13 +42,12 @@ pub struct CreditsView {
 
 const INVALID: &str = "Credit observations are invalid.";
 
-/// The grants in credits.json; none when the file doesn't exist.
-pub fn read_grants(path: &Path) -> Result<Vec<ApiCredit>, String> {
-    match std::fs::read(path) {
-        Ok(data) => serde_json::from_slice(&data).map_err(|_| INVALID.to_string()),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(_) => Err("Credit observations could not be read.".into()),
+/// The grants in credits.json; none when it's empty, as the pool serves one it doesn't keep.
+pub fn parse_grants(bytes: &[u8]) -> Result<Vec<ApiCredit>, String> {
+    if bytes.trim_ascii().is_empty() {
+        return Ok(Vec::new());
     }
+    serde_json::from_slice(bytes).map_err(|_| INVALID.to_string())
 }
 
 /// Once `renews_at` has passed (and before `expires_at`), the grant is a fresh period: the
