@@ -1,14 +1,19 @@
 //! One SSE stream per dashboard tab: a snapshot of every live key on connect, then only the
-//! keys whose JSON changed, a removed key as null.
+//! keys whose JSON changed, a removed key as null, and `stale` events naming the state files
+//! that grew.
 
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Mutex,
+    time::Duration,
+};
 
 use bytes::Bytes;
 use serde_json::Value;
-use tokio::sync::mpsc;
+use tokio::sync::{Notify, mpsc};
 
 #[derive(Default)]
-pub struct Stream(Mutex<Inner>);
+pub struct Stream(Mutex<Inner>, Notify);
 
 #[derive(Default)]
 struct Inner {
@@ -16,6 +21,7 @@ struct Inner {
     live: HashMap<String, String>,
     clients: Vec<mpsc::Sender<Bytes>>,
     closed: bool,
+    grown: BTreeSet<&'static str>,
 }
 
 fn frame(kind: &str, keys: &[String], values: &HashMap<String, String>) -> Bytes {
@@ -101,6 +107,26 @@ impl Stream {
     pub fn heartbeat(&self) {
         self.inner().send(&Bytes::from_static(b": \n\n"));
     }
+
+    /// Notes that a state file grew; `run_stale` names it to listeners, so a reader
+    /// elsewhere reads on from where it stopped.
+    pub fn grew(&self, file: &'static str) {
+        self.inner().grown.insert(file);
+        self.1.notify_one();
+    }
+
+    /// Sends the names of the files that grew, at most once a second.
+    pub async fn run_stale(&self) {
+        loop {
+            self.1.notified().await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let mut inner = self.inner();
+            let tags = serde_json::to_string(&std::mem::take(&mut inner.grown)).expect("names");
+            inner.send(&Bytes::from(format!(
+                "data: {{\"type\":\"stale\",\"tags\":{tags}}}\n\n"
+            )));
+        }
+    }
 }
 
 impl Inner {
@@ -162,5 +188,21 @@ mod tests {
             stream.subscribe().try_recv(),
             Err(mpsc::error::TryRecvError::Disconnected)
         ));
+    }
+
+    #[tokio::test]
+    async fn names_the_files_that_grew_once() {
+        let stream = std::sync::Arc::new(Stream::default());
+        let mut rx = stream.subscribe();
+        rx.recv().await.unwrap();
+        stream.grew("receipts.ndjson");
+        stream.grew("attribution.ndjson");
+        stream.grew("receipts.ndjson");
+        let running = stream.clone();
+        tokio::spawn(async move { running.run_stale().await });
+        assert_eq!(
+            text(&rx.recv().await.unwrap()),
+            "data: {\"type\":\"stale\",\"tags\":[\"attribution.ndjson\",\"receipts.ndjson\"]}\n\n"
+        );
     }
 }

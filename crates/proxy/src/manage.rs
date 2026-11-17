@@ -8,7 +8,7 @@ use axum::{
     Json, Router,
     body::Body,
     extract::{Path, Query, Request, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{delete, get, patch, post},
@@ -29,6 +29,7 @@ pub fn router(app: Arc<App>) -> Router<Arc<App>> {
     Router::new()
         .route("/deck/events", get(events))
         .route("/deck/accounts", get(accounts))
+        .route("/deck/files/{name}", get(file))
         .route("/deck/accounts/policy", post(policy))
         .route("/credentials", get(credentials).delete(delete_credentials))
         .route("/credentials/status", patch(credential_status))
@@ -98,6 +99,70 @@ pub async fn run_live(app: Arc<App>) {
         entries.push(("pool".into(), pool));
         app.live.publish(&entries);
     }
+}
+
+/// The state files a reader elsewhere follows, like broadcom-usage on another machine.
+const FILES: [&str; 4] = [
+    "receipts.ndjson",
+    "attribution.ndjson",
+    "usage-history.ndjson",
+    "credits.json",
+];
+
+/// One of the pool's state files, whole or from a byte offset (`Range: bytes=<from>-[<to>]`),
+/// so a reader reads on from where it stopped; a file not written yet is empty.
+async fn file(
+    State(app): State<Arc<App>>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    if !FILES.contains(&name.as_str()) {
+        return fail(
+            StatusCode::NOT_FOUND,
+            "The pool keeps no file by that name.",
+        );
+    }
+    let path = app.state_dir().join(name);
+    let range = headers
+        .get(header::RANGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(byte_range);
+    let read = tokio::task::spawn_blocking(move || files::read_range(&path, range)).await;
+    let no_store = (header::CACHE_CONTROL, "no-store");
+    match read {
+        Ok(Ok(files::Slice::Whole(bytes))) => ([no_store], bytes).into_response(),
+        Ok(Ok(files::Slice::Part { from, size, bytes })) => {
+            let to = from + bytes.len() as u64 - 1;
+            let range = format!("bytes {from}-{to}/{size}");
+            (
+                StatusCode::PARTIAL_CONTENT,
+                [no_store, (header::CONTENT_RANGE, range.as_str())],
+                bytes,
+            )
+                .into_response()
+        }
+        Ok(Ok(files::Slice::Past(size))) => {
+            let range = format!("bytes */{size}");
+            (
+                StatusCode::RANGE_NOT_SATISFIABLE,
+                [no_store, (header::CONTENT_RANGE, range.as_str())],
+            )
+                .into_response()
+        }
+        Ok(Err(e)) => fail(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        Err(e) => fail(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+    }
+}
+
+/// A `Range: bytes=<from>-[<to>]` header's offsets; anything else is read whole.
+fn byte_range(value: &str) -> Option<(u64, Option<u64>)> {
+    let (from, to) = value.strip_prefix("bytes=")?.split_once('-')?;
+    let from = from.parse().ok()?;
+    let to = match to {
+        "" => None,
+        to => Some(to.parse().ok().filter(|&to| to >= from)?),
+    };
+    Some((from, to))
 }
 
 async fn events(State(app): State<Arc<App>>) -> Response {

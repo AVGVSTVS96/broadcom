@@ -1,6 +1,6 @@
 use std::{
-    fs::{self, OpenOptions},
-    io::{self, Write},
+    fs::{self, File, OpenOptions},
+    io::{self, Read, Seek, SeekFrom, Write},
     os::unix::fs::OpenOptionsExt,
     path::Path,
     sync::atomic::{AtomicU64, Ordering},
@@ -55,6 +55,44 @@ pub fn append(dir: &Path, name: &str, value: &impl Serialize) {
     }
 }
 
+/// What a reader gets of a file it asked for whole or from a byte offset on.
+#[derive(Debug, PartialEq)]
+pub enum Slice {
+    Whole(Vec<u8>),
+    Part {
+        from: u64,
+        size: u64,
+        bytes: Vec<u8>,
+    },
+    /// The offset is at or past the end of a file this long.
+    Past(u64),
+}
+
+/// Reads a file whole, or bytes `from` through `to` (to its end without one); a file not
+/// written yet reads as empty.
+pub fn read_range(path: &Path, range: Option<(u64, Option<u64>)>) -> io::Result<Slice> {
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok(range.map_or(Slice::Whole(Vec::new()), |_| Slice::Past(0)));
+        }
+        Err(e) => return Err(e),
+    };
+    let mut bytes = Vec::new();
+    let Some((from, to)) = range else {
+        file.read_to_end(&mut bytes)?;
+        return Ok(Slice::Whole(bytes));
+    };
+    let size = file.metadata()?.len();
+    if from >= size {
+        return Ok(Slice::Past(size));
+    }
+    let end = to.map_or(size, |to| (to + 1).min(size));
+    file.seek(SeekFrom::Start(from))?;
+    file.take(end - from).read_to_end(&mut bytes)?;
+    Ok(Slice::Part { from, size, bytes })
+}
+
 pub fn now_ms() -> i64 {
     jiff::Timestamp::now().as_millisecond()
 }
@@ -92,4 +130,39 @@ pub fn parse_ms(text: &str) -> Option<i64> {
     text.parse::<jiff::Timestamp>()
         .ok()
         .map(jiff::Timestamp::as_millisecond)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_file_reads_whole_or_from_an_offset() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("receipts.ndjson");
+        assert_eq!(read_range(&path, Some((0, None))).unwrap(), Slice::Past(0));
+        assert_eq!(read_range(&path, None).unwrap(), Slice::Whole(Vec::new()));
+        fs::write(&path, "a\nbc\n").unwrap();
+        assert_eq!(
+            read_range(&path, Some((2, None))).unwrap(),
+            Slice::Part {
+                from: 2,
+                size: 5,
+                bytes: b"bc\n".to_vec()
+            }
+        );
+        assert_eq!(
+            read_range(&path, Some((0, Some(2)))).unwrap(),
+            Slice::Part {
+                from: 0,
+                size: 5,
+                bytes: b"a\nb".to_vec()
+            }
+        );
+        assert_eq!(read_range(&path, Some((5, None))).unwrap(), Slice::Past(5));
+        assert_eq!(
+            read_range(&path, None).unwrap(),
+            Slice::Whole(b"a\nbc\n".to_vec())
+        );
+    }
 }

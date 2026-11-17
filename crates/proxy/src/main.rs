@@ -83,6 +83,10 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
     tokio::spawn(manage::run_live(app.clone()));
+    tokio::spawn({
+        let live = app.live.clone();
+        async move { live.run_stale().await }
+    });
 
     let stopping = Arc::new(tokio::sync::Notify::new());
     let server =
