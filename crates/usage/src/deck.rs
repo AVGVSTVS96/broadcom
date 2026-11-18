@@ -134,6 +134,8 @@ pub struct Deck {
     pub readings: Mutex<AppendLog<LimitReading>>,
     pub bindings: Mutex<AppendLog<Binding>>,
     loader: tokio::sync::Mutex<()>,
+    credits_loader: tokio::sync::Mutex<()>,
+    tokens_loader: tokio::sync::Mutex<()>,
     past: Mutex<Option<Past>>,
     tokens: Mutex<Option<(i64, Instant, Arc<TokensView>)>>,
 }
@@ -176,6 +178,8 @@ impl Deck {
             readings: Mutex::new(AppendLog::new(views::parse_reading)),
             bindings: Mutex::new(AppendLog::new(views::parse_binding)),
             loader: tokio::sync::Mutex::new(()),
+            credits_loader: tokio::sync::Mutex::new(()),
+            tokens_loader: tokio::sync::Mutex::new(()),
             past: Mutex::new(None),
             tokens: Mutex::new(None),
         }
@@ -374,26 +378,61 @@ impl Deck {
         Ok(views::with_live(&view, &live))
     }
 
-    /// Every day's tokens over all history, summed again once the store's rows change or the
-    /// rolling windows are FRESH_FOR old.
+    /// Every day's tokens over all history. A request never waits on a summed view: one that
+    /// missed a change or is FRESH_FOR old sums again behind it.
     pub async fn tokens(self: &Arc<Self>) -> Result<Arc<TokensView>> {
+        let changed_at = self.state.lock().changed_at;
+        let cached = self.tokens.lock().as_ref().map(|(_, built, view)| {
+            let stale =
+                built.elapsed() >= FRESH_FOR || changed_at.is_some_and(|changed| changed > *built);
+            (stale, view.clone())
+        });
+        match cached {
+            Some((stale, view)) => {
+                if stale {
+                    let deck = self.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = deck.refresh_tokens().await {
+                            tracing::warn!("summing tokens: {e:#}");
+                        }
+                    });
+                }
+                Ok(view)
+            }
+            None => self.refresh_tokens().await,
+        }
+    }
+
+    /// Sums the tokens again, one sum at a time, unless the store's rows are unchanged and the
+    /// rolling windows younger than FRESH_FOR.
+    async fn refresh_tokens(self: &Arc<Self>) -> Result<Arc<TokensView>> {
+        let asked = Instant::now();
+        let _summing = self.tokens_loader.lock().await;
+        if let Some((_, built, view)) = self.tokens.lock().as_ref()
+            && *built >= asked
+        {
+            return Ok(view.clone());
+        }
         let deck = self.clone();
-        tokio::task::spawn_blocking(move || {
+        let (view, changed) = tokio::task::spawn_blocking(move || -> Result<_> {
             let mut rows = deck.rows.lock();
             rows.sync(&deck.store)?;
             let rev = rows.rev.unwrap_or(-1);
-            let mut cached = deck.tokens.lock();
-            if let Some((at, built, view)) = cached.as_ref()
-                && *at == rev
-                && built.elapsed() < FRESH_FOR
-            {
-                return Ok(view.clone());
+            let unchanged = deck.tokens.lock().as_ref().and_then(|(at, built, view)| {
+                (*at == rev && built.elapsed() < FRESH_FOR).then(|| view.clone())
+            });
+            if let Some(view) = unchanged {
+                return Ok((view, false));
             }
             let view = Arc::new(views::tokens_view(&rows.sorted, deck.zone, now_millis()));
-            *cached = Some((rev, Instant::now(), view.clone()));
-            Ok(view)
+            *deck.tokens.lock() = Some((rev, Instant::now(), view.clone()));
+            Ok((view, true))
         })
-        .await?
+        .await??;
+        if changed {
+            self.stream.stale(&["tokens"]);
+        }
+        Ok(view)
     }
 
     /// The pooled accounts' plan seats and the configured plans, as Plan $ prices them.
@@ -402,7 +441,8 @@ impl Deck {
         views::plans_of(&accounts, &self.config.plans, &self.config.tiers)
     }
 
-    /// The API-credit grants, carried forward by the proxy's receipts since their reading.
+    /// The API-credit grants, carried forward by the proxy's receipts since their reading. A
+    /// request never waits on a read view: one that missed a change reads again behind it.
     pub async fn credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
         let cached = {
             let mut state = self.state.lock();
@@ -410,15 +450,35 @@ impl Deck {
             let fresh = state
                 .credits_at
                 .is_some_and(|at| state.changed_at.is_none_or(|changed| at >= changed));
-            state.credits.clone().filter(|_| fresh)
+            state.credits.clone().map(|view| (fresh, view))
         };
         match cached {
-            Some(view) => view,
+            Some((fresh, view)) => {
+                if !fresh {
+                    let deck = self.clone();
+                    tokio::spawn(async move { deck.refresh_credits().await });
+                }
+                view
+            }
             None => self.refresh_credits().await,
         }
     }
 
+    /// Reads the receipts again, one read at a time: callers queued behind a read that
+    /// started after them take its view.
     pub async fn refresh_credits(self: &Arc<Self>) -> Arc<Result<CreditsView, String>> {
+        let asked = Instant::now();
+        let _reading = self.credits_loader.lock().await;
+        let done = {
+            let state = self.state.lock();
+            state
+                .credits
+                .clone()
+                .filter(|_| state.credits_at.is_some_and(|at| at >= asked))
+        };
+        if let Some(view) = done {
+            return view;
+        }
         let started = Instant::now();
         let deck = self.clone();
         let view = tokio::task::spawn_blocking(move || {
@@ -725,9 +785,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn credits_after_a_change_are_read_again() {
+    async fn credits_after_a_change_answer_at_once_and_are_read_again_behind() {
         let (deck, dir) = credits_deck("fresh", "2026-11-03T00:00:00Z");
         let before = deck.credits().await;
+        let mut rx = deck.stream.subscribe();
         apply(
             &deck.store,
             "server",
@@ -735,8 +796,27 @@ mod tests {
             &[],
         );
         deck.usage_changed();
-        let after = deck.credits().await;
-        assert_ne!(before, after);
+        assert_eq!(deck.credits().await, before);
+        while !rx.recv().await.unwrap().contains("credits") {}
+        assert_ne!(deck.credits().await, before);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn credit_reads_asked_for_during_a_read_share_the_next_one() {
+        let (deck, dir) = credits_deck("shared", "2026-11-03T00:00:00Z");
+        let reads: Vec<_> = (0..8)
+            .map(|_| {
+                let deck = deck.clone();
+                tokio::spawn(async move { deck.refresh_credits().await })
+            })
+            .collect();
+        deck.refresh_credits().await;
+        let mut views = Vec::new();
+        for read in reads {
+            views.push(read.await.unwrap());
+        }
+        assert!(views.iter().all(|view| Arc::ptr_eq(view, &views[0])));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

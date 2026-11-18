@@ -21,7 +21,7 @@ const OverviewPage = async () => {
 
   return (
     <>
-      <RefreshOnStale tags={["accounts", "credits"]} />
+      <RefreshOnStale tags={["accounts", "credits", "tokens"]} />
       <Overview
         history={history.ok ? history.value : {}}
         grants={grants.ok ? grants.value : null}

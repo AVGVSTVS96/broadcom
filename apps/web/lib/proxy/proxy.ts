@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   Context,
   Data,
+  Duration,
   Effect,
   Layer,
   ManagedRuntime,
@@ -20,6 +21,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 const proxyBase = process.env.BROADCOM_PROXY ?? "http://127.0.0.1:8317";
 const usageBase = process.env.BROADCOM_USAGE ?? "http://127.0.0.1:8320";
+const answerWithin = Duration.seconds(8);
 
 export type Source = "proxy" | "usage";
 
@@ -139,7 +141,19 @@ export const ProxyLive = Layer.effect(
                 }),
             ),
           ),
-      get: (at, schema) => decode(at, schema, HttpClientRequest.get(at)),
+      get: (at, schema) =>
+        decode(at, schema, HttpClientRequest.get(at)).pipe(
+          Effect.timeoutOrElse({
+            duration: answerWithin,
+            orElse: () =>
+              Effect.fail(
+                new ProxyError({
+                  path: at,
+                  reason: `no answer in ${Duration.format(answerWithin)}`,
+                }),
+              ),
+          }),
+        ),
       send: (method, at, body, schema) =>
         decode(
           at,
