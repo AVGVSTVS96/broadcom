@@ -6,6 +6,7 @@
       "label": "label-3",
       "row": "row-4",
       "app": null,
+      "href": null,
       "state": "idle",
       "account": "account-5",
       "host": "server",
@@ -21,6 +22,7 @@
       "label": "label-9",
       "row": "row-10",
       "app": "app-11",
+      "href": "href-14",
       "state": "idle",
       "account": "account-12",
       "host": "server",
@@ -30,9 +32,6 @@
       "agentSdk": false,
       "question": null,
       "reply": null
-    },
-    "app:buzz": {
-      "connected": true
     }
   }
 }

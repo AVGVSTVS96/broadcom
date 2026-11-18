@@ -9,7 +9,7 @@ Sessions and Credits views and its live-sessions stream.
 transcripts ─┐
 Mac pushes ──┤                     ┌─ GET /deck/usage, /deck/sessions, /deck/credits
 GH artifacts ┼─▶ SQLite (usage.db) ┤
-receipts ────┘   records → events  └─ GET /deck/events (SSE: s:<session>, app:<name>)
+receipts ────┘   records → events  └─ GET /deck/events (SSE: s:<session>)
 ```
 
 - `records` keeps every device's records as sent, forever. `events` holds one resolved
@@ -37,3 +37,15 @@ broadcom-usage serve --config ~/.config/broadcom-usage/config.json
 
 Every config field is optional; see `src/config.rs`. Clients send the management key as
 `Authorization: Bearer <key>` or `X-Management-Key: <key>`.
+
+## Threads
+
+Sessions that run in a conversation, like a chat topic, rank under it once `threadsFile`
+lists it. Whatever runs the conversations writes the file and rewrites it as they change:
+
+```json
+[{ "session": "4f9c2e1a", "app": "Telegram", "thread": "-1001:12", "name": "Pipeline", "href": "https://t.me/c/1/12" }]
+```
+
+`session` is a session id or its first 8 characters; a thread with none still names a
+session whose title matches it and no other thread.

@@ -38,8 +38,10 @@ pub struct Config {
     /// column of `scripts/limit-weights.py`; it splits each limit rise between models.
     /// Replaces the built-in weights whole; unlisted models count 1.
     pub model_weights: BTreeMap<String, f64>,
-    pub hex: PathBuf,
     pub claude: PathBuf,
+    /// A JSON array of the threads sessions ran in, `{session?, app, thread, name, href?}`,
+    /// that names their rows; whatever runs the threads writes it, and each change is read.
+    pub threads_file: Option<PathBuf>,
     /// The Go proxy's usage folder, whose journals are followed read-only: each device's
     /// history loads into the store, and a journal speaks for its device until the store
     /// hears from the device itself, after which it only adds what the store lacks.
@@ -81,7 +83,7 @@ impl Default for Config {
         Self {
             listen: vec!["127.0.0.1:8320".into()],
             state_dir: home.join(".local/state/broadcom-usage"),
-            key_file: home.join(".config/cliproxyapi/key"),
+            key_file: home.join(".config/broadcom/key"),
             device_id: None,
             device_label: None,
             pool: "http://127.0.0.1:8317".into(),
@@ -91,8 +93,8 @@ impl Default for Config {
             agent_sdk_factor: AgentSdk::default().factor,
             agent_sdk_entrypoints: AgentSdk::default().entrypoints,
             model_weights: ModelWeights::default().0,
-            hex: home.join("hex"),
             claude: home.join(".claude"),
+            threads_file: None,
             go_usage_dir: None,
             collect: None,
             github_repos: Vec::new(),
@@ -111,12 +113,14 @@ impl Config {
         for p in [
             &mut config.state_dir,
             &mut config.key_file,
-            &mut config.hex,
             &mut config.claude,
         ] {
             *p = expand(p);
         }
-        if let Some(p) = &mut config.go_usage_dir {
+        for p in [&mut config.go_usage_dir, &mut config.threads_file]
+            .into_iter()
+            .flatten()
+        {
             *p = expand(p);
         }
         Ok(config)

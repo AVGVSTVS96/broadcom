@@ -2,7 +2,7 @@ use foldhash::{HashMap, HashMapExt, HashSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use super::attribution::AgentSdk;
 use super::identity::{Names, SessionRef, Who, label_of, row_of, who_of};
@@ -24,6 +24,8 @@ pub struct LiveSession {
     /// The Usage row key this session ranks under with by=agent.
     pub row: String,
     pub app: Option<String>,
+    /// Where its thread or run opens, when its source gives a link.
+    pub href: Option<String>,
     pub state: String,
     /// The account the pool has the session on.
     pub account: Option<String>,
@@ -60,12 +62,11 @@ pub struct Blocked {
     pub reply: Option<String>,
 }
 
-/// Running Claude sessions, blocked jobs, and which hex apps are connected.
+/// Running Claude sessions and blocked jobs.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Processes {
     pub running: Vec<Running>,
     pub blocked: Vec<Blocked>,
-    pub apps: Vec<(String, bool)>,
 }
 
 fn sorted_entries(dir: &Path) -> Vec<String> {
@@ -90,8 +91,8 @@ fn is_running(pid: f64) -> bool {
 }
 
 /// Reads `<claude>/sessions/<pid>.json` (live only while its pid is a running process),
-/// `<claude>/jobs/*/state.json` and `<hex>/state/<app>/{sessions,hub.sock}`.
-pub fn read_processes(claude: &Path, hex: &Path) -> Processes {
+/// and `<claude>/jobs/*/state.json`.
+pub fn read_processes(claude: &Path) -> Processes {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct SessionFile {
@@ -177,14 +178,6 @@ pub fn read_processes(claude: &Path, hex: &Path) -> Processes {
     found
         .blocked
         .sort_by(|a, b| locale_compare(&a.session_id, &b.session_id));
-
-    let apps = hex.join("state");
-    for app in sorted_entries(&apps) {
-        let dir = apps.join(&app);
-        if dir.join("sessions").exists() {
-            found.apps.push((app, dir.join("hub.sock").exists()));
-        }
-    }
     found
 }
 
@@ -210,27 +203,24 @@ pub fn seats_of(rows: &[Binding], now: i64) -> Vec<(String, String)> {
     seats
 }
 
-/// The live sessions and apps, as the stream's `s:<session>` and `app:<name>` keys.
+/// The live sessions, as the stream's `s:<session>` keys.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Live {
     pub sessions: Vec<LiveSession>,
-    pub apps: Vec<(String, bool)>,
 }
 
 impl Live {
-    /// The stream's keys in order: sessions, then apps.
+    /// The stream's keys, in order.
     pub fn entries(&self) -> Vec<(String, Value)> {
-        let sessions = self.sessions.iter().map(|s| {
-            (
-                format!("s:{}", s.id),
-                serde_json::to_value(s).expect("plain data"),
-            )
-        });
-        let apps = self
-            .apps
+        self.sessions
             .iter()
-            .map(|(name, connected)| (format!("app:{name}"), json!({ "connected": connected })));
-        sessions.chain(apps).collect()
+            .map(|s| {
+                (
+                    format!("s:{}", s.id),
+                    serde_json::to_value(s).expect("plain data"),
+                )
+            })
+            .collect()
     }
 }
 
@@ -315,6 +305,7 @@ pub fn live_map(
             label: label_of(&shown).0,
             row: row_of(&ranked, key),
             app: (ranked.kind == "thread").then(|| ranked.app.clone()),
+            href: ranked.href.clone(),
             state: state.to_string(),
             account: seats.get(id).map(std::string::ToString::to_string),
             host: "server".into(),
@@ -327,10 +318,7 @@ pub fn live_map(
         }
     };
 
-    let mut live = Live {
-        sessions: Vec::new(),
-        apps: found.apps.clone(),
-    };
+    let mut live = Live::default();
     for r in &found.running {
         let state = if blocked.contains_key(r.session_id.as_str()) {
             "blocked"
@@ -378,7 +366,7 @@ mod tests {
     #[test]
     fn running_and_blocked_sessions() {
         let root = std::env::temp_dir().join(format!("views-live-{}", std::process::id()));
-        let (claude, hex) = (root.join("claude"), root.join("hex"));
+        let claude = root.join("claude");
         let file = |path: std::path::PathBuf, text: &str| {
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
             std::fs::write(path, text).unwrap();
@@ -398,9 +386,7 @@ mod tests {
             claude.join("jobs/j/state.json"),
             r#"{"state":"blocked","sessionId":"asks","cwd":"/w","updatedAt":"1970-01-01T00:00:01Z","needs":"","detail":"Waiting on a prompt","suggestedReply":"go"}"#,
         );
-        file(hex.join("state/telegram/sessions/x"), "");
-        file(hex.join("state/telegram/hub.sock"), "");
-        let found = read_processes(&claude, &hex);
+        let found = read_processes(&claude);
         let live = live_map(
             &found,
             &[("asks".into(), "acct".into())],
@@ -438,7 +424,6 @@ mod tests {
                 )
             ]
         );
-        assert_eq!(live.apps, [("telegram".to_string(), true)]);
         std::fs::remove_dir_all(root).unwrap();
     }
 

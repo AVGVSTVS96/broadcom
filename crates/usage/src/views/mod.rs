@@ -17,7 +17,7 @@ mod view;
 
 pub use attribution::{AgentSdk, ModelWeights, attribution_reach};
 pub use credits::{ApiCredit, CreditUsage, CreditsView, credits, parse_grants};
-pub use identity::{Names, Past, Who, load_names, read_past};
+pub use identity::{Names, Who, read_threads};
 pub use limits::{AppendLog, Binding, LimitReading, parse_binding, parse_reading};
 pub use live::{Live, LiveSession, Processes, live_map, read_processes, seats_of};
 pub use plans::{ConfiguredPlan, Plan, PlanPricing, PlansView, PoolAccount, Tier, plans_of};

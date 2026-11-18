@@ -125,13 +125,8 @@ pub fn start(app: Arc<App>) {
     }));
     let claude = &app.config.claude;
     let (sessions, jobs) = (claude.join("sessions"), claude.join("jobs"));
-    let hex_state = app.config.hex.join("state");
     spawn_watch(
-        &[
-            (sessions.clone(), false),
-            (jobs.clone(), true),
-            (hex_state.clone(), true),
-        ],
+        &[(sessions.clone(), false), (jobs.clone(), true)],
         Duration::from_millis(250),
         move |path| {
             let named = |root: &Path, names: &[&str]| {
@@ -141,9 +136,7 @@ pub fn start(app: Arc<App>) {
                         .file_name()
                         .is_some_and(|n| names.iter().any(|x| n == *x))
             };
-            path.starts_with(&sessions)
-                || named(&jobs, &["state.json"])
-                || named(&hex_state, &["sessions", "hub.sock"])
+            path.starts_with(&sessions) || named(&jobs, &["state.json"])
         },
         {
             let deck = deck.clone();
@@ -153,10 +146,21 @@ pub fn start(app: Arc<App>) {
             }
         },
     );
-    tokio::spawn(follow_hex(
-        deck.clone(),
-        app.config.hex.join(".hex/bin/hex"),
-    ));
+    if let Some(file) = app.config.threads_file.clone()
+        && let Some(dir) = file.parent()
+    {
+        let deck = deck.clone();
+        spawn_watch(
+            &[(dir.to_path_buf(), false)],
+            Duration::from_millis(250),
+            move |path| path == file,
+            move || {
+                deck.refresh_names();
+                deck.publish();
+                deck.stream.stale(&["usage"]);
+            },
+        );
+    }
     tokio::spawn({
         let deck = deck.clone();
         async move {
@@ -362,37 +366,6 @@ fn spawn_watch(
             .await;
         }
     });
-}
-
-/// Follows `hex watch`, which prints a line whenever a thread's name changes.
-async fn follow_hex(deck: Arc<Deck>, hex: PathBuf) {
-    use tokio::io::AsyncBufReadExt;
-    if !hex.exists() {
-        return;
-    }
-    loop {
-        let child = tokio::process::Command::new(&hex)
-            .arg("watch")
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true)
-            .spawn();
-        if let Ok(mut child) = child {
-            if let Some(out) = child.stdout.take() {
-                let mut lines = tokio::io::BufReader::new(out).lines();
-                while let Ok(Some(_)) = lines.next_line().await {
-                    tokio::time::sleep(Duration::from_millis(250)).await;
-                    let names = deck.clone();
-                    let _ = tokio::task::spawn_blocking(move || names.refresh_names()).await;
-                    deck.publish();
-                    deck.stream.stale(&["usage"]);
-                }
-            }
-            let _ = child.wait().await;
-        }
-        tracing::warn!("hex watch exited; starting it again");
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    }
 }
 
 /// Catches up whenever a followed file changes: once the writes go quiet for a second,

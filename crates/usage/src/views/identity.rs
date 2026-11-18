@@ -1,6 +1,5 @@
-use foldhash::{HashMap, HashMapExt};
+use foldhash::{HashMap, HashSet, HashSetExt};
 use std::path::Path;
-use std::process::Command;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -57,21 +56,32 @@ impl Serialize for Who {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// A conversation sessions run in, like a chat topic, as `threadsFile` lists it.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 struct Thread {
     app: String,
+    #[serde(rename = "thread")]
     id: String,
     name: String,
+    #[serde(default)]
+    href: Option<String>,
 }
 
-/// hex's threads, for naming sessions.
+/// One line of `threadsFile`: a thread, and a session that ran in it.
+#[derive(Deserialize)]
+struct Entry {
+    /// A session id, or its first 8 characters.
+    #[serde(default)]
+    session: Option<String>,
+    #[serde(flatten)]
+    thread: Thread,
+}
+
+/// The threads sessions ran in, for naming sessions.
 #[derive(Debug, Clone, Default)]
 pub struct Names {
-    /// Thread by its current Claude session, from `hex threads`.
-    current: HashMap<String, Thread>,
-    /// Thread by the first 8 characters of a past session id, from `hex log`
-    /// messages whose meta names the session's log.
-    logged: HashMap<String, Thread>,
+    /// Thread by session id, or by its first 8 characters.
+    sessions: HashMap<String, Thread>,
     /// Threads by name, across apps.
     named: HashMap<String, Vec<Thread>>,
 }
@@ -92,24 +102,6 @@ static RUN_SESSION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^github:([0-9]+):").expect("a valid regex"));
 static RUN_NUMBER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r" #[0-9]+$").expect("a valid regex"));
-static PAST_LOG_NAME: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"-([0-9a-f]{8})\.md$").expect("a valid regex"));
-
-fn thread_link(app: &str, id: &str) -> Option<String> {
-    match app {
-        "t3" => Some(format!("t3-thread://v1/{id}")),
-        "telegram" => {
-            let (chat, topic) = id.split_once(':').unwrap_or((id, ""));
-            let internal = chat.strip_prefix("-100").unwrap_or(chat);
-            Some(if topic.is_empty() {
-                format!("https://t.me/c/{internal}")
-            } else {
-                format!("https://t.me/c/{internal}/{topic}")
-            })
-        }
-        _ => None,
-    }
-}
 
 pub(crate) fn basename(path: &str) -> &str {
     let trimmed = path.trim_end_matches('/');
@@ -121,9 +113,8 @@ pub(crate) fn prefix(id: &str, n: usize) -> &str {
     id.get(..n).unwrap_or(id)
 }
 
-/// Names a session, in order: a GitHub Actions run, by tokenhub's session id; its
-/// thread's current session; a past session of a thread, by hex's log; a title that
-/// names exactly one thread; a bin/job title `<owner>/<unit>`; any other title; else
+/// Names a session, in order: a GitHub Actions run, by tokenhub's session id; the thread
+/// `threadsFile` puts it in, by its id or first 8 characters; a title that names exactly one thread; a bin/job title `<owner>/<unit>`; any other title; else
 /// its project. A name alone never joins two threads.
 pub fn who_of(names: &Names, s: SessionRef) -> Who {
     let project = s.repository.unwrap_or(s.project).to_string();
@@ -150,9 +141,9 @@ pub fn who_of(names: &Names, s: SessionRef) -> Who {
     }
     let title = s.title.map_or_default(str::trim);
     let found = names
-        .current
+        .sessions
         .get(s.session_id)
-        .or_else(|| names.logged.get(prefix(s.session_id, 8)))
+        .or_else(|| names.sessions.get(prefix(s.session_id, 8)))
         .or_else(|| match names.named.get(title) {
             Some(threads) if !title.is_empty() && threads.len() == 1 => threads.first(),
             _ => None,
@@ -163,7 +154,7 @@ pub fn who_of(names: &Names, s: SessionRef) -> Who {
             app: t.app.clone(),
             thread: t.id.clone(),
             name: t.name.clone(),
-            href: thread_link(&t.app, &t.id),
+            href: t.href.clone(),
             ..Who::default()
         };
     }
@@ -244,102 +235,31 @@ pub fn app_of(who: &Who) -> &str {
     }
 }
 
-/// Runs `hex <command> --json`, so the views never read hex.db's tables. A machine without
-/// hex has no threads.
-fn hex_json<T: for<'de> Deserialize<'de>>(hex: &Path, command: &str) -> Result<Vec<T>, String> {
-    let output = match Command::new(hex.join(".hex/bin/hex"))
-        .args([command, "--json"])
-        .output()
-    {
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        run => run.map_err(|err| format!("hex {command}: {err}"))?,
+/// The threads `file` lists, as a JSON array of `{session?, app, thread, name, href?}`.
+/// No file, or none there yet, names no threads.
+pub fn read_threads(file: Option<&Path>) -> Result<Names, String> {
+    let Some(file) = file else {
+        return Ok(Names::default());
     };
-    if !output.status.success() {
-        let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(format!(
-            "hex {command}: {}",
-            if message.is_empty() {
-                output.status.to_string()
-            } else {
-                message
-            }
-        ));
-    }
-    serde_json::from_slice(&output.stdout).map_err(|err| format!("hex {command}: {err}"))
-}
-
-/// Each past session's first 8 characters → (app, thread), from messages whose meta
-/// names the session's log. Only hex's old log import wrote those, so hex's whole log
-/// is read once, not at every change.
-pub type Past = HashMap<String, (String, String)>;
-
-pub fn read_past(hex: &Path) -> Result<Past, String> {
-    #[derive(Deserialize)]
-    struct Message {
-        #[serde(default)]
-        to: Option<String>,
-        #[serde(default)]
-        meta: Option<Meta>,
-    }
-    #[derive(Deserialize)]
-    struct Meta {
-        #[serde(default)]
-        app: Option<String>,
-        #[serde(default)]
-        log: Option<String>,
-    }
-    let rows: Vec<Message> = hex_json(hex, "log")?;
-    let mut past = Past::new();
-    for row in rows {
-        let Some(meta) = row.meta else { continue };
-        let (app, log) = (meta.app.unwrap_or_default(), meta.log.unwrap_or_default());
-        if let Some(id) = PAST_LOG_NAME.captures(&log).filter(|_| !app.is_empty()) {
-            past.insert(id[1].to_string(), (app, row.to.unwrap_or_default()));
-        }
-    }
-    Ok(past)
-}
-
-/// hex's threads by session, past session and name.
-pub fn load_names(hex: &Path, past: &Past) -> Result<Names, String> {
-    #[derive(Deserialize)]
-    struct Row {
-        #[serde(default)]
-        app: Option<String>,
-        #[serde(default)]
-        thread: Option<String>,
-        #[serde(default)]
-        name: Option<String>,
-        #[serde(default)]
-        session: Option<String>,
-    }
-    let rows: Vec<Row> = hex_json(hex, "threads")?;
+    let text = match std::fs::read(file) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Names::default()),
+        read => read.map_err(|err| format!("{}: {err}", file.display()))?,
+    };
+    let entries: Vec<Entry> =
+        serde_json::from_slice(&text).map_err(|err| format!("{}: {err}", file.display()))?;
     let mut names = Names::default();
-    let mut threads: HashMap<(String, String), Thread> = HashMap::new();
-    let mut order = Vec::new();
-    for row in rows {
-        let t = Thread {
-            app: row.app.unwrap_or_default(),
-            id: row.thread.unwrap_or_default(),
-            name: row.name.unwrap_or_default(),
-        };
-        let key = (t.app.clone(), t.id.clone());
-        if !threads.contains_key(&key) {
-            order.push(key.clone());
+    let mut seen = HashSet::new();
+    for Entry { session, thread } in entries {
+        if seen.insert((thread.app.clone(), thread.id.clone())) {
+            names
+                .named
+                .entry(thread.name.clone())
+                .or_default()
+                .push(thread.clone());
         }
-        if let Some(session) = row.session.filter(|s| !s.is_empty()) {
-            names.current.insert(session, t.clone());
+        if let Some(session) = session.filter(|s| !s.is_empty()) {
+            names.sessions.insert(session, thread);
         }
-        threads.insert(key, t);
-    }
-    for (id, key) in past {
-        if let Some(t) = threads.get(key) {
-            names.logged.insert(id.clone(), t.clone());
-        }
-    }
-    for key in order {
-        let t = threads[&key].clone();
-        names.named.entry(t.name.clone()).or_default().push(t);
     }
     Ok(names)
 }
@@ -386,30 +306,37 @@ mod tests {
     }
 
     #[test]
-    fn a_machine_without_hex_has_no_threads() {
-        let nowhere = Path::new("/nonexistent/hex");
-        let names = load_names(nowhere, &read_past(nowhere).unwrap()).unwrap();
-        assert!(names.current.is_empty() && names.logged.is_empty());
+    fn no_threads_file_names_no_threads() {
+        for file in [None, Some(Path::new("/nonexistent/threads.json"))] {
+            let names = read_threads(file).unwrap();
+            assert!(names.sessions.is_empty() && names.named.is_empty());
+        }
     }
 
     #[test]
     fn names_sessions_in_order() {
-        let thread = |name: &str| Thread {
-            app: "telegram".into(),
-            id: format!("-1001:{name}"),
-            name: name.into(),
-        };
-        let mut names = Names::default();
-        names.current.insert("live".into(), thread("Live"));
-        names.logged.insert("pastpast".into(), thread("Past"));
-        names
-            .named
-            .insert("Twice".into(), vec![thread("Twice"), thread("Twice")]);
-        names.named.insert("Once".into(), vec![thread("Once")]);
+        let file = std::env::temp_dir().join(format!("threads-{}.json", std::process::id()));
+        std::fs::write(
+            &file,
+            r#"[
+                {"session":"live","app":"Telegram","thread":"-1001:Live","name":"Live","href":"https://t.me/c/1/7"},
+                {"session":"pastpast","app":"Telegram","thread":"-1001:Past","name":"Past"},
+                {"app":"Telegram","thread":"-1001:Once","name":"Once"},
+                {"app":"Telegram","thread":"-1001:Twice","name":"Twice"},
+                {"app":"Telegram","thread":"-1001:Twice2","name":"Twice"}
+            ]"#,
+        )
+        .unwrap();
+        let names = read_threads(Some(&file)).unwrap();
+        std::fs::remove_file(&file).unwrap();
         let row = |s: SessionRef| row_of(&who_of(&names, s), "k");
-        assert_eq!(row(session("live", None)), "t:telegram:-1001:Live");
-        assert_eq!(row(session("pastpast-1234", None)), "t:telegram:-1001:Past");
-        assert_eq!(row(session("x", Some(" Once "))), "t:telegram:-1001:Once");
+        assert_eq!(row(session("live", None)), "t:Telegram:-1001:Live");
+        assert_eq!(
+            who_of(&names, session("live", None)).href.as_deref(),
+            Some("https://t.me/c/1/7")
+        );
+        assert_eq!(row(session("pastpast-1234", None)), "t:Telegram:-1001:Past");
+        assert_eq!(row(session("x", Some(" Once "))), "t:Telegram:-1001:Once");
         assert_eq!(row(session("x", Some("Twice"))), "s:k");
         assert_eq!(row(session("x", Some("hex/kb-wave"))), "j:hex/kb-wave");
         assert_eq!(row(session("x", None)), "p:/home/me/hex");
@@ -426,10 +353,6 @@ mod tests {
                 "g:o/r:CI".into(),
                 Some("https://github.com/o/r/actions/runs/42")
             )
-        );
-        assert_eq!(
-            thread_link("telegram", "-1001:7").as_deref(),
-            Some("https://t.me/c/1/7")
         );
     }
 

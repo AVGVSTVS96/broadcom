@@ -89,6 +89,7 @@ export const LiveSession = Schema.Struct({
   cwd: Schema.String,
   entrypoint: Schema.String,
   host: Schema.String,
+  href: Schema.optionalKey(Schema.NullOr(Schema.String)),
   id: Schema.String,
   label: Schema.String,
   row: Schema.String,
@@ -97,8 +98,6 @@ export const LiveSession = Schema.Struct({
 });
 
 export type LiveSession = typeof LiveSession.Type;
-
-export const AppLink = Schema.Struct({ connected: Schema.Boolean });
 
 export const Grant = Schema.Struct({
   account: Schema.String,

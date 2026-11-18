@@ -37,7 +37,7 @@ describe("live events", () => {
         live: {
           "a:a1": account,
           "a:bad": { id: 1 },
-          "app:hex": { connected: true },
+          "x:other": { connected: true },
         },
         type: "snapshot",
       }),

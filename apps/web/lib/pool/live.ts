@@ -169,30 +169,6 @@ export const handoffs = (moves: readonly Move[], now: number): Handoffs => {
   };
 };
 
-export const threadHref = (row: string) => {
-  const [kind, app, ...rest] = row.split(":");
-  const id = rest.join(":");
-
-  if (kind !== "t" || id === "") {
-    return null;
-  }
-
-  if (app === "t3") {
-    return `t3-thread://v1/${id}`;
-  }
-
-  if (app === "telegram") {
-    const [chat = "", topic] = id.split(":");
-    const internal = chat.replace(/^-100/u, "");
-
-    return topic === undefined
-      ? `https://t.me/c/${internal}`
-      : `https://t.me/c/${internal}/${topic}`;
-  }
-
-  return null;
-};
-
 const strength = { blocked: 0, idle: 2, working: 1 } as const;
 
 export const byState = (a: LiveSession, b: LiveSession) =>

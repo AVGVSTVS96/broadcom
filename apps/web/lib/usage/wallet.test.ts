@@ -59,11 +59,11 @@ describe("walletOf", () => {
 describe("labelsOf", () => {
   test("rows that share a name show where they ran", () => {
     const labels = labelsOf([
-      { key: "t:telegram:-100123", label: "hex" },
+      { key: "t:Telegram:-100123", label: "General" },
       { key: "p:local:/home/someone/hex", label: "hex" },
       { key: "p:hex", label: "hex" },
       { key: "p:github.com/owner/hex", label: "hex" },
-      { key: "t:telegram:-100123:45", label: "iikb" },
+      { key: "t:Telegram:-100123:45", label: "iikb" },
       { key: "p:github.com/owner/iikb", label: "iikb" },
       { key: "j:seqno", label: "seqno" },
     ]);

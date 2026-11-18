@@ -11,7 +11,7 @@ import { Section } from "@/components/viz/section";
 import type { LiveData } from "@/features/live/read";
 import { useLive } from "@/lib/live/client";
 import { useNow } from "@/lib/live/now";
-import { byState, threadHref, waiting } from "@/lib/pool/live";
+import { byState, waiting } from "@/lib/pool/live";
 import type { Handoff, Handoffs } from "@/lib/pool/live";
 import { nameOf, namesOf } from "@/lib/pool/names";
 import type { Account, LiveSession, MoveCause, SessionState } from "@/lib/proxy/schema";
@@ -25,15 +25,7 @@ const dots = {
   working: "bg-ok",
 } as const satisfies Record<SessionState, string>;
 
-const apps = new Map([
-  ["buzz", "Buzz"],
-  ["discord", "Discord"],
-  ["t3", "T3 Code"],
-  ["telegram", "Telegram"],
-  ["voice", "Voice"],
-]);
-
-const appName = (app: string | null) => apps.get(app ?? "") ?? "Job";
+const appName = (app: string | null) => app ?? "Job";
 
 const rankIn = (order: readonly string[], id: string | null) => {
   const at = id === null ? -1 : order.indexOf(id);
@@ -125,7 +117,7 @@ const Waiting = ({
     >
       <ul className="-mx-2 divide-y">
         {asking.toReversed().map((session) => {
-          const href = threadHref(session.row);
+          const href = session.href ?? null;
 
           return (
             <li
@@ -165,7 +157,7 @@ const Waiting = ({
 };
 
 const SessionLine = ({ session, now }: { session: LiveSession; now: number }) => {
-  const href = threadHref(session.row);
+  const href = session.href ?? null;
 
   return (
     <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 py-2 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,14rem)_4.5rem]">

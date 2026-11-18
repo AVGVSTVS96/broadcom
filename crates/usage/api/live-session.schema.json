@@ -20,6 +20,13 @@
         "null"
       ]
     },
+    "href": {
+      "description": "Where its thread or run opens, when its source gives a link.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "state": {
       "type": "string"
     },
@@ -68,6 +75,7 @@
     "label",
     "row",
     "app",
+    "href",
     "state",
     "account",
     "host",

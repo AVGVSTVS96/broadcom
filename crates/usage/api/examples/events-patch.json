@@ -6,6 +6,7 @@
       "label": "label-3",
       "row": "row-4",
       "app": null,
+      "href": null,
       "state": "working",
       "account": "account-5",
       "host": "server",

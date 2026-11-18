@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { handoffs, threadHref, waiting } from "@/lib/pool/live";
+import { handoffs, waiting } from "@/lib/pool/live";
 import type { Move } from "@/lib/pool/live";
 import type { LiveSession } from "@/lib/proxy/schema";
 
@@ -43,13 +43,6 @@ test("handoffs count starts and moves per hour, and group moves by route", () =>
 
   expect(a?.left.reduce((sum, count) => sum + count, 0)).toBe(4);
   expect(a?.started.reduce((sum, count) => sum + count, 0)).toBe(1);
-});
-
-test("thread rows link to their conversation where the app has links", () => {
-  expect(threadHref("t:telegram:-1001234:56")).toBe("https://t.me/c/1234/56");
-  expect(threadHref("t:t3:abc")).toBe("t3-thread://v1/abc");
-  expect(threadHref("t:buzz:abc")).toBeNull();
-  expect(threadHref("p:local:/home")).toBeNull();
 });
 
 test("the worst hour of one session's moves in the day reads as a bounce", () => {

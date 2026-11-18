@@ -15,8 +15,8 @@ use crate::store::{Store, now_millis};
 use crate::stream::Stream;
 use crate::views::{
     self, ApiCredit, AppendLog, Binding, CreditsView, Labels, LimitInputs, LimitReading, Live,
-    Names, Past, PlanPricing, PlansView, PoolAccount, Processes, Range, Row, SessionUsage,
-    TokensView, UsageView,
+    Names, PlanPricing, PlansView, PoolAccount, Processes, Range, Row, SessionUsage, TokensView,
+    UsageView,
 };
 
 /// A range older than this reloads behind the request that finds it.
@@ -136,7 +136,6 @@ pub struct Deck {
     loader: tokio::sync::Mutex<()>,
     credits_loader: tokio::sync::Mutex<()>,
     tokens_loader: tokio::sync::Mutex<()>,
-    past: Mutex<Option<Past>>,
     tokens: Mutex<Option<(i64, Instant, Arc<TokensView>)>>,
 }
 
@@ -180,7 +179,6 @@ impl Deck {
             loader: tokio::sync::Mutex::new(()),
             credits_loader: tokio::sync::Mutex::new(()),
             tokens_loader: tokio::sync::Mutex::new(()),
-            past: Mutex::new(None),
             tokens: Mutex::new(None),
         }
     }
@@ -330,7 +328,7 @@ impl Deck {
             match (&state.names, &state.names_error) {
                 (Some(names), _) => names.clone(),
                 (None, Some(e)) => return Err(anyhow!(e.clone())),
-                (None, None) => return Err(anyhow!("hex's thread names haven't loaded yet.")),
+                (None, None) => return Err(anyhow!("Thread names haven't loaded yet.")),
             }
         };
         let key = serde_json::to_string(&q)?;
@@ -549,18 +547,9 @@ impl Deck {
         }
     }
 
-    /// Re-reads hex's thread names; past thread names are read once.
+    /// Re-reads the threads sessions ran in, from `threadsFile`.
     pub fn refresh_names(&self) {
-        let hex = &self.config.hex;
-        let mut past = self.past.lock();
-        if past.is_none() {
-            match views::read_past(hex) {
-                Ok(p) => *past = Some(p),
-                Err(e) => tracing::warn!("hex history: {e}"),
-            }
-        }
-        let empty = Past::default();
-        let result = views::load_names(hex, past.as_ref().unwrap_or(&empty));
+        let result = views::read_threads(self.config.threads_file.as_deref());
         let mut state = self.state.lock();
         match result {
             Ok(names) => {
@@ -571,7 +560,7 @@ impl Deck {
                 }
             }
             Err(e) => {
-                tracing::warn!("hex names: {e}");
+                tracing::warn!("threads: {e}");
                 if state.names.is_none() {
                     state.names_error = Some(e);
                 }
@@ -580,7 +569,7 @@ impl Deck {
     }
 
     pub fn refresh_processes(&self) {
-        let found = views::read_processes(&self.config.claude, &self.config.hex);
+        let found = views::read_processes(&self.config.claude);
         self.state.lock().processes = found;
     }
 

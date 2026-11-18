@@ -385,19 +385,14 @@ const placeOf = (project: string) =>
 export const labelsOf = (
   rows: readonly { readonly key: string; readonly label: string }[],
 ): ReadonlyMap<string, string> => {
-  const named = rows.map((row) => ({
-    key: row.key,
-    label: /^t:telegram:-\d+$/u.test(row.key) ? "General" : row.label,
-  }));
-
   const counts = new Map<string, number>();
 
-  for (const row of named) {
+  for (const row of rows) {
     counts.set(row.label, (counts.get(row.label) ?? 0) + 1);
   }
 
   return new Map(
-    named.map((row) => [
+    rows.map((row) => [
       row.key,
       (counts.get(row.label) ?? 0) > 1 && row.key.startsWith("p:")
         ? placeOf(row.key.slice(2))
