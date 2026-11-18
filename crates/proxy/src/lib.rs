@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Router,
+    extract::DefaultBodyLimit,
     http::StatusCode,
     routing::{get, post},
 };
@@ -28,4 +29,6 @@ pub fn router(app: Arc<app::App>) -> Router {
         .route("/healthz", get(|| async { StatusCode::OK }))
         .nest("/v8/management", manage::router(app.clone()))
         .with_state(app)
+        // WHY: axum's default 2 MB cap rejects a conversation with a few screenshots; Anthropic takes 32 MB.
+        .layer(DefaultBodyLimit::max(32 << 20))
 }
