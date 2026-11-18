@@ -14,7 +14,8 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 - `scripts/deploy.sh`: builds `apps/web` from `origin/main` (`--no-pull`: from the checkout as it is) into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service` when it runs on this machine.
 - `cargo install --path crates/usage` then restart `broadcom-usage.service`: ships the usage service.
 - `uv run --with numpy python -I scripts/limit-weights.py`: how much weekly or five-hour limit each model uses per token next to Opus 5.5, fit from meter readings and proxy receipts.
-- `git tag vX.Y.Z && git push origin vX.Y.Z`: the release workflow builds the macOS and Linux downloads `scripts/install.sh` fetches (both binaries, the standalone dashboard, the Bun that runs it, `scripts/broadcom`), smoke-tests each and publishes them. `cargo publish -p broadcom-proxy` after bumping its version.
+- Release: set `version` in the root `Cargo.toml`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow refuses a tag that doesn't match it, builds the macOS and Linux downloads `scripts/install.sh` fetches (both binaries, the standalone dashboard, the Bun that runs it, `scripts/broadcom`), smoke-tests each, publishes them, then publishes broadcom-proxy to crates.io.
+- `rust-toolchain.toml` pins the Rust that CI, releases and local builds use; bump it on purpose and fix what its clippy finds.
 
 ## Map
 
