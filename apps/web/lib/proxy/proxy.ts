@@ -36,7 +36,7 @@ const usagePaths = [
 const sourceOf = (at: string): Source =>
   usagePaths.some((prefix) => at.startsWith(prefix)) ? "usage" : "proxy";
 
-const keyFile = process.env.BROADCOM_KEY_FILE ?? path.join(homedir(), ".config/cliproxyapi/key");
+const keyFile = process.env.BROADCOM_KEY_FILE ?? path.join(homedir(), ".config/broadcom/key");
 
 export class ProxyError extends Data.TaggedError("ProxyError")<{
   readonly path: string;

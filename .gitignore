@@ -3,6 +3,7 @@ target/
 .next/
 .next-a/
 .next-b/
+apps/web/app/(extension)/
 out/
 *.tsbuildinfo
 next-env.d.ts

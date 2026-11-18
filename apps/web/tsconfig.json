@@ -6,7 +6,10 @@
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./*"] }
+    "paths": {
+      "@/*": ["./*"],
+      "@extension/*": ["./app/(extension)/*", "./components/shell/extension/*"]
+    }
   },
   "include": [
     "next-env.d.ts",

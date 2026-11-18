@@ -13,10 +13,17 @@ if [ "${1:-}" != --no-pull ]; then
   git merge --ff-only --quiet origin/main
 fi
 head=$(git rev-parse HEAD)
-[ "$(cat "$state/built" 2>/dev/null)" = "$head $live" ] && { echo "already built: $(git log -1 --format='%h %s') in $live"; exit 0; }
-bun install --frozen-lockfile --silent
+extension=${BROADCOM_EXTENSION:-$(sed -n 's/^BROADCOM_EXTENSION=//p' "$state/env" 2>/dev/null || true)}
+mount="apps/web/app/(extension)"
+if [ -n "$extension" ]; then
+  changed=$(rsync -ai --delete --exclude node_modules "$extension/" "$mount/")
+else
+  changed=$([ ! -e "$mount" ] || { rm -rf "$mount" && echo removed; })
+fi
+[ -z "$changed" ] && [ "$(cat "$state/built" 2>/dev/null)" = "$head $live" ] && { echo "already built: $(git log -1 --format='%h %s') in $live"; exit 0; }
+bun install "$([ -e "$mount/package.json" ] && echo --no-save || echo --frozen-lockfile)" --silent
 rm -rf "apps/web/$next"
-BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { tail -30 /tmp/broadcom-build.log; exit 1; }
+BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { rm -f "$state/built"; tail -30 /tmp/broadcom-build.log; exit 1; }
 previous=$(cat "$state/slot" 2>/dev/null || true)
 echo "BROADCOM_DIST=$next" >"$state/slot"
 echo "$head $next" >"$state/built"

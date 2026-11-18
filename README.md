@@ -71,4 +71,24 @@ bun install
 BROADCOM_PROXY=http://127.0.0.1:8317 bun --filter @broadcom/web dev
 ```
 
-`BROADCOM_KEY_FILE` points at the proxy's management key (default `~/.config/cliproxyapi/key`). The key stays on the server.
+`BROADCOM_KEY_FILE` points at the proxy's management key (default `~/.config/broadcom/key`). The key stays on the server.
+
+### Add pages
+
+A folder at `apps/web/app/(extension)` adds pages to the dashboard. It's a Next.js [route group](https://nextjs.org/docs/app/api-reference/file-conventions/route-groups): its folders are routes, `pages.ts` puts them in the nav, and `package.json` brings their dependencies.
+
+```
+apps/web/app/(extension)/
+├── pages.ts          the nav entries
+├── package.json      { "name": "notes", "dependencies": { … } }
+├── notes/page.tsx    /notes
+└── lib/notes.ts      imported as @extension/lib/notes
+```
+
+```ts
+import type { Page } from "@/components/shell/nav";
+
+export const pages: readonly Page[] = [{ href: "/notes", name: "Notes" }];
+```
+
+Its code imports the dashboard's like any page does (`@/components/viz/section`). The folder is git-ignored; `scripts/deploy.sh` copies in the one `BROADCOM_EXTENSION` names, from the environment or `~/.config/broadcom/env`, before it builds.

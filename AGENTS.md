@@ -1,6 +1,6 @@
 # BROADCOM
 
-A Claude account pool and its dashboard: which account takes new work, how much each plan and free credit has left, how fast it's going, how many tokens it has spent and who spent them, and adding or removing accounts. Also hosts pages for the machine it runs on (Files, Plugins, Executor).
+A Claude account pool and its dashboard: which account takes new work, how much each plan and free credit has left, how fast it's going, how many tokens it has spent and who spent them, and adding or removing accounts.
 
 Never start a second pool on the same logins: refresh tokens rotate, so each pool signs the other out. Another machine uses the one pool through `broadcom connect <url>`.
 
@@ -11,7 +11,7 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 - `bun run check`: oxlint, oxfmt, typecheck and tests for the web app, then rustfmt, clippy and tests for the crates. CI and the pre-commit hook run it.
 - `bun run fix`: oxlint's fixes, oxfmt, cargo fmt.
 - `bun --filter @broadcom/web dev`: the dashboard, with `BROADCOM_PROXY` set.
-- `scripts/deploy.sh`: builds `apps/web` from `origin/main` (`--no-pull`: from the checkout as it is) into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service` when it runs on this machine.
+- `scripts/deploy.sh`: builds `apps/web` from `origin/main` (`--no-pull`: from the checkout as it is), with the extension `BROADCOM_EXTENSION` names copied in, into the idle `.next-a`/`.next-b` slot and restarts `broadcom.service` when it runs on this machine.
 - `cargo install --path crates/usage` then restart `broadcom-usage.service`: ships the usage service.
 - `uv run --with numpy python -I scripts/limit-weights.py`: how much weekly or five-hour limit each model uses per token next to Opus 5.5, fit from meter readings and proxy receipts.
 - Release: set `version` in the root `Cargo.toml`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow refuses a tag that doesn't match it, builds the macOS and Linux downloads `scripts/install.sh` fetches (both binaries, the standalone dashboard, the Bun that runs it, `scripts/broadcom`), smoke-tests each, publishes them, then publishes broadcom-proxy to crates.io.
@@ -24,7 +24,8 @@ The pool spends cheapest first: plans, then free credit, then paid extra usage. 
 | `apps/web/app/`             | routes: read, derive, render                                                      | features, lib      |
 | `apps/web/features/<page>/` | a page's components, its `read.ts` and `actions.ts`                               | lib                |
 | `apps/web/lib/proxy/`       | the `Proxy` service, every payload's Effect Schema, reads pages share             | nothing in the app |
-| `apps/web/lib/<domain>/`    | pool, usage, files, plugins, executor, settings, time, live: logic and adapters   | lib                |
+| `apps/web/lib/<domain>/`    | pool, usage, settings, time, live: logic and adapters                             | lib                |
+| `apps/web/app/(extension)/` | git-ignored: pages someone else adds, with `pages.ts` for the nav (README)        | lib, `@extension/` |
 | `apps/web/lib/outside.ts`   | the only home of React effects                                                    | react              |
 | `apps/web/components/`      | `ui/` from `bunx shadcn add`; `viz/` shared chart pieces (SVG, d3-scale/d3-shape) | lib                |
 | `crates/proxy`              | broadcom-proxy, the Rust account pool; `DESIGN.md`                                | its own deps       |

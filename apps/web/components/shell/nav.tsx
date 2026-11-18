@@ -1,5 +1,6 @@
 "use client";
 
+import { pages } from "@extension/pages";
 import { ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+export interface Page {
+  readonly href: string;
+  readonly name: string;
+}
+
 const groups = [
   [
     { href: "/", name: "Overview" },
@@ -22,13 +28,9 @@ const groups = [
     { href: "/live", name: "Live" },
     { href: "/accounts", name: "Accounts" },
   ],
-  [
-    { href: "/files", name: "Files" },
-    { href: "/plugins", name: "Plugins" },
-    { href: "/executor", name: "Executor" },
-  ],
+  pages,
   [{ href: "/settings", name: "Settings" }],
-] as const;
+].filter((group): group is readonly [Page, ...Page[]] => group.length > 0);
 
 const isCurrent = (href: string, path: string) =>
   href === "/" ? path === "/" : path.startsWith(href);
