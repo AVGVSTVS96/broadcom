@@ -19,7 +19,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: package.json
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup toolchain install
       - run: cargo build --profile dist --locked -p broadcom-proxy -p broadcom-usage
       - run: bun install --frozen-lockfile
       - run: bun --filter @broadcom/web build

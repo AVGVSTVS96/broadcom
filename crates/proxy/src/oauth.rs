@@ -181,10 +181,7 @@ async fn refresh(app: &App, login: &Login) -> Result<Fields, RefreshError> {
     let status = response.status();
     let body: Value = response.json().await.unwrap_or_default();
     if !status.is_success() {
-        let reason = body
-            .pointer("/error")
-            .map(Value::to_string)
-            .unwrap_or_default();
+        let reason = body.pointer("/error").map_or_default(Value::to_string);
         return Err(if reason.contains("invalid_grant") {
             RefreshError::SignedOut(reason)
         } else {
@@ -580,9 +577,7 @@ async fn exchange(
     anyhow::ensure!(
         status.is_success(),
         "The code exchange failed ({status}): {}",
-        body.pointer("/error")
-            .map(Value::to_string)
-            .unwrap_or_default()
+        body.pointer("/error").map_or_default(Value::to_string)
     );
     let tokens: Tokens = serde_json::from_value(body)?;
     let mut login = Login {

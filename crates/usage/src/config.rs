@@ -65,9 +65,7 @@ fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D:
 }
 
 fn home() -> PathBuf {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default()
+    std::env::var_os("HOME").map_or_default(PathBuf::from)
 }
 
 pub fn expand(path: &Path) -> PathBuf {

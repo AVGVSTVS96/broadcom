@@ -89,8 +89,7 @@ impl GitHub {
                 .pass(&mut deliver)
                 .await
                 .err()
-                .map(|err| format!("{err:#}"))
-                .unwrap_or_default();
+                .map_or_default(|err| format!("{err:#}"));
             if problem != reported {
                 if problem.is_empty() {
                     tracing::info!("GitHub Actions records are current again");

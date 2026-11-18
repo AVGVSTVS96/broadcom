@@ -148,9 +148,8 @@ impl Resolver {
                 if let Some(common) = read_metadata(&git_dir.join("commondir")) {
                     git_dir = clean(&git_dir.join(common.trim()));
                 }
-                let origin = read_metadata(&git_dir.join("config"))
-                    .map(|c| origin_remote(&c))
-                    .unwrap_or_default();
+                let origin =
+                    read_metadata(&git_dir.join("config")).map_or_default(|c| origin_remote(&c));
                 if !origin.is_empty() {
                     return Some(origin);
                 }

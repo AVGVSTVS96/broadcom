@@ -65,9 +65,7 @@ fn open(config: Config) -> Result<App> {
         local,
         pricing.policy(),
     )?);
-    let key = std::fs::read_to_string(&config.key_file)
-        .map(|k| k.trim().to_string())
-        .unwrap_or_default();
+    let key = std::fs::read_to_string(&config.key_file).map_or_default(|k| k.trim().to_string());
     let deck = Arc::new(Deck::new(config.clone(), store.clone()));
     Ok(App {
         config,

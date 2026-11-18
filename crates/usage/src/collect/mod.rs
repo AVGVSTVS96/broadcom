@@ -100,8 +100,7 @@ fn env_dirs(name: &str) -> Vec<PathBuf> {
 
 fn base(path: &Path) -> String {
     path.file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default()
+        .map_or_default(|n| n.to_string_lossy().into_owned())
 }
 
 impl Collector {
@@ -238,8 +237,7 @@ impl Collector {
         let logs: Vec<&LogFile> = self
             .listing
             .as_ref()
-            .map(|l| l.logs.values().collect())
-            .unwrap_or_default();
+            .map_or_default(|l| l.logs.values().collect());
         let cached = cache::files(&self.db)?;
         let cold = cached.is_empty();
         let stale: Vec<usize> = (0..logs.len())

@@ -65,7 +65,7 @@ pub fn parse_query(query: &str) -> Query {
             .entry(key.into_owned())
             .or_insert_with(|| value.into_owned());
     }
-    let get = |key: &str| params.get(key).map(String::as_str).unwrap_or_default();
+    let get = |key: &str| params.get(key).map_or_default(String::as_str);
     let mut filter = BTreeMap::new();
     for dimension in DIMENSIONS {
         let mut values: Vec<String> = get(&format!("w.{dimension}"))

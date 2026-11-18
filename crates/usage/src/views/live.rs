@@ -69,13 +69,11 @@ pub struct Processes {
 }
 
 fn sorted_entries(dir: &Path) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(dir)
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok()?.file_name().into_string().ok())
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut names: Vec<String> = std::fs::read_dir(dir).map_or_default(|entries| {
+        entries
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .collect()
+    });
     names.sort();
     names
 }

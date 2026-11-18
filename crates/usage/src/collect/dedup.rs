@@ -209,9 +209,7 @@ fn filter_codex_replays(files: &mut [Parsed]) {
                 .entry(p)
                 .or_insert_with(|| files[p].events.iter().map(|e| key(&e.usage)).collect());
         }
-        let parent_compactions = parent
-            .map(|p| files[p].compaction_ids.clone())
-            .unwrap_or_default();
+        let parent_compactions = parent.map_or_default(|p| files[p].compaction_ids.clone());
         let replays = parent.and_then(|p| parent_replays.get(&p));
         let child = &files[c];
         let keep: Vec<bool> = child

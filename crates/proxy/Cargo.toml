@@ -2,6 +2,7 @@
 name = "broadcom-proxy"
 version = "0.1.0"
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "One address for all your Claude subscriptions: a Claude account pool for Claude Code"
 repository.workspace = true

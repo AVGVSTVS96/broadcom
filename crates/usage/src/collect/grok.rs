@@ -304,8 +304,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
         for group in subdirectories(&real) {
             let base = group
                 .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
+                .map_or_default(|n| n.to_string_lossy().into_owned());
             let mut group_project = path_unescape(&base)
                 .filter(|d| d.starts_with('/'))
                 .unwrap_or_default();
@@ -336,8 +335,7 @@ pub fn collect(roots: &[PathBuf]) -> (Vec<Parsed>, Vec<String>) {
                 if s.id.is_empty() {
                     s.id = directory
                         .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_default();
+                        .map_or_default(|n| n.to_string_lossy().into_owned());
                 }
                 if s.project.is_empty() {
                     s.project.clone_from(&group_project);

@@ -210,8 +210,7 @@ pub async fn read_usage(app: &App, account: &str, token: &str, now: i64) {
     if !stale {
         a.resets = body
             .cedar_ember
-            .map(|c| c.grants)
-            .unwrap_or_default()
+            .map_or_default(|c| c.grants)
             .iter()
             .filter_map(grant)
             .collect();
@@ -240,8 +239,7 @@ fn grant(g: &Value) -> Option<Reset> {
     let clears: Vec<&str> = g
         .get("clears")
         .and_then(Value::as_array)
-        .map(|c| c.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
+        .map_or_default(|c| c.iter().filter_map(Value::as_str).collect());
     let kind = if flag("gives_back_weekly") == Some(true) {
         "fable".to_string()
     } else if !text("type").is_empty() {
@@ -337,8 +335,7 @@ pub async fn spend(app: &App, account: &str, asked: bool, now: i64) -> bool {
         .accounts
         .iter()
         .find(|a| a.id() == account)
-        .map(|a| a.label().to_string())
-        .unwrap_or_default();
+        .map_or_default(|a| a.label().to_string());
     let Some((claim, resent)) = claim(app, account, &mut plan, &why, now) else {
         return false;
     };

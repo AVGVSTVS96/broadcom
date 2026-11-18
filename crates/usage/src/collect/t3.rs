@@ -51,8 +51,7 @@ pub fn read(directory: &Path, base_url: &str) -> BTreeMap<String, Metadata> {
         .filter(|m| m.is_file() && m.len() <= 512)
         .and_then(|_| std::fs::read(directory.join("environment-id")).ok())
         .and_then(|data| String::from_utf8(data).ok())
-        .map(|s| text(Some(&Cell::Text(s)), 512))
-        .unwrap_or_default();
+        .map_or_default(|s| text(Some(&Cell::Text(s)), 512));
     let mut deleted = HashSet::new();
     for name in ["statev2.sqlite", "state.sqlite"] {
         let file = directory.join(name);
@@ -119,7 +118,7 @@ fn thread_url(base: &str, environment_id: &str, thread_id: &str) -> String {
     let Some(host) = u.host_str() else {
         return String::new();
     };
-    let port = u.port().map(|p| format!(":{p}")).unwrap_or_default();
+    let port = u.port().map_or_default(|p| format!(":{p}"));
     format!(
         "{}://{}{port}{}/{}/{}",
         u.scheme(),

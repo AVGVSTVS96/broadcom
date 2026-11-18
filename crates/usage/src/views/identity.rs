@@ -148,7 +148,7 @@ pub fn who_of(names: &Names, s: SessionRef) -> Who {
             ..Who::default()
         };
     }
-    let title = s.title.map(str::trim).unwrap_or_default();
+    let title = s.title.map_or_default(str::trim);
     let found = names
         .current
         .get(s.session_id)

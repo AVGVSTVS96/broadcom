@@ -99,31 +99,25 @@ pub fn now_ms() -> i64 {
 
 /// A time as the records write it: RFC 3339 in UTC.
 pub fn utc(ms: i64) -> String {
-    jiff::Timestamp::from_millisecond(ms)
-        .map(|t| t.to_string())
-        .unwrap_or_default()
+    jiff::Timestamp::from_millisecond(ms).map_or_default(|t| t.to_string())
 }
 
 /// A time as credential files write it: RFC 3339 with the local offset.
 pub fn local(ms: i64) -> String {
-    jiff::Timestamp::from_millisecond(ms)
-        .map(|t| {
-            t.to_zoned(jiff::tz::TimeZone::system())
-                .strftime("%Y-%m-%dT%H:%M:%S%:z")
-                .to_string()
-        })
-        .unwrap_or_default()
+    jiff::Timestamp::from_millisecond(ms).map_or_default(|t| {
+        t.to_zoned(jiff::tz::TimeZone::system())
+            .strftime("%Y-%m-%dT%H:%M:%S%:z")
+            .to_string()
+    })
 }
 
 /// A time as people read it in the reset plan: "Mon Jan 2 3:04pm", local.
 pub fn when(ms: i64) -> String {
-    jiff::Timestamp::from_millisecond(ms)
-        .map(|t| {
-            t.to_zoned(jiff::tz::TimeZone::system())
-                .strftime("%a %b %-d %-I:%M%P")
-                .to_string()
-        })
-        .unwrap_or_default()
+    jiff::Timestamp::from_millisecond(ms).map_or_default(|t| {
+        t.to_zoned(jiff::tz::TimeZone::system())
+            .strftime("%a %b %-d %-I:%M%P")
+            .to_string()
+    })
 }
 
 pub fn parse_ms(text: &str) -> Option<i64> {

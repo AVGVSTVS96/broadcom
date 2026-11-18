@@ -69,9 +69,7 @@ impl<'a> Val<'a> {
 
     /// A trimmed string value, or "" for anything else.
     pub fn text(&self) -> String {
-        self.str()
-            .map(|s| js_trim(&s).to_string())
-            .unwrap_or_default()
+        self.str().map_or_default(|s| js_trim(&s).to_string())
     }
 
     pub fn num(&self) -> Option<f64> {
@@ -96,8 +94,7 @@ impl<'a> Val<'a> {
     pub fn get(&self, name: &str) -> Val<'a> {
         self.members()
             .find(|(key, _)| key == name)
-            .map(|(_, v)| Val::parse(v))
-            .unwrap_or_default()
+            .map_or_default(|(_, v)| Val::parse(v))
     }
 
     pub fn members(&self) -> Members<'a> {
