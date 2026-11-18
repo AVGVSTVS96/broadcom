@@ -2,6 +2,8 @@
 
 A Claude account pool and its dashboard: which account takes new work, how much each plan and free credit has left, how fast it's going, how many tokens it has spent and who spent them, and adding or removing accounts. Also hosts pages for the machine it runs on (Files, Plugins, Executor).
 
+Never start a second pool on the same logins: refresh tokens rotate, so each pool signs the other out. Another machine uses the one pool through `broadcom connect <url>`.
+
 The pool spends cheapest first: plans, then free credit, then paid extra usage. Free credit costs nothing: the monthly API credit a Max or Ultra plan includes, and any promotional or cloud credit, held in API keys in an organization with no card, so they need no extra-usage switch. Paid extra usage bills money, and only on an account whose owner turned extra usage on. Call each by those names; "API credit" alone doesn't say which.
 
 ## Commands

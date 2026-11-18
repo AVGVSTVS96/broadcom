@@ -20,13 +20,13 @@ broadcom-proxy login     # once per Claude account: open the link, paste the cod
 broadcom-proxy           # serves on 127.0.0.1:8317
 ```
 
-The first run writes a client key to `~/.config/broadcom-proxy/client-keys`. Give it to Claude Code:
+The first run writes a client key to `~/.config/broadcom-proxy/client-keys`. Point Claude Code at the pool with it, here or on any machine that reaches `listen`:
 
 ```sh
-ANTHROPIC_BASE_URL=http://127.0.0.1:8317 \
-ANTHROPIC_CUSTOM_HEADERS="X-Api-Key: $(head -1 ~/.config/broadcom-proxy/client-keys)" \
-claude
+BROADCOM_KEY=$(head -1 ~/.config/broadcom-proxy/client-keys) broadcom-proxy connect http://127.0.0.1:8317
 ```
+
+That checks the pool takes the key, sets `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `~/.claude/settings.json`, and has Claude Code answer once through the pool. Without `BROADCOM_KEY` it asks for the key.
 
 ## How it picks an account
 

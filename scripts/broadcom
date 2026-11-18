@@ -9,8 +9,15 @@ port=${BROADCOM_PORT:-4840}
 
 case ${1:-} in
 "") ;;
+connect)
+  shift
+  exec "$root/bin/broadcom-proxy" connect "$@"
+  ;;
 -h | --help)
-  echo "usage: broadcom    sign in a first Claude account if there's none, then run the pool, usage service and dashboard"
+  cat <<'EOF'
+usage: broadcom                sign in a first Claude account if there's none, then run the pool, usage service and dashboard
+       broadcom connect <url>  point Claude Code on this machine at the pool at <url>, with the key in BROADCOM_KEY or asked for
+EOF
   exit 0
   ;;
 *)
@@ -54,8 +61,7 @@ cat <<EOF
 Dashboard: http://127.0.0.1:$port
 
 Point Claude Code at the pool:
-  export ANTHROPIC_BASE_URL=http://127.0.0.1:8317
-  export ANTHROPIC_CUSTOM_HEADERS="X-Api-Key: \$(head -1 ~/.config/broadcom-proxy/client-keys)"
+  BROADCOM_KEY=\$(head -1 ~/.config/broadcom-proxy/client-keys) broadcom connect http://127.0.0.1:8317
 
 EOF
 

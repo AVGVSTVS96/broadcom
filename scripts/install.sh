@@ -31,6 +31,9 @@ case ":$PATH:" in
 *) echo "Add it to your PATH: export PATH=\"$bin:\$PATH\"" ;;
 esac
 
+if [ $# -gt 0 ]; then
+  exec "$dir/bin/broadcom" "$@"
+fi
 if (exec </dev/tty) 2>/dev/null; then
   exec "$dir/bin/broadcom" </dev/tty
 fi

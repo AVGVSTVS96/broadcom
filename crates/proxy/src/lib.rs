@@ -10,6 +10,7 @@ use axum::{
 pub mod accounts;
 pub mod app;
 pub mod config;
+pub mod connect;
 pub mod files;
 pub mod forward;
 pub mod live;

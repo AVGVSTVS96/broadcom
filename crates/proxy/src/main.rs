@@ -9,7 +9,7 @@ use anyhow::Context;
 use broadcom_proxy::{
     app::{App, Endpoints},
     config::{Config, ensure_secret},
-    manage,
+    connect, manage,
     oauth::{self, Provider, Status},
     sampler,
 };
@@ -20,6 +20,8 @@ const DRAIN: Duration = Duration::from_mins(10);
 const USAGE: &str = "\
 usage: broadcom-proxy [config.json]        run the pool
        broadcom-proxy login [config.json]  add a Claude account
+       broadcom-proxy connect <url>        point Claude Code on this machine at the pool at <url>,
+                                           with the key in BROADCOM_KEY or asked for
 
 The config defaults to ~/.config/broadcom-proxy/config.json; without one, every default applies.";
 
@@ -29,6 +31,10 @@ async fn main() -> anyhow::Result<()> {
     if args.iter().any(|a| a == "-h" || a == "--help") {
         println!("{USAGE}");
         return Ok(());
+    }
+    if args.first().is_some_and(|a| a == "connect") {
+        let url = args.get(1).with_context(|| USAGE.to_string())?;
+        return connect(url.trim_end_matches('/')).await;
     }
     let login = args.first().is_some_and(|a| a == "login");
     if login {
@@ -125,6 +131,47 @@ async fn add_account(app: Arc<App>) -> anyhow::Result<()> {
         app.config.credentials_dir.display()
     );
     Ok(())
+}
+
+/// Checks the pool takes the key, writes it into Claude Code's settings, then has Claude Code
+/// answer once through it.
+async fn connect(url: &str) -> anyhow::Result<()> {
+    let key = match std::env::var("BROADCOM_KEY") {
+        Ok(key) => key,
+        Err(_) => rpassword::prompt_password(format!("Client key for {url}: "))
+            .context("no BROADCOM_KEY set and no terminal to ask for it")?,
+    };
+    let key = key.trim();
+    connect::check(url, key).await?;
+    let settings = connect::settings_path();
+    connect::write(&settings, url, key)?;
+    println!("Claude Code now uses {url} ({}).", settings.display());
+
+    let reply = tokio::process::Command::new("claude")
+        .args(["-p", "--model", "haiku", "Reply with the word ok."])
+        .stdin(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .output();
+    match tokio::time::timeout(Duration::from_mins(2), reply).await {
+        Ok(Ok(out)) if out.status.success() => {
+            println!(
+                "It answered through the pool: {}",
+                String::from_utf8_lossy(&out.stdout).trim()
+            );
+            Ok(())
+        }
+        Ok(Ok(out)) => anyhow::bail!(
+            "Claude Code got no answer through {url}: {}{}",
+            String::from_utf8_lossy(&out.stdout).trim(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ),
+        Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+            println!("Claude Code isn't installed here yet; it will use the pool once it is.");
+            Ok(())
+        }
+        Ok(Err(e)) => Err(e).context("running claude"),
+        Err(_) => anyhow::bail!("Claude Code got no answer through {url} in 2 minutes"),
+    }
 }
 
 /// The socket systemd passed in, which holds the port across restarts, or a fresh one.

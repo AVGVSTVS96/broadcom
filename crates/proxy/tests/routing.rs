@@ -275,6 +275,18 @@ async fn a_request_past_axums_default_body_limit_goes_through() {
 }
 
 #[tokio::test]
+async fn connect_checks_the_pool_takes_the_key() {
+    let p = pool(&[]).await;
+    broadcom_proxy::connect::check(&p.proxy, "client-key")
+        .await
+        .unwrap();
+    let refused = broadcom_proxy::connect::check(&p.proxy, "wrong")
+        .await
+        .unwrap_err();
+    assert!(refused.to_string().contains("401"));
+}
+
+#[tokio::test]
 async fn a_free_key_needs_no_extra_usage() {
     let p = pool(&[("free", "free")]).await;
     p.plans_out();
