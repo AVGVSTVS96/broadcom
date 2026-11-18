@@ -259,6 +259,22 @@ async fn plans_then_free_credit_then_paid_extra_usage() {
 }
 
 #[tokio::test]
+async fn a_request_past_axums_default_body_limit_goes_through() {
+    let p = pool(&[]).await;
+    let screenshots = "a".repeat(8 << 20);
+    let response = p
+        .http
+        .post(format!("{}/v1/messages", p.proxy))
+        .header("x-api-key", "client-key")
+        .json(&json!({"model": "claude-x", "max_tokens": 1, "messages": [{"role": "user", "content": screenshots}]}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(p.up.served().len(), 1);
+}
+
+#[tokio::test]
 async fn a_free_key_needs_no_extra_usage() {
     let p = pool(&[("free", "free")]).await;
     p.plans_out();
