@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS cursors (
   offset INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_proxy ON events (account_id, millis) WHERE source = 'proxy';
+CREATE INDEX IF NOT EXISTS events_proxy_since ON events (millis) WHERE source = 'proxy' AND gone = 0;
 CREATE INDEX IF NOT EXISTS events_model ON events (raw_model);
 ";
 
