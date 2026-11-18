@@ -3,8 +3,8 @@ Description=broadcom: the BROADCOM dashboard (Next.js)
 After=network-online.target tailscaled.service cliproxyapi.service
 
 [Service]
-WorkingDirectory=%h/Developer/broadcom/apps/web
-ExecStart=%h/Developer/broadcom/apps/web/node_modules/.bin/next start -H 127.0.0.1 -p 4840
+WorkingDirectory=%h/.local/share/pipeline/broadcom/apps/web
+ExecStart=%h/.local/share/pipeline/broadcom/apps/web/node_modules/.bin/next start -H 127.0.0.1 -p 4840
 Environment=NODE_ENV=production NEXT_MANUAL_SIG_HANDLE=1 BROADCOM_PROXY=http://127.0.0.1:8317
 EnvironmentFile=-%h/.config/broadcom/slot
 Restart=on-failure
