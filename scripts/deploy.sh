@@ -22,7 +22,7 @@ else
 fi
 [ -z "$changed" ] && [ "$(cat "$state/built" 2>/dev/null)" = "$head $live" ] && { echo "already built: $(git log -1 --format='%h %s') in $live"; exit 0; }
 bun install "$([ -e "$mount/package.json" ] && echo --no-save || echo --frozen-lockfile)" --silent
-rm -rf "apps/web/$next"
+rm -rf "apps/web/$next" apps/web/.next apps/web/.next-*/types
 BROADCOM_DIST=$next bun run --cwd apps/web build >/tmp/broadcom-build.log 2>&1 || { rm -f "$state/built"; tail -30 /tmp/broadcom-build.log; exit 1; }
 previous=$(cat "$state/slot" 2>/dev/null || true)
 echo "BROADCOM_DIST=$next" >"$state/slot"
